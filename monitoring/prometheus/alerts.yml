@@ -1,0 +1,90 @@
+groups:
+  - name: luxride_critical
+    rules:
+      - alert: PaidButNotConfirmed
+        expr: paid_not_confirmed_count > 0 OR processing_paid_count > 0
+        for: 1m
+        labels:
+          severity: critical
+          service: luxride-backend
+        annotations:
+          summary: "Payment received but reservation not confirmed"
+          description: "paid_not_confirmed={{ $value }} — client paid but booking was not auto-confirmed. Investigate immediately."
+
+      - alert: ReservationConflictAfterPayment
+        expr: increase(reservation_conflicts_total{reason="overlap_after_payment"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          service: luxride-backend
+        annotations:
+          summary: "Reservation conflict after payment"
+          description: "A paid booking hit an overlap conflict and may require manual review."
+
+      - alert: DbPoolExhausted
+        expr: db_pool_waiting > 0
+        for: 2m
+        labels:
+          severity: critical
+          service: luxride-backend
+        annotations:
+          summary: "Database connection pool exhausted"
+          description: "{{ $value }} clients waiting for a DB connection."
+
+  - name: luxride_warning
+    rules:
+      - alert: StripeWebhookFailed
+        expr: increase(stripe_webhook_failures_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: luxride-backend
+        annotations:
+          summary: "Stripe webhook failures detected"
+          description: "Webhook failures increased in the last 5 minutes."
+
+      - alert: CheckoutErrorRateHigh
+        expr: |
+          (
+            rate(checkout_abandoned_total[5m]) + rate(payment_failures_total[5m])
+          )
+          /
+          clamp_min(rate(checkout_started_total[5m]), 0.001)
+          > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          service: luxride-backend
+        annotations:
+          summary: "Checkout error rate above 5%"
+          description: "Checkout failures and abandonments exceed 5% of started checkouts."
+
+      - alert: TooMany500Errors
+        expr: sum(rate(http_requests_total{status_code=~"5.."}[5m])) > 0.1
+        for: 3m
+        labels:
+          severity: warning
+          service: luxride-backend
+        annotations:
+          summary: "High 5xx error rate"
+          description: "More than 0.1 5xx responses per second over 3 minutes."
+
+      - alert: AdminLoginFailuresSpike
+        expr: increase(admin_login_failures_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          service: luxride-backend
+        annotations:
+          summary: "Admin login failure spike"
+          description: "More than 10 failed admin login attempts in 5 minutes."
+
+      - alert: EmailConfirmationFailed
+        expr: increase(email_confirmation_failures_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: luxride-backend
+        annotations:
+          summary: "Booking confirmation email failed"
+          description: "At least one confirmation email failed to send."

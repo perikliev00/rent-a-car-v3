@@ -1,0 +1,15 @@
+{
+  "name": "luxride",
+  "private": true,
+  "scripts": {
+    "db:migrate": "npm --prefix backend run db:migrate --",
+    "db:seed": "npm --prefix backend run db:seed --",
+    "db:reset": "npm --prefix backend run db:reset --",
+    "db:backup": "npm --prefix backend run db:backup --",
+    "db:restore": "npm --prefix backend run db:restore --",
+    "db:setup": "npm --prefix backend run db:setup --",
+    "e2e": "npm --prefix e2e test",
+    "e2e:ui": "npm --prefix e2e run test:ui",
+    "e2e:install": "npm --prefix e2e exec playwright install --with-deps chromium"
+  }
+}
