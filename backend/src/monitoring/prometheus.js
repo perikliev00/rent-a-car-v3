@@ -1,0 +1,220 @@
+const client = require('prom-client');
+
+client.collectDefaultMetrics({ register: client.register });
+
+const httpRequestsTotal = new client.Counter({
+  name: 'http_requests_total',
+  help: 'Total HTTP requests',
+  labelNames: ['method', 'status_code', 'route'],
+});
+
+const httpRequestDurationMs = new client.Histogram({
+  name: 'http_request_duration_ms',
+  help: 'HTTP request duration in milliseconds',
+  labelNames: ['method', 'status_code', 'route'],
+  buckets: [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000],
+});
+
+const paymentFailuresTotal = new client.Counter({
+  name: 'payment_failures_total',
+  help: 'Total payment failures',
+});
+
+const webhookFailuresTotal = new client.Counter({
+  name: 'stripe_webhook_failures_total',
+  help: 'Total Stripe webhook failures',
+  labelNames: ['reason'],
+});
+
+const errorsTotal = new client.Counter({
+  name: 'errors_total',
+  help: 'Total application errors',
+});
+
+const checkoutStartedTotal = new client.Counter({
+  name: 'checkout_started_total',
+  help: 'Checkout sessions started',
+});
+
+const checkoutCompletedTotal = new client.Counter({
+  name: 'checkout_completed_total',
+  help: 'Checkout sessions completed successfully',
+});
+
+const checkoutAbandonedTotal = new client.Counter({
+  name: 'checkout_abandoned_total',
+  help: 'Checkout sessions abandoned or expired',
+});
+
+const reservationConflictsTotal = new client.Counter({
+  name: 'reservation_conflicts_total',
+  help: 'Reservation conflicts',
+  labelNames: ['reason'],
+});
+
+const adminLoginFailuresTotal = new client.Counter({
+  name: 'admin_login_failures_total',
+  help: 'Failed admin login attempts',
+});
+
+const emailConfirmationFailuresTotal = new client.Counter({
+  name: 'email_confirmation_failures_total',
+  help: 'Failed booking confirmation emails',
+});
+
+const businessEventsTotal = new client.Counter({
+  name: 'business_events_total',
+  help: 'Business event occurrences',
+  labelNames: ['event'],
+});
+
+const dbQueryDurationMs = new client.Histogram({
+  name: 'db_query_duration_ms',
+  help: 'Database query duration in milliseconds',
+  labelNames: ['operation'],
+  buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500],
+});
+
+const paidNotConfirmedCount = new client.Gauge({
+  name: 'paid_not_confirmed_count',
+  help: 'Reservations paid but needing manual review',
+});
+
+const processingPaidCount = new client.Gauge({
+  name: 'processing_paid_count',
+  help: 'Reservations stuck in processing_payment with Stripe session',
+});
+
+const activeReservationsCount = new client.Gauge({
+  name: 'active_reservations_count',
+  help: 'Active hold reservations (pending_payment or processing_payment)',
+});
+
+const unresolvedPaymentFailuresCount = new client.Gauge({
+  name: 'unresolved_payment_failures_count',
+  help: 'Unresolved payment failure records',
+});
+
+const dbPoolTotal = new client.Gauge({
+  name: 'db_pool_total',
+  help: 'Database connection pool total connections',
+});
+
+const dbPoolIdle = new client.Gauge({
+  name: 'db_pool_idle',
+  help: 'Database connection pool idle connections',
+});
+
+const dbPoolWaiting = new client.Gauge({
+  name: 'db_pool_waiting',
+  help: 'Database connection pool waiting clients',
+});
+
+function normalizeRoute(route) {
+  if (!route || route === 'unknown') {
+    return 'unknown';
+  }
+  return route.replace(/\/\d+/g, '/:id');
+}
+
+function recordRequest(method, path, statusCode, durationMs, route) {
+  const normalizedRoute = normalizeRoute(route || path);
+  const labels = {
+    method: method || 'UNKNOWN',
+    status_code: String(statusCode),
+    route: normalizedRoute,
+  };
+
+  httpRequestsTotal.inc(labels);
+  httpRequestDurationMs.observe(labels, durationMs);
+}
+
+function recordDbQuery(operation, durationMs) {
+  dbQueryDurationMs.observe({ operation: operation || 'query' }, durationMs);
+}
+
+function incrementPaymentFailures() {
+  paymentFailuresTotal.inc();
+}
+
+function incrementWebhookFailures(reason = 'unknown') {
+  webhookFailuresTotal.inc({ reason });
+}
+
+function incrementErrors() {
+  errorsTotal.inc();
+}
+
+function incrementCheckoutStarted() {
+  checkoutStartedTotal.inc();
+}
+
+function incrementCheckoutCompleted() {
+  checkoutCompletedTotal.inc();
+}
+
+function incrementCheckoutAbandoned() {
+  checkoutAbandonedTotal.inc();
+}
+
+function incrementReservationConflict(reason) {
+  reservationConflictsTotal.inc({ reason: reason || 'unknown' });
+}
+
+function incrementAdminLoginFailures() {
+  adminLoginFailuresTotal.inc();
+}
+
+function incrementEmailConfirmationFailures() {
+  emailConfirmationFailuresTotal.inc();
+}
+
+function incrementBusinessEvent(event) {
+  if (!event) return;
+  businessEventsTotal.inc({ event });
+}
+
+function setGaugeValues(values) {
+  if (values.paidNotConfirmed != null) {
+    paidNotConfirmedCount.set(values.paidNotConfirmed);
+  }
+  if (values.processingPaid != null) {
+    processingPaidCount.set(values.processingPaid);
+  }
+  if (values.activeReservations != null) {
+    activeReservationsCount.set(values.activeReservations);
+  }
+  if (values.unresolvedPaymentFailures != null) {
+    unresolvedPaymentFailuresCount.set(values.unresolvedPaymentFailures);
+  }
+  if (values.dbPoolTotal != null) {
+    dbPoolTotal.set(values.dbPoolTotal);
+  }
+  if (values.dbPoolIdle != null) {
+    dbPoolIdle.set(values.dbPoolIdle);
+  }
+  if (values.dbPoolWaiting != null) {
+    dbPoolWaiting.set(values.dbPoolWaiting);
+  }
+}
+
+async function getMetrics() {
+  return client.register.metrics();
+}
+
+module.exports = {
+  recordRequest,
+  recordDbQuery,
+  incrementPaymentFailures,
+  incrementWebhookFailures,
+  incrementErrors,
+  incrementCheckoutStarted,
+  incrementCheckoutCompleted,
+  incrementCheckoutAbandoned,
+  incrementReservationConflict,
+  incrementAdminLoginFailures,
+  incrementEmailConfirmationFailures,
+  incrementBusinessEvent,
+  setGaugeValues,
+  getMetrics,
+};

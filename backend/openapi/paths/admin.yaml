@@ -1,0 +1,1089 @@
+/api/v1/admin/dashboard:
+  get:
+    tags: [Admin]
+    summary: Staff dashboard summary
+    description: |
+      x-permissions: staff (requireStaffApi)
+    security:
+      - cookieAuth: []
+    responses:
+      '200':
+        description: Dashboard metrics
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/users:
+  get:
+    tags: [Admin]
+    summary: List users
+    description: |
+      x-permissions: can_manage_users
+    security:
+      - cookieAuth: []
+    parameters:
+      - $ref: '#/components/parameters/PageQuery'
+      - $ref: '#/components/parameters/LimitQuery'
+    responses:
+      '200':
+        description: Users list
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+                      properties:
+                        users:
+                          type: array
+                          items:
+                            $ref: '#/components/schemas/User'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+  post:
+    tags: [Admin]
+    summary: Create user
+    description: |
+      x-permissions: can_manage_users
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [email, password]
+            properties:
+              email:
+                type: string
+                format: email
+              password:
+                type: string
+                format: password
+              firstName:
+                type: string
+              lastName:
+                type: string
+              roleIds:
+                type: array
+                items:
+                  type: string
+    responses:
+      '200':
+        description: User created
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/users/{id}:
+  get:
+    tags: [Admin]
+    summary: Get user by ID
+    description: |
+      x-permissions: can_manage_users
+    security:
+      - cookieAuth: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    responses:
+      '200':
+        description: User details
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+                      properties:
+                        user:
+                          $ref: '#/components/schemas/User'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '404':
+        description: Not found
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+  patch:
+    tags: [Admin]
+    summary: Update user
+    description: |
+      x-permissions: can_manage_users
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    responses:
+      '200':
+        description: User updated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+  delete:
+    tags: [Admin]
+    summary: Delete user
+    description: |
+      x-permissions: can_manage_users
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    responses:
+      '200':
+        description: User deleted
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/users/{userId}/roles:
+  put:
+    tags: [Admin]
+    summary: Replace user roles
+    description: |
+      x-permissions: can_manage_users
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [roleIds]
+            properties:
+              roleIds:
+                type: array
+                items:
+                  type: string
+    responses:
+      '200':
+        description: Roles replaced
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/users/{userId}/roles/{roleId}:
+  post:
+    tags: [Admin]
+    summary: Assign role to user
+    description: |
+      x-permissions: can_manage_users
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: roleId
+        in: path
+        required: true
+        schema:
+          type: string
+    responses:
+      '200':
+        description: Role assigned
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+  delete:
+    tags: [Admin]
+    summary: Revoke role from user
+    description: |
+      x-permissions: can_manage_users
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: roleId
+        in: path
+        required: true
+        schema:
+          type: string
+    responses:
+      '200':
+        description: Role revoked
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/rbac:
+  get:
+    tags: [Admin]
+    summary: RBAC catalog (roles and permissions)
+    description: |
+      x-permissions: can_manage_users
+    security:
+      - cookieAuth: []
+    responses:
+      '200':
+        description: Roles and permissions catalog
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/rbac/roles/{roleId}/permissions:
+  put:
+    tags: [Admin]
+    summary: Replace role permissions
+    description: |
+      x-permissions: can_manage_users
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - name: roleId
+        in: path
+        required: true
+        schema:
+          type: string
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [permissionIds]
+            properties:
+              permissionIds:
+                type: array
+                items:
+                  type: string
+    responses:
+      '200':
+        description: Permissions updated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/pricing:
+  get:
+    tags: [Admin]
+    summary: Get full pricing configuration
+    description: |
+      x-permissions: can_manage_pricing
+    security:
+      - cookieAuth: []
+    responses:
+      '200':
+        description: Pricing config
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/pricing/delivery-fees:
+  put:
+    tags: [Admin]
+    summary: Update delivery fees
+    description: |
+      x-permissions: can_manage_pricing
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    responses:
+      '200':
+        description: Delivery fees updated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/pricing/seasons:
+  post:
+    tags: [Admin]
+    summary: Create pricing season
+    description: |
+      x-permissions: can_manage_pricing
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    responses:
+      '200':
+        description: Season created
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/pricing/weekend:
+  put:
+    tags: [Admin]
+    summary: Update weekend pricing rules
+    description: |
+      x-permissions: can_manage_pricing
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    responses:
+      '200':
+        description: Weekend pricing updated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/pricing/discounts/{id}:
+  put:
+    tags: [Admin]
+    summary: Update discount rule
+    description: |
+      x-permissions: can_manage_pricing
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    responses:
+      '200':
+        description: Discount updated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/pricing/deposit:
+  put:
+    tags: [Admin]
+    summary: Update deposit rules
+    description: |
+      x-permissions: can_manage_pricing
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    responses:
+      '200':
+        description: Deposit updated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/pricing/extras:
+  post:
+    tags: [Admin]
+    summary: Create pricing extra
+    description: |
+      x-permissions: can_manage_pricing
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    responses:
+      '200':
+        description: Extra created
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/pricing/preview:
+  post:
+    tags: [Admin]
+    summary: Preview price calculation
+    description: |
+      x-permissions: can_manage_pricing
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    responses:
+      '200':
+        description: Price preview
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/pricing/global-fees/{feeKey}:
+  put:
+    tags: [Admin]
+    summary: Update a global fee by key
+    description: |
+      x-permissions: can_manage_pricing
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - name: feeKey
+        in: path
+        required: true
+        schema:
+          type: string
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    responses:
+      '200':
+        description: Global fee updated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/contacts:
+  get:
+    tags: [Admin]
+    summary: List contact form submissions
+    description: |
+      x-permissions: can_manage_contacts
+    security:
+      - cookieAuth: []
+    parameters:
+      - $ref: '#/components/parameters/PageQuery'
+      - $ref: '#/components/parameters/LimitQuery'
+    responses:
+      '200':
+        description: Contacts list
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/contacts/{id}:
+  patch:
+    tags: [Admin]
+    summary: Update contact status
+    description: |
+      x-permissions: can_manage_contacts
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+    responses:
+      '200':
+        description: Contact updated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+  delete:
+    tags: [Admin]
+    summary: Delete contact submission
+    description: |
+      x-permissions: can_manage_contacts
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    responses:
+      '200':
+        description: Contact deleted
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/audit-logs:
+  get:
+    tags: [Admin]
+    summary: List audit logs
+    description: |
+      x-permissions: can_view_audit_logs
+    security:
+      - cookieAuth: []
+    parameters:
+      - $ref: '#/components/parameters/PageQuery'
+      - $ref: '#/components/parameters/LimitQuery'
+      - $ref: '#/components/parameters/DateFromQuery'
+      - $ref: '#/components/parameters/DateToQuery'
+    responses:
+      '200':
+        description: Audit logs
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/notifications:
+  get:
+    tags: [Admin]
+    summary: List staff notifications
+    description: |
+      x-permissions: staff
+    security:
+      - cookieAuth: []
+    responses:
+      '200':
+        description: Notifications
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/realtime/stream:
+  get:
+    tags: [Admin]
+    summary: Server-sent events stream
+    description: |
+      Long-lived SSE stream for admin realtime updates.
+      x-permissions: staff (requireStaffApi)
+    security:
+      - cookieAuth: []
+    responses:
+      '200':
+        description: Event stream
+        content:
+          text/event-stream:
+            schema:
+              type: string
+              description: SSE event frames
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/api-keys:
+  get:
+    tags: [ApiKeys]
+    summary: List API keys
+    description: |
+      x-permissions: can_manage_api_keys
+    security:
+      - cookieAuth: []
+    responses:
+      '200':
+        description: API keys (secrets redacted)
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+  post:
+    tags: [ApiKeys]
+    summary: Create API key
+    description: |
+      Returns the raw key once. Store it securely.
+      x-permissions: can_manage_api_keys
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              name:
+                type: string
+              scopes:
+                type: array
+                items:
+                  type: string
+    responses:
+      '200':
+        description: API key created
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/api-keys/{id}:
+  delete:
+    tags: [ApiKeys]
+    summary: Revoke API key
+    description: |
+      x-permissions: can_manage_api_keys
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    responses:
+      '200':
+        description: API key revoked
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '404':
+        description: Not found
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'

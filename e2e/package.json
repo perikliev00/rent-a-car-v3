@@ -1,0 +1,16 @@
+{
+  "name": "luxride-e2e",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.52.0",
+    "@types/node": "^22.15.0",
+    "bcrypt": "^6.0.0",
+    "pg": "^8.22.0",
+    "stripe": "^18.1.0",
+    "typescript": "^5.8.3"
+  }
+}

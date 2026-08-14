@@ -1,0 +1,59 @@
+openapi: 3.0.3
+info:
+  title: LuxRide API
+  version: 1.0.0
+  description: |
+    LuxRide car rental API (v1).
+
+    Session auth uses an HttpOnly `sid` cookie. Mutating requests also require
+    an `X-CSRF-Token` header obtained from `GET /api/v1/auth/csrf`.
+
+    Public car/meta endpoints optionally accept `x-api-key`.
+    Stripe webhooks use `Stripe-Signature` at the unversioned `/webhook/stripe` path.
+servers:
+  - url: /
+    description: Current host
+tags:
+  - name: Auth
+    description: Authentication, CSRF, and current session
+  - name: Cars
+    description: Public fleet catalog, search, and meta
+  - name: Reservations
+    description: Holds, account reservations, and admin reservation ops
+  - name: Orders
+    description: Customer checkout orders and admin order management
+  - name: Payments
+    description: Stripe checkout and payment reconciliation
+  - name: Admin
+    description: Staff dashboard, users, RBAC, pricing, contacts, audit, notifications, API keys
+  - name: Calendar
+    description: Fleet calendar events, tasks, and scheduling
+  - name: Fleet
+    description: Admin car fleet, service, damage, documents, compliance
+  - name: Analytics
+    description: Revenue, utilization, and export analytics
+  - name: ApiKeys
+    description: Staff API key management
+paths: {}
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sid
+      description: Session cookie set after login
+    csrfHeader:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+      description: CSRF token from GET /api/v1/auth/csrf; required on mutating cookie-auth requests
+    apiKeyHeader:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: Optional API key for public/machine access
+    stripeSignature:
+      type: apiKey
+      in: header
+      name: Stripe-Signature
+      description: Stripe webhook signature header

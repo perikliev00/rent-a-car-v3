@@ -1,0 +1,671 @@
+/api/v1/admin/calendar/events:
+  get:
+    tags: [Calendar]
+    summary: List calendar events in a range
+    description: |
+      x-permissions: calendar.view or calendar.view_own
+    security:
+      - cookieAuth: []
+    parameters:
+      - $ref: '#/components/parameters/DateFromQuery'
+      - $ref: '#/components/parameters/DateToQuery'
+    responses:
+      '200':
+        description: Calendar events
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/calendar/day/{date}:
+  get:
+    tags: [Calendar]
+    summary: Day agenda
+    description: |
+      x-permissions: calendar.view or calendar.view_own
+    security:
+      - cookieAuth: []
+    parameters:
+      - name: date
+        in: path
+        required: true
+        schema:
+          type: string
+          format: date
+    responses:
+      '200':
+        description: Day events
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/calendar/car/{carId}:
+  get:
+    tags: [Calendar]
+    summary: Calendar events for a car
+    description: |
+      x-permissions: calendar.view or calendar.view_own
+    security:
+      - cookieAuth: []
+    parameters:
+      - $ref: '#/components/parameters/CarIdPath'
+      - $ref: '#/components/parameters/DateFromQuery'
+      - $ref: '#/components/parameters/DateToQuery'
+    responses:
+      '200':
+        description: Car calendar
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/calendar/availability:
+  get:
+    tags: [Calendar]
+    summary: Fleet availability overview
+    description: |
+      x-permissions: calendar.view or calendar.view_own
+    security:
+      - cookieAuth: []
+    parameters:
+      - $ref: '#/components/parameters/DateFromQuery'
+      - $ref: '#/components/parameters/DateToQuery'
+    responses:
+      '200':
+        description: Availability grid
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/calendar/conflicts:
+  get:
+    tags: [Calendar]
+    summary: Detect scheduling conflicts
+    description: |
+      x-permissions: calendar.view or calendar.view_own
+    security:
+      - cookieAuth: []
+    parameters:
+      - $ref: '#/components/parameters/DateFromQuery'
+      - $ref: '#/components/parameters/DateToQuery'
+    responses:
+      '200':
+        description: Conflicts
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/calendar/events/{id}/details:
+  get:
+    tags: [Calendar]
+    summary: Event details
+    description: |
+      x-permissions: calendar.view or calendar.view_own
+    security:
+      - cookieAuth: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    responses:
+      '200':
+        description: Event details
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '404':
+        description: Not found
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/calendar/events/{id}/move:
+  patch:
+    tags: [Calendar]
+    summary: Move calendar event
+    description: |
+      x-permissions: calendar.move
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              startDate:
+                type: string
+                format: date
+              endDate:
+                type: string
+                format: date
+              carId:
+                type: string
+                format: uuid
+    responses:
+      '200':
+        description: Event moved
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/calendar/events/{id}/resize:
+  patch:
+    tags: [Calendar]
+    summary: Resize calendar event
+    description: |
+      x-permissions: calendar.move
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              startDate:
+                type: string
+                format: date
+              endDate:
+                type: string
+                format: date
+    responses:
+      '200':
+        description: Event resized
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/calendar/manual-events:
+  post:
+    tags: [Calendar]
+    summary: Create manual calendar event
+    description: |
+      x-permissions: calendar.edit
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    responses:
+      '200':
+        description: Manual event created
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/calendar/manual-events/{id}:
+  patch:
+    tags: [Calendar]
+    summary: Update manual calendar event
+    description: |
+      x-permissions: calendar.edit
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    responses:
+      '200':
+        description: Manual event updated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+  delete:
+    tags: [Calendar]
+    summary: Delete manual calendar event
+    description: |
+      x-permissions: calendar.edit
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    responses:
+      '200':
+        description: Manual event deleted
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/calendar/tasks:
+  get:
+    tags: [Calendar]
+    summary: List calendar tasks
+    description: |
+      x-permissions: calendar.view or calendar.view_own
+    security:
+      - cookieAuth: []
+    parameters:
+      - $ref: '#/components/parameters/DateFromQuery'
+      - $ref: '#/components/parameters/DateToQuery'
+    responses:
+      '200':
+        description: Tasks list
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+  post:
+    tags: [Calendar]
+    summary: Create calendar task
+    description: |
+      x-permissions: calendar.edit
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    responses:
+      '200':
+        description: Task created
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/calendar/tasks/{id}:
+  patch:
+    tags: [Calendar]
+    summary: Update calendar task
+    description: |
+      x-permissions: calendar.edit
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    responses:
+      '200':
+        description: Task updated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+  delete:
+    tags: [Calendar]
+    summary: Delete calendar task
+    description: |
+      x-permissions: calendar.edit
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    responses:
+      '200':
+        description: Task deleted
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/calendar/tasks/{id}/status:
+  patch:
+    tags: [Calendar]
+    summary: Update calendar task status
+    description: |
+      x-permissions: calendar.edit
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [status]
+            properties:
+              status:
+                type: string
+    responses:
+      '200':
+        description: Task status updated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/calendar/reservations/{id}/cancel:
+  post:
+    tags: [Calendar]
+    summary: Cancel reservation from calendar
+    description: |
+      x-permissions: can_view_reservations_ops or calendar.move
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    requestBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              reason:
+                type: string
+    responses:
+      '200':
+        description: Reservation cancelled
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/calendar/assignable-staff:
+  get:
+    tags: [Calendar]
+    summary: List staff assignable to calendar tasks
+    description: |
+      x-permissions: calendar.assign_staff
+    security:
+      - cookieAuth: []
+    responses:
+      '200':
+        description: Assignable staff
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'

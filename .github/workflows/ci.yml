@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - run: npm ci
+      - run: npm test
+
+  frontend:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: front end
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: front end/package-lock.json
+
+      - run: npm ci
+      - run: npm run check
+
+  integration-e2e:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: luxride_test
+          POSTGRES_USER: luxride
+          POSTGRES_PASSWORD: luxride
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U luxride -d luxride_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://luxride:luxride@localhost:5432/luxride_test
+      RUN_INTEGRATION_TESTS: '1'
+      STRIPE_STUB: '1'
+      EMAIL_ENABLED: 'false'
+      STRIPE_SECRET: sk_test_ci_placeholder_key_123456789012
+      STRIPE_WEBHOOK_SECRET: whsec_ci_placeholder_secret
+      SESSION_SECRET: test-session-secret-32-chars-minimum!!
+      FRONTEND_BASE_URL: http://localhost:5173
+      CORS_ORIGINS: http://localhost:5173
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            front end/package-lock.json
+            e2e/package-lock.json
+
+      - name: Setup test database
+        working-directory: backend
+        run: npm ci && npm run db:setup
+
+      - name: Run backend unit tests
+        working-directory: backend
+        run: npm test
+
+      - name: Run DB consistency tests
+        working-directory: backend
+        env:
+          RUN_DB_TESTS: 'true'
+        run: npm run test:db
+
+      - name: Run integration tests
+        working-directory: backend
+        run: npm run test:integration
+
+      - name: Install E2E dependencies
+        run: |
+          npm --prefix e2e ci
+          npm run e2e:install
+
+      - name: Run Playwright E2E tests
+        run: npm run e2e

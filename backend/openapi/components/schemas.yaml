@@ -1,0 +1,130 @@
+# Shared schemas for LuxRide API.
+# Successful JSON responses follow ApiSuccessEnvelope: { success: true, data: ... }
+# Errors follow ApiError: { success: false, error: { code, message, ... } }
+
+ApiError:
+  type: object
+  required: [success, error]
+  properties:
+    success:
+      type: boolean
+      enum: [false]
+    error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Machine-readable error code
+        message:
+          type: string
+          description: Human-readable error message
+        requestId:
+          type: string
+        correlationId:
+          type: string
+
+ApiSuccessEnvelope:
+  type: object
+  required: [success, data]
+  properties:
+    success:
+      type: boolean
+      enum: [true]
+    data:
+      description: Endpoint-specific payload
+
+RateLimitedError:
+  allOf:
+    - $ref: '#/components/schemas/ApiError'
+    - type: object
+      example:
+        success: false
+        error:
+          code: RATE_LIMITED
+          message: Too many requests. Please try again later.
+
+User:
+  type: object
+  properties:
+    id:
+      type: string
+      format: uuid
+    email:
+      type: string
+      format: email
+    firstName:
+      type: string
+    lastName:
+      type: string
+    roles:
+      type: array
+      items:
+        type: string
+    createdAt:
+      type: string
+      format: date-time
+
+Car:
+  type: object
+  properties:
+    id:
+      type: string
+      format: uuid
+    make:
+      type: string
+    model:
+      type: string
+    year:
+      type: integer
+    category:
+      type: string
+    dailyRate:
+      type: number
+      format: double
+    locationId:
+      type: string
+    status:
+      type: string
+      enum: [available, rented, maintenance, inactive]
+    imageUrl:
+      type: string
+      format: uri
+
+Order:
+  type: object
+  properties:
+    id:
+      type: string
+      format: uuid
+    status:
+      type: string
+    carId:
+      type: string
+      format: uuid
+    customerEmail:
+      type: string
+      format: email
+    startDate:
+      type: string
+      format: date
+    endDate:
+      type: string
+      format: date
+    totalAmount:
+      type: number
+      format: double
+    currency:
+      type: string
+      example: EUR
+    createdAt:
+      type: string
+      format: date-time
+
+StripeWebhookAck:
+  type: object
+  required: [received]
+  properties:
+    received:
+      type: boolean
+      example: true

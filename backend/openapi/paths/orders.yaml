@@ -1,0 +1,420 @@
+/api/v1/orders:
+  post:
+    tags: [Orders]
+    summary: Create customer order
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+      - {}
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    responses:
+      '200':
+        description: Order created
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+                      properties:
+                        order:
+                          $ref: '#/components/schemas/Order'
+      '401':
+        description: Not authenticated (when required)
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/orders:
+  get:
+    tags: [Orders]
+    summary: List admin orders
+    description: |
+      x-permissions: can_view_orders
+    security:
+      - cookieAuth: []
+    parameters:
+      - $ref: '#/components/parameters/PageQuery'
+      - $ref: '#/components/parameters/LimitQuery'
+      - name: status
+        in: query
+        schema:
+          type: string
+    responses:
+      '200':
+        description: Orders list
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+  post:
+    tags: [Orders]
+    summary: Create order (admin)
+    description: |
+      x-permissions: can_edit_orders
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    responses:
+      '200':
+        description: Order created
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+                      properties:
+                        order:
+                          $ref: '#/components/schemas/Order'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/orders/expired:
+  get:
+    tags: [Orders]
+    summary: List expired orders
+    description: |
+      x-permissions: can_view_orders
+    security:
+      - cookieAuth: []
+    responses:
+      '200':
+        description: Expired orders
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/orders/deleted:
+  get:
+    tags: [Orders]
+    summary: List soft-deleted orders
+    description: |
+      x-permissions: can_view_orders
+    security:
+      - cookieAuth: []
+    responses:
+      '200':
+        description: Deleted orders
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/orders/deleted/empty:
+  post:
+    tags: [Orders]
+    summary: Permanently empty deleted orders
+    description: |
+      x-permissions: can_cancel_orders (purge)
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    responses:
+      '200':
+        description: Trash emptied
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/orders/new:
+  get:
+    tags: [Orders]
+    summary: Create-order form metadata
+    description: |
+      x-permissions: can_edit_orders
+    security:
+      - cookieAuth: []
+    responses:
+      '200':
+        description: Form defaults and options
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/orders/{id}:
+  get:
+    tags: [Orders]
+    summary: Get admin order by ID
+    description: |
+      x-permissions: can_view_orders
+    security:
+      - cookieAuth: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    responses:
+      '200':
+        description: Order details
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+                      properties:
+                        order:
+                          $ref: '#/components/schemas/Order'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '404':
+        description: Not found
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+  put:
+    tags: [Orders]
+    summary: Update admin order
+    description: |
+      x-permissions: can_edit_orders
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    responses:
+      '200':
+        description: Order updated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+  delete:
+    tags: [Orders]
+    summary: Soft-delete admin order
+    description: |
+      x-permissions: can_cancel_orders
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    responses:
+      '200':
+        description: Order deleted
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/orders/{id}/edit:
+  get:
+    tags: [Orders]
+    summary: Edit-order form metadata
+    description: |
+      x-permissions: can_edit_orders
+    security:
+      - cookieAuth: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    responses:
+      '200':
+        description: Edit form data
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '404':
+        description: Not found
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/orders/{id}/restore:
+  post:
+    tags: [Orders]
+    summary: Restore soft-deleted order
+    description: |
+      x-permissions: can_edit_orders
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    responses:
+      '200':
+        description: Order restored
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'

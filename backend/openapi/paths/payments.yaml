@@ -1,0 +1,195 @@
+/api/v1/checkout:
+  post:
+    tags: [Payments]
+    summary: Start Stripe Checkout session
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+      - {}
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    responses:
+      '200':
+        description: Checkout session created
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+                      properties:
+                        url:
+                          type: string
+                          format: uri
+                        sessionId:
+                          type: string
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/checkout/success:
+  get:
+    tags: [Payments]
+    summary: Checkout success callback
+    description: Confirms a completed Stripe Checkout session and returns order/payment state.
+    security:
+      - cookieAuth: []
+      - {}
+    parameters:
+      - name: session_id
+        in: query
+        required: false
+        schema:
+          type: string
+    responses:
+      '200':
+        description: Checkout confirmed
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/checkout/cancel:
+  post:
+    tags: [Payments]
+    summary: Cancel in-progress checkout
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+      - {}
+    responses:
+      '200':
+        description: Checkout cancelled
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+
+/api/v1/admin/payments:
+  get:
+    tags: [Payments]
+    summary: List payments
+    description: |
+      x-permissions: can_view_payments (or equivalent staff permission)
+    security:
+      - cookieAuth: []
+    parameters:
+      - $ref: '#/components/parameters/PageQuery'
+      - $ref: '#/components/parameters/LimitQuery'
+      - $ref: '#/components/parameters/DateFromQuery'
+      - $ref: '#/components/parameters/DateToQuery'
+    responses:
+      '200':
+        description: Payments list
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/payments/reconcile:
+  post:
+    tags: [Payments]
+    summary: Reconcile payments with Stripe
+    description: |
+      x-permissions: can_manage_payments (reconcile)
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    requestBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    responses:
+      '200':
+        description: Reconciliation result
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/webhook/stripe:
+  post:
+    tags: [Payments]
+    summary: Stripe webhook receiver
+    description: |
+      Unversioned Stripe webhook endpoint. Expects the **raw request body**
+      (do not JSON-parse before signature verification) and a valid
+      `Stripe-Signature` header.
+    security:
+      - stripeSignature: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            description: Stripe event payload (verified via signature)
+            additionalProperties: true
+    responses:
+      '200':
+        description: Event acknowledged
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StripeWebhookAck'
+      '400':
+        description: Invalid signature or payload
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                received:
+                  type: boolean
+                  example: false
+                error:
+                  type: string

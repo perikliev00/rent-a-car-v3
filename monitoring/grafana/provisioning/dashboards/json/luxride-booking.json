@@ -1,0 +1,86 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 0 },
+      "id": 1,
+      "targets": [
+        {
+          "expr": "active_reservations_count",
+          "legendFormat": "active",
+          "refId": "A"
+        }
+      ],
+      "title": "Active Reservations",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 0 },
+      "id": 2,
+      "targets": [
+        {
+          "expr": "sum(rate(business_events_total{event=\"reservation.created\"}[5m]))",
+          "legendFormat": "created/s",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(business_events_total{event=\"reservation.confirmed\"}[5m]))",
+          "legendFormat": "confirmed/s",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(rate(business_events_total{event=\"reservation.cancelled\"}[5m]))",
+          "legendFormat": "cancelled/s",
+          "refId": "C"
+        }
+      ],
+      "title": "Reservation Lifecycle",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 },
+      "id": 3,
+      "targets": [
+        {
+          "expr": "sum(rate(reservation_conflicts_total[5m])) by (reason)",
+          "legendFormat": "{{reason}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Reservation Conflicts",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "id": 4,
+      "targets": [
+        {
+          "expr": "sum(rate(checkout_abandoned_total[5m]))",
+          "legendFormat": "abandoned/s",
+          "refId": "A"
+        }
+      ],
+      "title": "Checkout Abandoned",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": ["luxride", "booking"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timezone": "browser",
+  "title": "LuxRide Booking",
+  "uid": "luxride-booking",
+  "version": 1
+}

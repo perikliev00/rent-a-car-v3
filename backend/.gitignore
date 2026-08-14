@@ -1,0 +1,10 @@
+﻿.env
+.env.*
+!.env.example
+node_modules/
+src/public/images/uploads/
+coverage/
+dist/
+uploads/
+*.log
+.DS_Store

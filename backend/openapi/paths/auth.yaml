@@ -1,0 +1,178 @@
+/api/v1/auth/login:
+  post:
+    tags: [Auth]
+    summary: Log in with email and password
+    description: Creates a session cookie (`sid`). Subject to rate limiting.
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [email, password]
+            properties:
+              email:
+                type: string
+                format: email
+              password:
+                type: string
+                format: password
+    responses:
+      '200':
+        description: Login successful
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+                      properties:
+                        user:
+                          $ref: '#/components/schemas/User'
+      '401':
+        description: Invalid credentials
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '429':
+        description: Rate limited
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RateLimitedError'
+
+/api/v1/auth/signup:
+  post:
+    tags: [Auth]
+    summary: Register a new customer account
+    description: Creates a user and session. Subject to rate limiting.
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [email, password, firstName, lastName]
+            properties:
+              email:
+                type: string
+                format: email
+              password:
+                type: string
+                format: password
+              firstName:
+                type: string
+              lastName:
+                type: string
+              phone:
+                type: string
+    responses:
+      '200':
+        description: Signup successful
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+                      properties:
+                        user:
+                          $ref: '#/components/schemas/User'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '429':
+        description: Rate limited
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RateLimitedError'
+
+/api/v1/auth/logout:
+  post:
+    tags: [Auth]
+    summary: End current session
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    responses:
+      '200':
+        description: Logged out
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/auth/csrf:
+  get:
+    tags: [Auth]
+    summary: Get CSRF token
+    description: Returns a CSRF token for use in the `X-CSRF-Token` header on mutating requests.
+    security: []
+    responses:
+      '200':
+        description: CSRF token
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+                      properties:
+                        csrfToken:
+                          type: string
+
+/api/v1/auth/me:
+  get:
+    tags: [Auth]
+    summary: Current authenticated user
+    security:
+      - cookieAuth: []
+    responses:
+      '200':
+        description: Current user
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+                      properties:
+                        user:
+                          $ref: '#/components/schemas/User'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'

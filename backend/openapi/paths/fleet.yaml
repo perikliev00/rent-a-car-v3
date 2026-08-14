@@ -1,0 +1,907 @@
+/api/v1/admin/cars:
+  get:
+    tags: [Fleet]
+    summary: List fleet cars (admin)
+    description: |
+      x-permissions: can_manage_cars
+    security:
+      - cookieAuth: []
+    parameters:
+      - $ref: '#/components/parameters/PageQuery'
+      - $ref: '#/components/parameters/LimitQuery'
+    responses:
+      '200':
+        description: Fleet cars
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+                      properties:
+                        cars:
+                          type: array
+                          items:
+                            $ref: '#/components/schemas/Car'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+  post:
+    tags: [Fleet]
+    summary: Create fleet car
+    description: |
+      x-permissions: can_manage_cars
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    responses:
+      '200':
+        description: Car created
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/cars/fleet-alerts:
+  get:
+    tags: [Fleet]
+    summary: List fleet alerts
+    description: |
+      x-permissions: can_manage_fleet_alerts
+    security:
+      - cookieAuth: []
+    responses:
+      '200':
+        description: Fleet alerts
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/cars/fleet-alerts/reconcile:
+  post:
+    tags: [Fleet]
+    summary: Reconcile fleet alerts
+    description: |
+      x-permissions: can_manage_fleet_alerts
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    responses:
+      '200':
+        description: Alerts reconciled
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/cars/{id}:
+  get:
+    tags: [Fleet]
+    summary: Get admin car by ID
+    description: |
+      x-permissions: can_manage_cars
+    security:
+      - cookieAuth: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    responses:
+      '200':
+        description: Car details
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+                      properties:
+                        car:
+                          $ref: '#/components/schemas/Car'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '404':
+        description: Not found
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+  put:
+    tags: [Fleet]
+    summary: Update fleet car
+    description: |
+      x-permissions: can_manage_cars
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    responses:
+      '200':
+        description: Car updated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+  delete:
+    tags: [Fleet]
+    summary: Delete fleet car
+    description: |
+      x-permissions: can_manage_cars
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    responses:
+      '200':
+        description: Car deleted
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/cars/{id}/availability:
+  get:
+    tags: [Fleet]
+    summary: Car availability windows
+    description: |
+      x-permissions: can_manage_cars
+    security:
+      - cookieAuth: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+      - $ref: '#/components/parameters/DateFromQuery'
+      - $ref: '#/components/parameters/DateToQuery'
+    responses:
+      '200':
+        description: Availability
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/cars/{id}/status:
+  post:
+    tags: [Fleet]
+    summary: Update car status
+    description: |
+      x-permissions: can_manage_cars
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [status]
+            properties:
+              status:
+                type: string
+                enum: [available, rented, maintenance, inactive]
+    responses:
+      '200':
+        description: Status updated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/cars/{id}/service-records:
+  get:
+    tags: [Fleet]
+    summary: List service records
+    description: |
+      x-permissions: can_manage_cars
+    security:
+      - cookieAuth: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    responses:
+      '200':
+        description: Service records
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+  post:
+    tags: [Fleet]
+    summary: Create service record
+    description: |
+      x-permissions: can_manage_cars
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    responses:
+      '200':
+        description: Service record created
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/cars/{id}/service-records/{recordId}:
+  put:
+    tags: [Fleet]
+    summary: Update service record
+    description: |
+      x-permissions: can_manage_cars
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+      - name: recordId
+        in: path
+        required: true
+        schema:
+          type: string
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    responses:
+      '200':
+        description: Service record updated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+  delete:
+    tags: [Fleet]
+    summary: Delete service record
+    description: |
+      x-permissions: can_manage_cars
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+      - name: recordId
+        in: path
+        required: true
+        schema:
+          type: string
+    responses:
+      '200':
+        description: Service record deleted
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/cars/{id}/damage-reports:
+  get:
+    tags: [Fleet]
+    summary: List damage reports
+    description: |
+      x-permissions: can_manage_cars
+    security:
+      - cookieAuth: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    responses:
+      '200':
+        description: Damage reports
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+  post:
+    tags: [Fleet]
+    summary: Create damage report
+    description: |
+      x-permissions: can_manage_cars
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    responses:
+      '200':
+        description: Damage report created
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/cars/{id}/damage-reports/{reportId}/resolve:
+  post:
+    tags: [Fleet]
+    summary: Resolve damage report
+    description: |
+      x-permissions: can_manage_cars
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+      - name: reportId
+        in: path
+        required: true
+        schema:
+          type: string
+    requestBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              note:
+                type: string
+    responses:
+      '200':
+        description: Damage report resolved
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/cars/{id}/damage-reports/{reportId}:
+  delete:
+    tags: [Fleet]
+    summary: Delete damage report
+    description: |
+      x-permissions: can_manage_cars
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+      - name: reportId
+        in: path
+        required: true
+        schema:
+          type: string
+    responses:
+      '200':
+        description: Damage report deleted
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/cars/{id}/documents:
+  get:
+    tags: [Fleet]
+    summary: List car documents
+    description: |
+      x-permissions: can_manage_cars
+    security:
+      - cookieAuth: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    responses:
+      '200':
+        description: Documents
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+  post:
+    tags: [Fleet]
+    summary: Upload car document
+    description: |
+      x-permissions: can_manage_cars
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    requestBody:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            properties:
+              file:
+                type: string
+                format: binary
+              kind:
+                type: string
+    responses:
+      '200':
+        description: Document uploaded
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/cars/{id}/documents/{docId}:
+  delete:
+    tags: [Fleet]
+    summary: Delete car document
+    description: |
+      x-permissions: can_manage_cars
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+      - name: docId
+        in: path
+        required: true
+        schema:
+          type: string
+    responses:
+      '200':
+        description: Document deleted
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/cars/{id}/compliance:
+  get:
+    tags: [Fleet]
+    summary: List compliance items
+    description: |
+      x-permissions: can_manage_cars
+    security:
+      - cookieAuth: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    responses:
+      '200':
+        description: Compliance items
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+  post:
+    tags: [Fleet]
+    summary: Create compliance item
+    description: |
+      x-permissions: can_manage_cars
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    responses:
+      '200':
+        description: Compliance item created
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/cars/{id}/compliance/{itemId}:
+  put:
+    tags: [Fleet]
+    summary: Update compliance item
+    description: |
+      x-permissions: can_manage_cars
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+      - name: itemId
+        in: path
+        required: true
+        schema:
+          type: string
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    responses:
+      '200':
+        description: Compliance item updated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+  delete:
+    tags: [Fleet]
+    summary: Delete compliance item
+    description: |
+      x-permissions: can_manage_cars
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+      - name: itemId
+        in: path
+        required: true
+        schema:
+          type: string
+    responses:
+      '200':
+        description: Compliance item deleted
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'

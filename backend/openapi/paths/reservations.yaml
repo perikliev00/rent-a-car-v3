@@ -1,0 +1,577 @@
+/api/v1/reservations/release:
+  post:
+    tags: [Reservations]
+    summary: Release active reservation hold
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    responses:
+      '200':
+        description: Hold released
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/reservations/release-and-rehold:
+  post:
+    tags: [Reservations]
+    summary: Release current hold and create a new hold
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              carId:
+                type: string
+                format: uuid
+              startDate:
+                type: string
+                format: date
+              endDate:
+                type: string
+                format: date
+    responses:
+      '200':
+        description: New hold created
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/account/reservations:
+  get:
+    tags: [Reservations]
+    summary: List current user reservations
+    security:
+      - cookieAuth: []
+    responses:
+      '200':
+        description: Reservations list
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/account/reservations/{id}:
+  get:
+    tags: [Reservations]
+    summary: Get account reservation by ID
+    security:
+      - cookieAuth: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    responses:
+      '200':
+        description: Reservation details
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '404':
+        description: Not found
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/account/reservations/{id}/travel:
+  patch:
+    tags: [Reservations]
+    summary: Update travel details on a reservation
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    responses:
+      '200':
+        description: Travel details updated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/account/reservations/{id}/cancel-request:
+  post:
+    tags: [Reservations]
+    summary: Request cancellation of a reservation
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    requestBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              reason:
+                type: string
+    responses:
+      '200':
+        description: Cancellation requested
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/account/reservations/{id}/pdf/{kind}:
+  get:
+    tags: [Reservations]
+    summary: Download reservation PDF
+    security:
+      - cookieAuth: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+      - name: kind
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [invoice, contract, voucher]
+    responses:
+      '200':
+        description: PDF document
+        content:
+          application/pdf:
+            schema:
+              type: string
+              format: binary
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '404':
+        description: Not found
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/reservations/ops-dashboard:
+  get:
+    tags: [Reservations]
+    summary: Reservation operations dashboard
+    description: |
+      Staff ops overview.
+      x-permissions: can_view_reservations_ops
+    security:
+      - cookieAuth: []
+    responses:
+      '200':
+        description: Ops dashboard data
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/reservations/cancellation-requests:
+  get:
+    tags: [Reservations]
+    summary: List cancellation requests
+    description: |
+      x-permissions: can_view_reservations_ops
+    security:
+      - cookieAuth: []
+    responses:
+      '200':
+        description: Cancellation requests
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/reservations/cancellation-requests/{id}/review:
+  post:
+    tags: [Reservations]
+    summary: Review a cancellation request
+    description: |
+      Approve or reject a customer cancellation request.
+      x-permissions: can_view_reservations_ops (review)
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [decision]
+            properties:
+              decision:
+                type: string
+                enum: [approve, reject]
+              note:
+                type: string
+    responses:
+      '200':
+        description: Review recorded
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/reservations/{id}:
+  get:
+    tags: [Reservations]
+    summary: Admin get reservation by ID
+    description: |
+      x-permissions: can_view_reservations_ops
+    security:
+      - cookieAuth: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    responses:
+      '200':
+        description: Reservation details
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '404':
+        description: Not found
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/reservations/{id}/status:
+  post:
+    tags: [Reservations]
+    summary: Update reservation status
+    description: |
+      x-permissions: can_view_reservations_ops (status update)
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [status]
+            properties:
+              status:
+                type: string
+    responses:
+      '200':
+        description: Status updated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/reservations/{id}/checklists:
+  get:
+    tags: [Reservations]
+    summary: Get pickup/return checklists
+    description: |
+      x-permissions: can_view_reservations_ops
+    security:
+      - cookieAuth: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    responses:
+      '200':
+        description: Checklists
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/reservations/{id}/pickup-checklist:
+  post:
+    tags: [Reservations]
+    summary: Submit pickup checklist
+    description: |
+      x-permissions: can_view_reservations_ops
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    responses:
+      '200':
+        description: Pickup checklist saved
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/reservations/{id}/return-checklist:
+  post:
+    tags: [Reservations]
+    summary: Submit return checklist
+    description: |
+      x-permissions: can_view_reservations_ops
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    responses:
+      '200':
+        description: Return checklist saved
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/admin/reservations/{id}/pdf/{kind}:
+  get:
+    tags: [Reservations]
+    summary: Admin download reservation PDF
+    description: |
+      x-permissions: can_view_reservations_ops
+    security:
+      - cookieAuth: []
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+      - name: kind
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [invoice, contract, voucher]
+    responses:
+      '200':
+        description: PDF document
+        content:
+          application/pdf:
+            schema:
+              type: string
+              format: binary
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '404':
+        description: Not found
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'

@@ -1,0 +1,173 @@
+/api/v1/cars:
+  get:
+    tags: [Cars]
+    summary: List available cars
+    description: Public fleet listing with optional filters.
+    security:
+      - {}
+      - apiKeyHeader: []
+    parameters:
+      - $ref: '#/components/parameters/PageQuery'
+      - $ref: '#/components/parameters/LimitQuery'
+      - name: category
+        in: query
+        schema:
+          type: string
+      - name: locationId
+        in: query
+        schema:
+          type: string
+    responses:
+      '200':
+        description: Car list
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+                      properties:
+                        cars:
+                          type: array
+                          items:
+                            $ref: '#/components/schemas/Car'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '429':
+        description: Rate limited
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RateLimitedError'
+
+/api/v1/cars/search:
+  get:
+    tags: [Cars]
+    summary: Search cars by availability window
+    security:
+      - {}
+      - apiKeyHeader: []
+    parameters:
+      - $ref: '#/components/parameters/DateFromQuery'
+      - $ref: '#/components/parameters/DateToQuery'
+      - name: locationId
+        in: query
+        schema:
+          type: string
+      - name: category
+        in: query
+        schema:
+          type: string
+    responses:
+      '200':
+        description: Matching cars
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+                      properties:
+                        cars:
+                          type: array
+                          items:
+                            $ref: '#/components/schemas/Car'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/cars/{carId}:
+  get:
+    tags: [Cars]
+    summary: Get car by ID
+    security:
+      - {}
+      - apiKeyHeader: []
+    parameters:
+      - $ref: '#/components/parameters/CarIdPath'
+    responses:
+      '200':
+        description: Car details
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+                      properties:
+                        car:
+                          $ref: '#/components/schemas/Car'
+      '404':
+        description: Car not found
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+
+/api/v1/locations:
+  get:
+    tags: [Cars]
+    summary: List pickup/dropoff locations
+    security:
+      - {}
+      - apiKeyHeader: []
+    responses:
+      '200':
+        description: Locations
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+
+/api/v1/pricing-info:
+  get:
+    tags: [Cars]
+    summary: Public pricing metadata
+    description: Seasons, extras, deposit rules, and related public pricing info.
+    security:
+      - {}
+      - apiKeyHeader: []
+    responses:
+      '200':
+        description: Pricing info
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+
+/api/v1/categories:
+  get:
+    tags: [Cars]
+    summary: List car categories
+    security:
+      - {}
+      - apiKeyHeader: []
+    responses:
+      '200':
+        description: Categories
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'

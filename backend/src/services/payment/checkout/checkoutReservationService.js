@@ -1,0 +1,153 @@
+const { getSessionId, buildExistingReservationSummary } = require('../../../utils/reservationHelpers');
+const { normalizeContactDetails } = require('../../paymentService');
+
+const {
+  findActiveReservationBySession,
+  extendReservationHold,
+  attachCarNameToReservation,
+  createPendingReservation,
+} = require('../../reservationService');
+const { changeStatus } = require('../../reservation/reservationStatusService');
+const { buildRenderOrderPageResponse } = require('./checkoutResponseFactory');
+
+async function resolveCheckoutReservation({ req, car, formData, startDate, endDate, pricing }) {
+  const trimmedContact = normalizeContactDetails(formData);
+  const sessionId = getSessionId(req);
+  const now = new Date();
+
+  let reservationDoc = await findActiveReservationBySession(req);
+  if (reservationDoc) {
+    reservationDoc = await attachCarNameToReservation(reservationDoc);
+  }
+
+  let createdReservationThisStep = false;
+
+  if (reservationDoc) {
+    const sameCar =
+      String(reservationDoc.carId?.id || reservationDoc.carId) === String(car.id);
+    const sameStart =
+      reservationDoc.pickupDate instanceof Date &&
+      reservationDoc.pickupDate.getTime() === startDate.getTime();
+    const sameEnd =
+      reservationDoc.returnDate instanceof Date &&
+      reservationDoc.returnDate.getTime() === endDate.getTime();
+
+    if (!sameCar || !sameStart || !sameEnd) {
+      return {
+        ok: false,
+        response: buildRenderOrderPageResponse(
+          car,
+          formData,
+          'You already have an active reservation. Please complete or release it before starting another.',
+          {
+            existingReservation: buildExistingReservationSummary(reservationDoc),
+            rentalDays: pricing.rentalDays,
+            deliveryPrice: pricing.deliveryPrice,
+            returnPrice: pricing.returnPrice,
+            totalPrice: pricing.totalPrice,
+            releaseRedirect: req.originalUrl,
+          }
+        ),
+      };
+    }
+
+    extendReservationHold(reservationDoc);
+
+    const { reservation: updated } = await changeStatus({
+      reservationId: reservationDoc.id,
+      newStatus: 'pending_payment',
+      reason: 'checkout_prepare',
+      actor: { type: 'customer', req, userId: req?.session?.user?.id },
+      patch: {
+        holdExpiresAt: reservationDoc.holdExpiresAt,
+        contact: {
+          fullName: trimmedContact.fullName,
+          phoneNumber: trimmedContact.phoneNumber,
+          email: trimmedContact.email,
+          address: trimmedContact.address,
+          hotelName: trimmedContact.hotelName,
+        },
+        pricing: {
+          rentalDays: pricing.rentalDays,
+          deliveryPrice: pricing.deliveryPrice,
+          returnPrice: pricing.returnPrice,
+          totalPrice: pricing.totalPrice,
+          deposit: pricing.deposit,
+          snapshot: pricing.snapshot,
+          selectedExtras: pricing.snapshot?.selectedExtras,
+          hotelDelivery: pricing.snapshot?.hotelDelivery,
+        },
+      },
+    });
+
+    reservationDoc = await attachCarNameToReservation(updated);
+  } else {
+    const {
+      reservation: createdReservation,
+      overlappingReservation,
+      bookedOverlap,
+    } = await createPendingReservation(
+      {
+        carId: car.id,
+        sessionId,
+        startDate,
+        endDate,
+        pickupTime: formData.pickupTime,
+        returnTime: formData.returnTime,
+        pickupLocation: formData.pickupLocation,
+        returnLocation: formData.returnLocation,
+        pricing,
+        contact: trimmedContact,
+        now,
+      },
+      req
+    );
+
+    if (overlappingReservation) {
+      return {
+        ok: false,
+        response: buildRenderOrderPageResponse(
+          car,
+          formData,
+          'Selected car is already reserved in this period. Please choose different dates or a different car.',
+          {
+            rentalDays: pricing.rentalDays,
+            deliveryPrice: pricing.deliveryPrice,
+            returnPrice: pricing.returnPrice,
+            totalPrice: pricing.totalPrice,
+          }
+        ),
+      };
+    }
+
+    if (bookedOverlap) {
+      return {
+        ok: false,
+        response: buildRenderOrderPageResponse(
+          car,
+          formData,
+          'Selected car is already booked in this period. Please choose different dates or a different car.',
+          {
+            rentalDays: pricing.rentalDays,
+            deliveryPrice: pricing.deliveryPrice,
+            returnPrice: pricing.returnPrice,
+            totalPrice: pricing.totalPrice,
+          }
+        ),
+      };
+    }
+
+    reservationDoc = createdReservation;
+    createdReservationThisStep = true;
+  }
+
+  return {
+    ok: true,
+    reservationDoc,
+    createdReservationThisStep,
+  };
+}
+
+module.exports = {
+  resolveCheckoutReservation,
+};

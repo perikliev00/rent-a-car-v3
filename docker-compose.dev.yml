@@ -1,0 +1,132 @@
+# LuxRide — development stack (hot reload)
+# Usage: docker compose -f docker-compose.dev.yml up --build
+#
+# Default: backend uses DATABASE_URL from backend/.env (localhost → host.docker.internal).
+# Optional bundled Postgres: COMPOSE_PROFILES=docker-db docker compose -f docker-compose.dev.yml up --build
+
+services:
+  db:
+    profiles: ["docker-db"]
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: luxride
+      POSTGRES_USER: luxride
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-luxride}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U luxride -d luxride"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./backend/.env
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: ${DATABASE_URL}
+      USE_LOCAL_DATABASE: ${USE_LOCAL_DATABASE:-1}
+      FRONTEND_BASE_URL: http://localhost:5173
+      CORS_ORIGINS: http://localhost:5173
+      METRICS_TOKEN: ${METRICS_TOKEN:-dev-metrics-token}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./backend:/app
+      - backend_node_modules:/app/node_modules
+      - backend_uploads:/app/uploads
+      - backend_public_uploads:/app/src/public/images/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+        required: false
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  frontend:
+    build:
+      context: "./front end"
+      dockerfile: Dockerfile.dev
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_BASE_URL: http://localhost:3000
+    volumes:
+      - "./front end:/app"
+      - frontend_node_modules:/app/node_modules
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    depends_on:
+      backend:
+        condition: service_healthy
+      alertmanager:
+        condition: service_started
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    ports:
+      - "9093:9093"
+    environment:
+      ALERTMANAGER_WEBHOOK_URL: ${ALERTMANAGER_WEBHOOK_URL:-}
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./monitoring/alertmanager/docker-entrypoint.sh:/docker-entrypoint.sh:ro
+      - alertmanager_data:/alertmanager
+    entrypoint: ["/bin/sh", "/docker-entrypoint.sh"]
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+      - alertmanager
+
+volumes:
+  postgres_data:
+  backend_node_modules:
+  backend_uploads:
+  backend_public_uploads:
+  frontend_node_modules:
+  prometheus_data:
+  grafana_data:
+  alertmanager_data:
