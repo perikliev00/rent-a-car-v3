@@ -1,6 +1,8 @@
-process.env.RUN_DB_TESTS = 'true';
-
 const { spawnSync } = require('child_process');
+const { requireTestDatabaseUrl } = require('../../scripts/loadTestEnv');
+
+requireTestDatabaseUrl('npm run test:db');
+process.env.RUN_DB_TESTS = 'true';
 
 const result = spawnSync(
   process.execPath,

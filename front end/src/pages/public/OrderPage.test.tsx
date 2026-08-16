@@ -1,5 +1,7 @@
+import { StrictMode } from 'react';
 import { screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiError } from '../../api/client';
 import { createOrder } from '../../api/orders';
 import { buildTestSearchQuery, renderWithRouter } from '../../test/test-utils';
 import type { OrderPageData } from '../../types/api';
@@ -62,6 +64,35 @@ describe('OrderPage', () => {
       expect(screen.getByText('Review your booking')).toBeInTheDocument();
     });
 
+    expect(screen.getByRole('button', { name: 'Continue to checkout' })).toBeInTheDocument();
+  });
+
+  it('keeps review when a later duplicate createOrder returns CONFLICT', async () => {
+    vi.mocked(createOrder)
+      .mockResolvedValueOnce(mockOrder)
+      .mockRejectedValueOnce(
+        new ApiError(
+          'CONFLICT',
+          'Selected car is already reserved in this period. Please choose different dates or a different car.',
+          409
+        )
+      );
+
+    renderWithRouter(
+      <StrictMode>
+        <OrderPage />
+      </StrictMode>,
+      {
+        route: `/order/1?${buildTestSearchQuery()}`,
+        path: '/order/:carId',
+      }
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Review your booking')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole('button', { name: 'Release existing reservation' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Continue to checkout' })).toBeInTheDocument();
   });
 });

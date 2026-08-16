@@ -266,19 +266,69 @@ export async function resizeCalendarEventEnd(
   page: Page,
   reservationId: number | string,
   deltaX: number
-): Promise<void> {
+): Promise<APIResponse> {
   const event = page.getByTestId(calendarEventTestId(reservationId));
   await expect(event).toBeVisible({ timeout: 15_000 });
   const handle = event.getByTestId('cal-resize-end');
-  await expect(handle).toBeVisible();
+  await expect(handle).toBeVisible({ timeout: 15_000 });
+  await handle.scrollIntoViewIfNeeded();
+
+  const track = event.locator('xpath=ancestor::*[@data-track="1"][1]');
+  const trackBox = await track.boundingBox();
   const box = await handle.boundingBox();
-  if (!box) throw new Error('resizeCalendarEventEnd: handle has no box');
+  if (!box || !trackBox) {
+    throw new Error('resizeCalendarEventEnd: missing bounding boxes');
+  }
+
   const startX = box.x + box.width / 2;
   const startY = box.y + box.height / 2;
-  await page.mouse.move(startX, startY);
-  await page.mouse.down();
-  await page.mouse.move(startX + deltaX, startY, { steps: 12 });
-  await page.mouse.up();
+  const dayPx = Math.max(80, Math.floor(trackBox.width / 7));
+  const appliedDelta = deltaX >= 0 ? Math.max(deltaX, dayPx) : -Math.max(Math.abs(deltaX), dayPx);
+  const endX = Math.min(
+    trackBox.x + trackBox.width - 8,
+    Math.max(trackBox.x + 8, startX + appliedDelta)
+  );
+
+  const resizeWait = page.waitForResponse(
+    (res) => res.url().includes('/resize') && res.request().method() === 'PATCH',
+    { timeout: 20_000 }
+  );
+
+  // Same PointerEvent path as drag-move: calendar resize listens on window, not mouse.
+  await handle.evaluate(
+    (el, { x0, y0, x1, y1 }) => {
+      const fire = (target: EventTarget, type: string, x: number, y: number, buttons: number) => {
+        target.dispatchEvent(
+          new PointerEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            clientX: x,
+            clientY: y,
+            pointerId: 1,
+            pointerType: 'mouse',
+            buttons,
+            view: window,
+          })
+        );
+      };
+      fire(el, 'pointerdown', x0, y0, 1);
+      const steps = 12;
+      for (let i = 1; i <= steps; i += 1) {
+        const t = i / steps;
+        fire(window, 'pointermove', x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, 1);
+      }
+      fire(window, 'pointerup', x1, y1, 0);
+    },
+    { x0: startX, y0: startY, x1: endX, y1: startY }
+  );
+
+  const resizeRes = await resizeWait;
+  if (!resizeRes.ok()) {
+    throw new Error(
+      `resizeCalendarEventEnd: resize failed (${resizeRes.status()}): ${await resizeRes.text()}`
+    );
+  }
+  return resizeRes;
 }
 
 export function calendarTrackTestId(carId: number | string): string {

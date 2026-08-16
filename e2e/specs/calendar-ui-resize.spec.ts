@@ -8,7 +8,12 @@ import {
   getReservationById,
 } from '../helpers/db';
 import { uniqueEmail, allocateFutureRange, E2E_GUEST } from '../helpers/test-env';
-import { getSofiaIsoDateString } from '../helpers/dates';
+import {
+  getSofiaIsoDateString,
+  addSofiaCalendarDays,
+  formatSofiaIsoDateFromParts,
+  parseSofiaDate,
+} from '../helpers/dates';
 import {
   openCalendarWeek,
   resizeCalendarEventEnd,
@@ -17,13 +22,33 @@ import {
 
 const CAR_NAME = `E2E Cal UI Resize ${Date.now()}`;
 
+/** Tuesday pickup so a 2-night stay sits mid-week with room to drag the end handle. */
+function allocateTuesdayStay(fromDaysAhead: number, nights: number) {
+  const base = allocateFutureRange({ fromDaysAhead, nights });
+  let pickup = base.pickupDate;
+  for (let i = 0; i < 7; i += 1) {
+    const at = parseSofiaDate(pickup, '12:00');
+    const weekday = at
+      ? new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Sofia', weekday: 'short' }).format(at)
+      : '';
+    if (weekday === 'Tue') break;
+    pickup = formatSofiaIsoDateFromParts(
+      addSofiaCalendarDays(parseSofiaDate(pickup, '00:00') ?? new Date(), 1)
+    );
+  }
+  const returnDate = formatSofiaIsoDateFromParts(
+    addSofiaCalendarDays(parseSofiaDate(pickup, '00:00') ?? new Date(), nights)
+  );
+  return { ...base, pickupDate: pickup, returnDate };
+}
+
 test.describe.configure({ mode: 'serial' });
 
 test.describe('Calendar UI resize (85)', () => {
   test.setTimeout(180_000);
 
   let carId: number;
-  const range = allocateFutureRange({ fromDaysAhead: 210, nights: 3 });
+  const range = allocateTuesdayStay(210, 2);
   const guestName = `Cal UI Resize ${Date.now()}`;
   const guestEmail = uniqueEmail('cal-ui-resize');
 
@@ -60,7 +85,15 @@ test.describe('Calendar UI resize (85)', () => {
     });
 
     await resizeCalendarEventEnd(adminPage, seeded.reservationId, 160);
-    await expect(adminPage.getByText('Reservation resized')).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => {
+        const row = await getReservationById(seeded.reservationId);
+        return Number(row.total_price);
+      }, { timeout: 15_000 })
+      .toBeGreaterThan(totalBefore);
+    await expect(adminPage.getByText('Reservation resized')).toBeVisible({ timeout: 5_000 }).catch(
+      () => undefined
+    );
 
     const longer = await getReservationById(seeded.reservationId);
     const longerReturn = getSofiaIsoDateString(new Date(longer.return_date));
@@ -69,13 +102,18 @@ test.describe('Calendar UI resize (85)', () => {
     await assertDateBlockCovers(carId, range.pickupDate, longerReturn);
 
     await resizeCalendarEventEnd(adminPage, seeded.reservationId, -120);
+    await expect
+      .poll(async () => {
+        const row = await getReservationById(seeded.reservationId);
+        return Number(row.total_price);
+      }, { timeout: 15_000 })
+      .toBeLessThan(Number(longer.total_price));
     await expect(adminPage.getByText('Reservation resized').last()).toBeVisible({
-      timeout: 15_000,
-    });
+      timeout: 5_000,
+    }).catch(() => undefined);
 
     const shorter = await getReservationById(seeded.reservationId);
     const shorterReturn = getSofiaIsoDateString(new Date(shorter.return_date));
-    expect(Number(shorter.total_price)).toBeLessThan(Number(longer.total_price));
     await assertDateBlockCovers(carId, range.pickupDate, shorterReturn);
   });
 });

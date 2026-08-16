@@ -97,11 +97,11 @@ test.describe('Calendar UI drag move (84)', () => {
     });
     const drawer = adminPage.getByRole('dialog');
     await expect(drawer.getByText('Trip').first()).toBeVisible();
-    // Drawer shows updated trip dates (e.g. "26 Feb 2027 13:14").
+    // Drawer uses date-fns `d MMM yyyy HH:mm` (e.g. "1 Mar 2027 13:14"), not zero-padded day.
+    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const [, movedMonth, movedDay] = movedPickup.split('-').map(Number);
     await expect(drawer.getByText(/^Pickup$/).locator('..')).toContainText(
-      formatSofiaIsoDateFromParts(
-        addSofiaCalendarDays(parseSofiaDate(movedPickup, '00:00') ?? new Date(), 0)
-      ).slice(8, 10)
+      `${movedDay} ${MONTHS[movedMonth - 1]}`
     );
 
     // Soft conflict: plant a free-range block ahead of the moved trip, drag into it, Cancel.

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { createOrder } from '../../api/orders';
@@ -18,6 +18,8 @@ export function OrderPage() {
   const navigate = useNavigate();
   const [orderData, setOrderData] = useState<OrderPageData | null>(null);
   const [conflictError, setConflictError] = useState<string | null>(null);
+  const orderDataRef = useRef<OrderPageData | null>(null);
+  const holdKeyRef = useRef<string>('');
 
   const search = useMemo(() => parseSearchFromUrl(searchParams), [searchParams]);
   const extras = search?.extras || [];
@@ -37,10 +39,12 @@ export function OrderPage() {
         hotelDelivery,
       }),
     onSuccess: (data) => {
+      orderDataRef.current = data;
       setOrderData(data);
       setConflictError(null);
     },
     onError: (err) => {
+      if (orderDataRef.current) return;
       if (err instanceof ApiError && err.code === 'CONFLICT') {
         setConflictError(err.message);
       }
@@ -73,10 +77,15 @@ export function OrderPage() {
     : '';
 
   useEffect(() => {
-    if (search && carId && !conflictError) {
+    if (!search || !carId) return;
+    const holdKey = `${searchKey}|${carId}`;
+    if (holdKeyRef.current !== holdKey) {
+      holdKeyRef.current = holdKey;
+      orderDataRef.current = null;
       setOrderData(null);
-      orderMutation.mutate();
+      setConflictError(null);
     }
+    orderMutation.mutate();
     // Recreate hold/pricing when dates/locations/addons change
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchKey, carId]);
@@ -134,7 +143,7 @@ export function OrderPage() {
     );
   }
 
-  if (orderMutation.isError && !conflictError) {
+  if (orderMutation.isError && !conflictError && !orderData) {
     return (
       <div className="mx-auto max-w-lg px-4 py-12">
         <ErrorAlert message={(orderMutation.error as Error).message}>

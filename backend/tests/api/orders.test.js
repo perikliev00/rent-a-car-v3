@@ -99,6 +99,43 @@ describe('POST /api/orders', () => {
     expect(response.body.error.code).toBe('CONFLICT');
   });
 
+  test('overlap of the same session and dates reuses the hold instead of 409', async () => {
+    const { validateBookingDates } = require('../../src/utils/bookingValidation');
+    const { startDate, endDate } = validateBookingDates({
+      pickupDate: validOrderBody.pickupDate,
+      returnDate: validOrderBody.returnDate,
+      pickupTime: validOrderBody.pickupTime,
+      returnTime: validOrderBody.returnTime,
+    });
+
+    const existing = {
+      id: 10,
+      carId: { id: 1, name: 'Toyota Corolla' },
+      pickupDate: startDate,
+      returnDate: endDate,
+      pickupTime: '10:00',
+      returnTime: '10:00',
+      pickupLocation: 'office',
+      returnLocation: 'office',
+    };
+    reservationService.findActiveReservationBySession
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(existing);
+    reservationService.createPendingReservation.mockResolvedValue({
+      overlappingReservation: true,
+      bookedOverlap: false,
+    });
+
+    const app = createApiTestApp();
+    const agent = await initTestAgent(app);
+
+    const response = await withCsrf(agent, agent.post('/api/orders')).send(validOrderBody).expect(200);
+
+    expect(response.body.success).toBe(true);
+    expect(reservationService.createPendingReservation).toHaveBeenCalled();
+    expect(reservationService.findActiveReservationBySession).toHaveBeenCalledTimes(2);
+  });
+
   test('returns validation error when return date is before pickup date', async () => {
     const app = createApiTestApp();
     const agent = await initTestAgent(app);

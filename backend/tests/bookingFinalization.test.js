@@ -78,7 +78,6 @@ const { changeStatus } = require('../src/services/reservation/reservationStatusS
 const orderSql = require('../src/services/sql/orderSqlService');
 const { addRange } = require('../src/services/sql/bookingSyncSqlService');
 const { trackPaymentFailure } = require('../src/monitoring/track');
-const { ConflictError } = require('../src/utils/appError');
 const {
   processStripeWebhookEvent,
   finalizeReservationByStripeSessionId,
@@ -528,18 +527,20 @@ describe('processStripeWebhookEvent', () => {
     expect(orderSql.createOrderFromReservation).toHaveBeenCalledTimes(1);
   });
 
-  test('B: throws ConflictError on overlap outside paid Stripe webhook context', async () => {
+  test('B: returns payment_not_paid for unpaid Stripe session without attempting overlap handling', async () => {
     reservationRepository.findByStripeSessionId.mockResolvedValue(
       buildActiveReservation({ stripeSessionId: 'cs_unpaid_overlap' })
     );
     addRange.mockRejectedValue(Object.assign(new Error('overlap'), { code: 'OVERLAP' }));
 
-    await expect(
-      finalizeReservationByStripeSessionId('cs_unpaid_overlap', {
-        stripeSessionPaymentStatus: 'unpaid',
-      })
-    ).rejects.toBeInstanceOf(ConflictError);
+    const result = await finalizeReservationByStripeSessionId('cs_unpaid_overlap', {
+      stripeSessionPaymentStatus: 'unpaid',
+    });
 
+    expect(result.found).toBe(true);
+    expect(result.finalized).toBe(false);
+    expect(result.reason).toBe('payment_not_paid');
+    expect(addRange).not.toHaveBeenCalled();
     expect(changeStatus).not.toHaveBeenCalledWith(expect.objectContaining({ newStatus: 'manual_review' }));
   });
 

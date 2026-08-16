@@ -139,7 +139,7 @@ test.describe('Booking happy path', () => {
       const carVisible = await carHeading.isVisible().catch(() => false);
 
       if (carVisible) {
-        await page.getByRole('link', { name: 'View details' }).first().click();
+        await page.getByRole('link', { name: /^View$/ }).first().click();
         await page.getByRole('button', { name: 'Book this car' }).click();
         await expect(page).toHaveURL(new RegExp(`/order/${carId}`));
         await expect(page.getByText(/already booked|already reserved/i)).toBeVisible({

@@ -1,6 +1,8 @@
-process.env.RUN_INTEGRATION_TESTS = '1';
-
 const { spawnSync } = require('child_process');
+const { requireTestDatabaseUrl } = require('../../scripts/loadTestEnv');
+
+requireTestDatabaseUrl('npm run test:integration');
+process.env.RUN_INTEGRATION_TESTS = '1';
 
 const result = spawnSync(
   process.execPath,

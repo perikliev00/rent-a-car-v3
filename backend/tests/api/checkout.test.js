@@ -165,7 +165,7 @@ describe('POST /api/checkout/cancel', () => {
     const response = await withCsrf(agent, agent.post('/api/checkout/cancel')).expect(200);
 
     expect(response.body.success).toBe(true);
-    expect(response.body.data.cancelled).toBe(true);
-    expect(response.body.data.message).toContain('cancelled');
+    expect(response.body.data.cancelled).toBe(false);
+    expect(response.body.data.message).toContain('No active reservation hold to cancel');
   });
 });

@@ -130,8 +130,7 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
     const sessionId = getSessionId(req);
     const now = new Date();
 
-    let existingForSession = await findActiveReservationBySession(req);
-    if (existingForSession) {
+    const respondForExistingSessionHold = async (existingForSession) => {
       const existingCarId = existingForSession.carId?.id || existingForSession.carId;
       const sameReservationParams =
         String(existingCarId) === String(car.id) &&
@@ -174,13 +173,18 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
         return apiResponse.success(res, buildOrderData({ message: null, existingReservation: null }));
       }
 
-      existingForSession = await attachCarNameToReservation(existingForSession);
+      await attachCarNameToReservation(existingForSession);
       return apiResponse.error(
         res,
         'CONFLICT',
         'You already have an active reservation. Please complete or release it before starting another.',
         409
       );
+    };
+
+    const existingForSession = await findActiveReservationBySession(req);
+    if (existingForSession) {
+      return respondForExistingSessionHold(existingForSession);
     }
 
     const { overlappingReservation, bookedOverlap } = await createPendingReservation({
@@ -197,6 +201,10 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
     }, req);
 
     if (overlappingReservation) {
+      const sessionHoldAfterOverlap = await findActiveReservationBySession(req);
+      if (sessionHoldAfterOverlap) {
+        return respondForExistingSessionHold(sessionHoldAfterOverlap);
+      }
       return apiResponse.error(
         res,
         'CONFLICT',

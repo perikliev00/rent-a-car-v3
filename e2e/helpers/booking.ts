@@ -167,8 +167,9 @@ export async function openOrderAndResolveConflict(
     }
   }
 
-  // Final fallback: clear leftover holds, then open once more.
+  // Final fallback: clear leftover holds, leave the previous view, then open once more.
   await cleanupReservationsForCar(carId);
+  await page.goto('/');
   await page.goto(buildOrderUrl(carId, range, options));
   await expect(page.getByRole('heading', { name: 'Review your booking' })).toBeVisible({
     timeout: 20_000,
@@ -180,6 +181,9 @@ export async function continueToCheckoutAndFillGuest(
   carId: number,
   guest = E2E_GUEST
 ): Promise<void> {
+  await expect(page.getByRole('heading', { name: 'Review your booking' })).toBeVisible({
+    timeout: 20_000,
+  });
   await page.getByRole('button', { name: 'Continue to checkout' }).click();
   await page.waitForURL(new RegExp(`/checkout/${carId}`));
   await page.getByLabel('Full name').fill(guest.fullName);

@@ -223,6 +223,31 @@ Copy the example files and fill in your values:
 
 ## Running Tests
 
+From the **repo root**:
+
+```bash
+npm test                 # backend Jest + frontend Vitest
+npm run test:unit        # backend Jest only
+npm run test:frontend    # frontend Vitest only
+npm run test:db          # DB consistency (needs PostgreSQL)
+npm run test:integration # concurrency / webhooks (needs PostgreSQL)
+npm run test:e2e         # Playwright
+npm run test:all         # everything above
+```
+
+`npm test` does not need a database. `test:db`, `test:integration`, and `test:e2e` use a dedicated test Postgres.
+
+Copy `.env.test.example` to `.env.test` (gitignored) and point `DATABASE_URL` at `luxride_test`, not `rent_a_car`. Test runners load that file automatically — no need to export `DATABASE_URL` in the shell. CI can still set `DATABASE_URL` in the environment (it wins over `.env.test`).
+
+```bash
+# Once: create the DB, then apply schema
+createdb luxride_test
+npm run db:setup:test
+
+npm run test:integration
+npm run test:e2e
+```
+
 ### Backend
 
 ```bash
@@ -232,10 +257,10 @@ npm test
 
 Jest runs integration tests in `backend/tests/` with `--runInBand`. Tests use a mocked environment (see `tests/setup.js`).
 
-Optional database consistency tests:
+Optional database consistency tests (from repo root, uses `.env.test`):
 
 ```bash
-RUN_DB_TESTS=1 npm run test:db
+npm run test:db
 ```
 
 ### Integration & E2E tests
@@ -243,15 +268,10 @@ RUN_DB_TESTS=1 npm run test:db
 Concurrency and webhook integration tests use a **separate test database** with real PostgreSQL, HTTP, and signed Stripe webhooks (no mocked `bookingFinalizationService` or `reservationSqlService`).
 
 ```bash
-# Create test DB (example)
 createdb luxride_test
-
-# Apply schema (from repo root)
-DATABASE_URL=postgres://luxride:luxride@localhost:5432/luxride_test npm run db:setup
-
-# Integration tests (concurrency, webhook idempotency, hold expiry)
-cd backend
-RUN_INTEGRATION_TESTS=1 DATABASE_URL=postgres://luxride:luxride@localhost:5432/luxride_test npm run test:integration
+npm run db:setup:test
+npm run test:integration
+npm run test:e2e
 ```
 
 Recommended env for local integration/E2E:

@@ -67,7 +67,7 @@ test.describe('GUEST-001 Public search filters', () => {
     await expect(page.getByRole('heading', { name: AUTO_NAME })).toHaveCount(0);
 
     const card = page.locator('article').filter({ hasText: MANUAL_NAME });
-    await card.getByRole('link', { name: 'View details' }).click();
+    await card.getByRole('link', { name: /^View$/ }).click();
     await expect(page).toHaveURL(new RegExp(`/cars/${manualCarId}`));
     const detailUrl = new URL(page.url());
     expect(detailUrl.searchParams.get('pickup-date')).toBe(range.pickupDate);

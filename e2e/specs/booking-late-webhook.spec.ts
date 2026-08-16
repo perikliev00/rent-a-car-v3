@@ -40,9 +40,13 @@ test.describe('Late webhook after hold expiry (80)', () => {
   });
 
   async function checkoutToProcessing(page: import('@playwright/test').Page, email: string) {
+    await page.goto('/');
     await cleanupReservationsForCar(carId);
     await deleteDateBlocksForCar(carId);
     await openOrderAndResolveConflict(page, carId, range);
+    await expect(page.getByRole('heading', { name: 'Review your booking' })).toBeVisible({
+      timeout: 20_000,
+    });
     await continueToCheckoutAndFillGuest(page, carId, {
       ...E2E_GUEST,
       email,
@@ -80,11 +84,14 @@ test.describe('Late webhook after hold expiry (80)', () => {
   });
 
   test('4b: late paid webhook with overlap goes to manual_review (no double book)', async ({
-    page,
+    browser,
     request,
     adminPage,
   }) => {
     const email = uniqueEmail('late-overlap');
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    try {
     const { stripeSessionId, reservation } = await checkoutToProcessing(page, email);
 
     await setHoldExpired(reservation.id);
@@ -120,5 +127,8 @@ test.describe('Late webhook after hold expiry (80)', () => {
     await expect(
       adminPage.getByRole('button', { name: String(reservation.id), exact: true }).first()
     ).toBeVisible({ timeout: 15_000 });
+    } finally {
+      await context.close();
+    }
   });
 });

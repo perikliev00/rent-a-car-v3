@@ -4,6 +4,7 @@ import {
   cleanupTestCar,
   cleanupE2eCarsByName,
   cleanupReservationsForCar,
+  deleteDateBlocksForCar,
   getActiveReservationForCar,
   assertReservationTotalPrice,
 } from '../helpers/db';
@@ -48,8 +49,10 @@ test.describe('MONEY-012 Pricing snapshot immutability', () => {
 
   test('held snapshot stays fixed after live fee bump; new quote sees new price', async ({
     page,
+    browser,
   }) => {
     pricingSnapshot = await snapshotPricingConfig();
+    let quoteContext: Awaited<ReturnType<typeof browser.newContext>> | null = null;
 
     try {
       await openOrderAndResolveConflict(page, carId, range, { hotelDelivery: true });
@@ -67,14 +70,21 @@ test.describe('MONEY-012 Pricing snapshot immutability', () => {
       expect(Number(holdAfterBump.id)).toBe(Number(hold.id));
       await assertReservationTotalPrice(Number(holdAfterBump.id), heldTotal);
 
-      // Clear the held reservation so a fresh quote uses live pricing config.
+      // Clear leftover holds/blocks and quote from a fresh session so live config applies.
       await cleanupReservationsForCar(carId);
-      await openOrderAndResolveConflict(page, carId, range, { hotelDelivery: true });
-      await expect(page.getByText('Total', { exact: true })).toBeVisible({ timeout: 15_000 });
-      const liveTotal = await readOrderSummaryTotal(page);
+      await deleteDateBlocksForCar(carId);
+      quoteContext = await browser.newContext();
+      const freshPage = await quoteContext.newPage();
+      await openOrderAndResolveConflict(freshPage, carId, range, { hotelDelivery: true });
+      await expect(freshPage.getByRole('heading', { name: 'Review your booking' })).toBeVisible({
+        timeout: 20_000,
+      });
+      await expect(freshPage.getByText('Total', { exact: true })).toBeVisible({ timeout: 15_000 });
+      const liveTotal = await readOrderSummaryTotal(freshPage);
       expect(liveTotal).toBeGreaterThan(heldTotal);
       expect(liveTotal).toBeCloseTo(heldTotal + 100, 2);
     } finally {
+      await quoteContext?.close();
       if (pricingSnapshot) {
         await restorePricingConfig(pricingSnapshot);
         pricingSnapshot = null;
