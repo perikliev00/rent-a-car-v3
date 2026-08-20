@@ -14,8 +14,10 @@ const {
 } = require('./reservation/reservationReadRepository');
 const {
   expireStaleHoldsForCar,
+  expireStaleHoldsForSession,
   createPendingReservation,
   createPendingReservationWithAvailabilityCheck,
+  reholdPendingReservationWithAvailabilityCheck,
   markReservationExpired,
   markAbandonedReservations,
 } = require('./reservation/reservationHoldRepository');
@@ -44,8 +46,10 @@ module.exports = {
   findOverlappingHold,
   findBookedDateOverlap,
   expireStaleHoldsForCar,
+  expireStaleHoldsForSession,
   createPendingReservation,
   createPendingReservationWithAvailabilityCheck,
+  reholdPendingReservationWithAvailabilityCheck,
   createConfirmedReservation,
   update,
   applyStatusChange,

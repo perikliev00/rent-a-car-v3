@@ -22,7 +22,68 @@ async function resolveCheckoutReservation({ req, car, formData, startDate, endDa
 
   let createdReservationThisStep = false;
 
-  if (reservationDoc) {
+  if (!reservationDoc) {
+    const {
+      reservation: createdReservation,
+      overlappingReservation,
+      bookedOverlap,
+      existingActiveReservation,
+    } = await createPendingReservation(
+      {
+        carId: car.id,
+        sessionId,
+        startDate,
+        endDate,
+        pickupTime: formData.pickupTime,
+        returnTime: formData.returnTime,
+        pickupLocation: formData.pickupLocation,
+        returnLocation: formData.returnLocation,
+        pricing,
+        contact: trimmedContact,
+        now,
+      },
+      req
+    );
+
+    if (existingActiveReservation) {
+      reservationDoc = await attachCarNameToReservation(existingActiveReservation);
+    } else if (overlappingReservation) {
+      return {
+        ok: false,
+        response: buildRenderOrderPageResponse(
+          car,
+          formData,
+          'Selected car is already reserved in this period. Please choose different dates or a different car.',
+          {
+            rentalDays: pricing.rentalDays,
+            deliveryPrice: pricing.deliveryPrice,
+            returnPrice: pricing.returnPrice,
+            totalPrice: pricing.totalPrice,
+          }
+        ),
+      };
+    } else if (bookedOverlap) {
+      return {
+        ok: false,
+        response: buildRenderOrderPageResponse(
+          car,
+          formData,
+          'Selected car is already booked in this period. Please choose different dates or a different car.',
+          {
+            rentalDays: pricing.rentalDays,
+            deliveryPrice: pricing.deliveryPrice,
+            returnPrice: pricing.returnPrice,
+            totalPrice: pricing.totalPrice,
+          }
+        ),
+      };
+    } else {
+      reservationDoc = createdReservation;
+      createdReservationThisStep = true;
+    }
+  }
+
+  if (reservationDoc && !createdReservationThisStep) {
     const sameCar =
       String(reservationDoc.carId?.id || reservationDoc.carId) === String(car.id);
     const sameStart =
@@ -81,64 +142,6 @@ async function resolveCheckoutReservation({ req, car, formData, startDate, endDa
     });
 
     reservationDoc = await attachCarNameToReservation(updated);
-  } else {
-    const {
-      reservation: createdReservation,
-      overlappingReservation,
-      bookedOverlap,
-    } = await createPendingReservation(
-      {
-        carId: car.id,
-        sessionId,
-        startDate,
-        endDate,
-        pickupTime: formData.pickupTime,
-        returnTime: formData.returnTime,
-        pickupLocation: formData.pickupLocation,
-        returnLocation: formData.returnLocation,
-        pricing,
-        contact: trimmedContact,
-        now,
-      },
-      req
-    );
-
-    if (overlappingReservation) {
-      return {
-        ok: false,
-        response: buildRenderOrderPageResponse(
-          car,
-          formData,
-          'Selected car is already reserved in this period. Please choose different dates or a different car.',
-          {
-            rentalDays: pricing.rentalDays,
-            deliveryPrice: pricing.deliveryPrice,
-            returnPrice: pricing.returnPrice,
-            totalPrice: pricing.totalPrice,
-          }
-        ),
-      };
-    }
-
-    if (bookedOverlap) {
-      return {
-        ok: false,
-        response: buildRenderOrderPageResponse(
-          car,
-          formData,
-          'Selected car is already booked in this period. Please choose different dates or a different car.',
-          {
-            rentalDays: pricing.rentalDays,
-            deliveryPrice: pricing.deliveryPrice,
-            returnPrice: pricing.returnPrice,
-            totalPrice: pricing.totalPrice,
-          }
-        ),
-      };
-    }
-
-    reservationDoc = createdReservation;
-    createdReservationThisStep = true;
   }
 
   return {

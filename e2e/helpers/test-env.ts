@@ -29,4 +29,4 @@ export const STRIPE_WEBHOOK_SECRET =
 export const STRIPE_SECRET =
   process.env.STRIPE_SECRET || 'sk_test_jest_placeholder_key_1234567890';
 
-export { allocateFutureRange } from './dates';
+export { allocateFutureRange, allocateFutureRangeOnWeekday } from './dates';

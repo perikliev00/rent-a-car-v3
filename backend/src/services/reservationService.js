@@ -98,7 +98,7 @@ async function createPendingReservation(payload, req = null) {
     ...payload,
     userId,
   });
-  const created = result?.reservation || null;
+  const created = result?.existingActiveReservation ? null : result?.reservation || null;
 
   if (created) {
     await recordInitialStatus({
@@ -289,6 +289,36 @@ async function cleanUpAbandonedReservations() {
   }
 }
 
+function publishReholdSideEffects(result) {
+  if (!result?.ok || !result.reservation) {
+    return;
+  }
+
+  try {
+    const {
+      publishLiveEvent,
+      publishCalendarUpdated,
+    } = require('../modules/realtime/realtime.publisher');
+    const carId =
+      result.reservation.carId?.id || result.reservation.carId || result.historyMetadata?.toCarId;
+    publishLiveEvent('reservation_updated', {
+      reservationId: result.reservation.id,
+      carId,
+      status: result.reservation.status,
+      oldStatus: 'pending_payment',
+      meta: result.historyMetadata || {},
+    });
+    publishCalendarUpdated({
+      action: 'customer_reheld',
+      entityType: 'reservation',
+      entityId: result.reservation.id,
+      meta: result.historyMetadata || {},
+    });
+  } catch (err) {
+    logger.error({ err, context: 'publishReholdSideEffects' }, 'Rehold live event hook error');
+  }
+}
+
 async function releaseAndReholdForSession(req, {
   carId,
   startDate,
@@ -301,30 +331,9 @@ async function releaseAndReholdForSession(req, {
 }) {
   const sessionId = getSessionId(req);
 
-  const bookedOverlap = await reservationRepository.findBookedDateOverlap(
-    carId,
-    startDate,
-    endDate
-  );
-  if (bookedOverlap) {
-    return { ok: false, conflict: true, reason: 'booked_overlap' };
-  }
-
-  const overlappingHold = await reservationRepository.findOverlappingHold({
-    carId,
-    startDate,
-    endDate,
-    excludeSessionId: sessionId,
-  });
-  if (overlappingHold) {
-    return { ok: false, conflict: true, reason: 'hold_overlap' };
-  }
-
-  await releaseActiveReservationForSession(req, { reason: 'rehold', skipAudit: true });
-
-  const result = await createPendingReservation({
-    carId,
+  const result = await reservationRepository.reholdWithAvailabilityCheck({
     sessionId,
+    carId,
     startDate,
     endDate,
     pickupTime,
@@ -334,11 +343,17 @@ async function releaseAndReholdForSession(req, {
     pricing,
   });
 
-  if (result.overlappingReservation || result.bookedOverlap) {
-    return { ok: false, conflict: true, reason: 'create_conflict', result };
+  if (result.ok) {
+    logEvent.info('reservation.reheld', {
+      reservationId: result.reservation?.id?.toString?.(),
+      fromCarId: result.fromCarId,
+      toCarId: carId?.toString?.() || carId,
+      sessionId,
+    });
+    publishReholdSideEffects(result);
   }
 
-  return { ok: true, reservation: result.reservation, result };
+  return result;
 }
 
 module.exports = {

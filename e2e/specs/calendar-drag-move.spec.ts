@@ -8,7 +8,7 @@ import {
   getReservationById,
   getOrderById,
 } from '../helpers/db';
-import { uniqueEmail, allocateFutureRange, E2E_GUEST } from '../helpers/test-env';
+import { uniqueEmail, allocateFutureRangeOnWeekday, E2E_GUEST } from '../helpers/test-env';
 import {
   openCalendarWeek,
   createManualBlockViaApi,
@@ -26,9 +26,16 @@ test.describe('Calendar UI drag move (84)', () => {
   test.setTimeout(180_000);
 
   let carId: number;
-  const original = allocateFutureRange({ fromDaysAhead: 200, nights: 2 });
+  // Wednesday pickup: room to drag later in the week without hitting the Monday edge.
+  const original = allocateFutureRangeOnWeekday(3, { fromDaysAhead: 21, nights: 2 });
   const guestName = `Cal Drag Guest ${Date.now()}`;
   const guestEmail = uniqueEmail('cal-drag');
+
+  function sofiaDayDiff(fromIso: string, toIso: string): number {
+    const [fy, fm, fd] = fromIso.split('-').map(Number);
+    const [ty, tm, td] = toIso.split('-').map(Number);
+    return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86_400_000);
+  }
 
   test.beforeAll(async () => {
     await cleanupE2eCarsByName(CAR_NAME);
@@ -67,8 +74,7 @@ test.describe('Calendar UI drag move (84)', () => {
       timeout: 15_000,
     });
 
-    // Drag earlier in the week — seeded ranges often sit at the right edge of the week view.
-    await dragCalendarEventByOffset(adminPage, seeded.reservationId, { dayOffsetPx: -320 });
+    await dragCalendarEventByOffset(adminPage, seeded.reservationId, { days: 1 });
     await expect(adminPage.getByText('Event moved')).toBeVisible({ timeout: 15_000 });
 
     await expect
@@ -81,7 +87,12 @@ test.describe('Calendar UI drag move (84)', () => {
     const afterMove = await getReservationById(seeded.reservationId);
     const movedPickup = getSofiaIsoDateString(new Date(afterMove.pickup_date));
     const movedReturn = getSofiaIsoDateString(new Date(afterMove.return_date));
-    expect(movedReturn).not.toBe(original.returnDate);
+    const shiftDays = sofiaDayDiff(original.pickupDate, movedPickup);
+    expect(shiftDays).toBeGreaterThanOrEqual(1);
+    expect(shiftDays).toBeLessThanOrEqual(3);
+    expect(sofiaDayDiff(movedPickup, movedReturn)).toBe(
+      sofiaDayDiff(original.pickupDate, original.returnDate)
+    );
 
     if (seeded.orderId) {
       const order = await getOrderById(seeded.orderId);
@@ -130,7 +141,7 @@ test.describe('Calendar UI drag move (84)', () => {
 
     await openCalendarWeek(adminPage, movedPickup);
     await dragCalendarEventByOffset(adminPage, seeded.reservationId, {
-      dayOffsetPx: 400,
+      days: 2,
       expectOk: false,
     });
     await expect(adminPage.getByRole('heading', { name: 'Calendar conflict' })).toBeVisible({

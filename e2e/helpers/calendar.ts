@@ -194,11 +194,12 @@ export function calendarEventTestId(reservationId: number | string): string {
 
 /**
  * Pointer-drag a reservation event along the same car track (positive = later).
+ * Prefer `days` so the offset tracks week-column width instead of a fixed pixel guess.
  */
 export async function dragCalendarEventByOffset(
   page: Page,
   reservationId: number | string,
-  options?: { dayOffsetPx?: number; expectOk?: boolean }
+  options?: { dayOffsetPx?: number; days?: number; expectOk?: boolean }
 ): Promise<APIResponse> {
   const event = page.getByTestId(calendarEventTestId(reservationId));
   await expect(event).toBeVisible({ timeout: 15_000 });
@@ -210,7 +211,11 @@ export async function dragCalendarEventByOffset(
   if (!trackBox || !handleBox) {
     throw new Error('dragCalendarEventByOffset: missing bounding boxes');
   }
-  const dayOffsetPx = options?.dayOffsetPx ?? Math.max(280, Math.floor(trackBox.width / 3));
+  const dayPx = Math.max(80, Math.floor(trackBox.width / 7));
+  const dayOffsetPx =
+    options?.days != null
+      ? options.days * dayPx
+      : (options?.dayOffsetPx ?? Math.max(dayPx, Math.floor(trackBox.width / 3)));
   const expectOk = options?.expectOk !== false;
   const startX = handleBox.x + handleBox.width / 2;
   const startY = handleBox.y + handleBox.height / 2;
@@ -218,6 +223,11 @@ export async function dragCalendarEventByOffset(
     trackBox.x + trackBox.width - 16,
     Math.max(trackBox.x + 16, startX + dayOffsetPx)
   );
+  if (Math.abs(endX - startX) < dayPx * 0.6) {
+    throw new Error(
+      `dragCalendarEventByOffset: drag collapsed to ${Math.round(endX - startX)}px (need ~${dayPx}px per day). Event is too close to the week edge.`
+    );
+  }
 
   const moveWait = page.waitForResponse(
     (res) => res.url().includes('/move') && res.request().method() === 'PATCH',

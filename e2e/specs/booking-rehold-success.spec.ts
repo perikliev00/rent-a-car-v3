@@ -57,7 +57,7 @@ test.describe('GUEST-004 Booking rehold success', () => {
 
     const holdB = await getActiveReservationForCar(carId);
     expect(holdB).toBeTruthy();
-    expect(Number(holdB.id)).not.toBe(holdAId);
+    expect(Number(holdB.id)).toBe(holdAId);
 
     const pickupB = parseSofiaDate(rangeB.pickupDate, rangeB.pickupTime)!;
     const returnB = parseSofiaDate(rangeB.returnDate, rangeB.returnTime)!;
@@ -71,6 +71,6 @@ test.describe('GUEST-004 Booking rehold success', () => {
       );
       return result.rows[0]?.status as string;
     });
-    expect(['cancelled', 'expired']).toContain(prior);
+    expect(prior).toBe('pending_payment');
   });
 });

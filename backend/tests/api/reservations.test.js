@@ -134,4 +134,34 @@ describe('POST /api/reservations/release-and-rehold', () => {
     expect(response.body.error.code).toBe('CONFLICT');
     expect(reservationService.releaseActiveReservationForSession).not.toHaveBeenCalled();
   });
+
+  test('returns not found when the session has no active reservation', async () => {
+    reservationService.releaseAndReholdForSession.mockResolvedValue({
+      ok: false,
+      reason: 'not_found',
+    });
+    const app = createApiTestApp();
+    const agent = await initTestAgent(app);
+
+    const response = await withCsrf(agent, agent.post('/api/reservations/release-and-rehold'))
+      .send(validReholdBody)
+      .expect(404);
+
+    expect(response.body.error.code).toBe('NOT_FOUND');
+  });
+
+  test('returns REHOLD_NOT_ALLOWED while payment is processing', async () => {
+    reservationService.releaseAndReholdForSession.mockResolvedValue({
+      ok: false,
+      reason: 'rehold_not_allowed',
+    });
+    const app = createApiTestApp();
+    const agent = await initTestAgent(app);
+
+    const response = await withCsrf(agent, agent.post('/api/reservations/release-and-rehold'))
+      .send(validReholdBody)
+      .expect(409);
+
+    expect(response.body.error.code).toBe('REHOLD_NOT_ALLOWED');
+  });
 });

@@ -3,7 +3,7 @@ const {
   ConflictError,
   isAppError,
 } = require('../utils/appError');
-const { isUniqueViolation, isCarDateBlockOverlapViolation, isReservationHoldOverlapViolation } = require('../db/transaction');
+const { isUniqueViolation, isCarDateBlockOverlapViolation, isReservationHoldOverlapViolation, isActiveSessionHoldUniqueViolation } = require('../db/transaction');
 const logger = require('../utils/logger');
 const { buildErrorPayload, getRequestIdFromReq } = require('../utils/httpResponse');
 const { captureException } = require('../config/sentry');
@@ -27,6 +27,12 @@ function usesApiEnvelope(req) {
 function normalizeError(err) {
   if (isAppError(err)) {
     return err;
+  }
+
+  if (isActiveSessionHoldUniqueViolation(err)) {
+    return new ConflictError(
+      'You already have an active reservation. Please complete or release it before starting another.'
+    );
   }
 
   if (isUniqueViolation(err)) {

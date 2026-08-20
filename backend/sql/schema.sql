@@ -33,6 +33,12 @@
 --   024 pricing engine
 --   025 customer portal
 --   026 reservation checklists
+--   027 rbac
+--   028 calendar
+--   029 notifications
+--   030 notifications rbac
+--   031 one active hold per session
+
 --
 -- Legacy destructive drops (e.g. bookings) live in migrations/ only.
 
@@ -66,3 +72,4 @@
 \ir schema/028_calendar.sql
 \ir schema/029_notifications.sql
 \ir schema/030_notifications_rbac.sql
+\ir schema/031_reservations_one_active_hold_per_session.sql

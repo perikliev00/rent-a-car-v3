@@ -32,7 +32,14 @@ async function findActiveBySessionId(sessionId, client = null) {
 }
 
 async function findOverlappingHold(
-  { carId, startDate, endDate, now = new Date(), excludeSessionId = null },
+  {
+    carId,
+    startDate,
+    endDate,
+    now = new Date(),
+    excludeSessionId = null,
+    excludeReservationId = null,
+  },
   client = null
 ) {
   const normalizedCarId = normalizeCarId(carId);
@@ -51,7 +58,13 @@ async function findOverlappingHold(
 
   if (excludeSessionId) {
     params.push(excludeSessionId);
-    excludeSql = `AND r.session_id <> $${params.length}`;
+    excludeSql += ` AND r.session_id <> $${params.length}`;
+  }
+
+  const excludedReservationId = Number(excludeReservationId);
+  if (Number.isInteger(excludedReservationId) && excludedReservationId > 0) {
+    params.push(excludedReservationId);
+    excludeSql += ` AND r.id <> $${params.length}`;
   }
 
   const result = await clientQuery(

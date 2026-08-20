@@ -99,7 +99,8 @@ describe('EventDetailsDrawer', () => {
 
     renderWithRouter(<EventDetailsDrawer eventId="task:9" open onClose={vi.fn()} />);
 
-    expect(await screen.findByRole('button', { name: 'Delete' })).toBeInTheDocument();
+    expect(await screen.findByText('Pickup')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
     expect(deleteCalendarTask).not.toHaveBeenCalled();
   });
 

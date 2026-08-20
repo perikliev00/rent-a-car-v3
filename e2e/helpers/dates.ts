@@ -146,3 +146,27 @@ export function allocateFutureRange(
 
   return { pickupDate, returnDate, pickupTime, returnTime };
 }
+
+/** 0 = Sunday … 6 = Saturday for a YYYY-MM-DD Sofia calendar date. */
+export function sofiaIsoWeekday(isoDate: string): number {
+  const [year, month, day] = isoDate.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+}
+
+/**
+ * Future range whose pickup falls on `weekday` (0=Sun … 3=Wed … 6=Sat).
+ * Keeps week-view drags away from the Monday/Sunday edges.
+ */
+export function allocateFutureRangeOnWeekday(
+  weekday: number,
+  options: AllocateFutureRangeOptions = {}
+): AllocatedFutureRange {
+  const fromDaysAhead = options.fromDaysAhead ?? 14;
+  for (let offset = 0; offset < 7; offset += 1) {
+    const range = allocateFutureRange({ ...options, fromDaysAhead: fromDaysAhead + offset });
+    if (sofiaIsoWeekday(range.pickupDate) === weekday) {
+      return range;
+    }
+  }
+  return allocateFutureRange({ ...options, fromDaysAhead });
+}

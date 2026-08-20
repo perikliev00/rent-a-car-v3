@@ -28,6 +28,10 @@ async function createWithAvailabilityCheck(payload) {
   return reservationSql.createPendingReservationWithAvailabilityCheck(payload);
 }
 
+async function reholdWithAvailabilityCheck(payload) {
+  return reservationSql.reholdPendingReservationWithAvailabilityCheck(payload);
+}
+
 async function createConfirmed(payload, client = null) {
   return reservationSql.createConfirmedReservation(payload, client);
 }
@@ -63,6 +67,7 @@ module.exports = {
   findBookedDateOverlap,
   create,
   createWithAvailabilityCheck,
+  reholdWithAvailabilityCheck,
   createConfirmed,
   update,
   markAbandoned,

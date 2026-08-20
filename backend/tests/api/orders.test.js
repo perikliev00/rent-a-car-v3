@@ -8,6 +8,23 @@ jest.mock('../../src/services/reservationService', () => ({
   releaseActiveReservationForSession: jest.fn(),
   attachCarNameToReservation: jest.fn(),
 }));
+jest.mock('../../src/services/sql/pricingConfigSqlService', () => {
+  const { DELIVERY_FEES } = require('../../src/constants/locations');
+  const config = {
+    seasons: [],
+    weekendRules: [],
+    discountRules: [],
+    depositRules: [{ id: 1, name: 'Default', defaultAmount: 300, active: true }],
+    deliveryFees: Object.entries(DELIVERY_FEES).map(([locationId, fee]) => ({ locationId, fee })),
+    deliveryFeeMap: { ...DELIVERY_FEES },
+    globalFees: [],
+    extras: [],
+  };
+  return {
+    loadPricingConfig: jest.fn(async () => config),
+    buildDefaultConfig: jest.fn(() => config),
+  };
+});
 
 const carRepository = require('../../src/repositories/carRepository');
 const reservationService = require('../../src/services/reservationService');
@@ -30,6 +47,15 @@ const validOrderBody = {
 };
 
 describe('POST /api/orders', () => {
+  jest.setTimeout(15000);
+
+  let agent;
+
+  beforeAll(async () => {
+    const app = createApiTestApp();
+    agent = await initTestAgent(app);
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     carRepository.findById.mockResolvedValue(mockCar);
@@ -41,9 +67,6 @@ describe('POST /api/orders', () => {
   });
 
   test('returns order data on success', async () => {
-    const app = createApiTestApp();
-    const agent = await initTestAgent(app);
-
     const response = await withCsrf(agent, agent.post('/api/orders')).send(validOrderBody).expect(200);
 
     expect(response.body.success).toBe(true);
@@ -59,9 +82,6 @@ describe('POST /api/orders', () => {
   });
 
   test('accepts single-digit hour times', async () => {
-    const app = createApiTestApp();
-    const agent = await initTestAgent(app);
-
     const response = await withCsrf(agent, agent.post('/api/orders'))
       .send({ ...validOrderBody, pickupTime: '9:00', returnTime: '9:30' })
       .expect(200);
@@ -77,9 +97,6 @@ describe('POST /api/orders', () => {
   });
 
   test('returns validation error for missing fields', async () => {
-    const app = createApiTestApp();
-    const agent = await initTestAgent(app);
-
     const response = await withCsrf(agent, agent.post('/api/orders')).send({ carId: 1 }).expect(422);
 
     expect(response.body.success).toBe(false);
@@ -91,8 +108,6 @@ describe('POST /api/orders', () => {
       overlappingReservation: true,
       bookedOverlap: false,
     });
-    const app = createApiTestApp();
-    const agent = await initTestAgent(app);
 
     const response = await withCsrf(agent, agent.post('/api/orders')).send(validOrderBody).expect(409);
 
@@ -126,9 +141,6 @@ describe('POST /api/orders', () => {
       bookedOverlap: false,
     });
 
-    const app = createApiTestApp();
-    const agent = await initTestAgent(app);
-
     const response = await withCsrf(agent, agent.post('/api/orders')).send(validOrderBody).expect(200);
 
     expect(response.body.success).toBe(true);
@@ -137,9 +149,6 @@ describe('POST /api/orders', () => {
   });
 
   test('returns validation error when return date is before pickup date', async () => {
-    const app = createApiTestApp();
-    const agent = await initTestAgent(app);
-
     const response = await withCsrf(agent, agent.post('/api/orders'))
       .send({
         ...validOrderBody,
@@ -175,9 +184,6 @@ describe('POST /api/orders', () => {
     };
     reservationService.findActiveReservationBySession.mockResolvedValue(existing);
     reservationService.attachCarNameToReservation.mockResolvedValue(existing);
-
-    const app = createApiTestApp();
-    const agent = await initTestAgent(app);
 
     const response = await withCsrf(agent, agent.post('/api/orders')).send(validOrderBody).expect(200);
 

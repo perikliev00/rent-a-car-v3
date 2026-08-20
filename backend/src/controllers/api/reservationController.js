@@ -1,11 +1,9 @@
 const { validationResult } = require('express-validator');
 const carRepository = require('../../repositories/carRepository');
 const { computeBookingPriceAsync } = require('../../utils/pricing');
-const { getSessionId } = require('../../utils/reservationHelpers');
 const { validateBookingDates } = require('../../utils/bookingValidation');
 const {
   releaseActiveReservationForSession,
-  createPendingReservation,
   releaseAndReholdForSession,
 } = require('../../services/reservationService');
 const { logCustomerAction } = require('../../services/admin/adminAuditService');
@@ -116,6 +114,17 @@ exports.releaseAndReholdReservation = asyncHandler(async (req, res, next) => {
     });
 
     if (!rehold.ok) {
+      if (rehold.reason === 'not_found') {
+        return apiResponse.error(res, 'NOT_FOUND', 'No active reservation.', 404);
+      }
+      if (rehold.reason === 'rehold_not_allowed') {
+        return apiResponse.error(
+          res,
+          'REHOLD_NOT_ALLOWED',
+          'This reservation cannot be moved while payment is processing.',
+          409
+        );
+      }
       return apiResponse.error(
         res,
         'CONFLICT',
@@ -129,9 +138,20 @@ exports.releaseAndReholdReservation = asyncHandler(async (req, res, next) => {
       entityType: 'reservation',
       entityId: rehold.reservation?.id ?? null,
       metadata: {
-        carId: car.id,
-        from: startDate.toISOString(),
-        to: endDate.toISOString(),
+        fromCarId: rehold.fromCarId ?? rehold.historyMetadata?.fromCarId ?? null,
+        toCarId: car.id,
+        fromPickup:
+          rehold.historyMetadata?.fromPickup ??
+          (rehold.fromPickup instanceof Date
+            ? rehold.fromPickup.toISOString()
+            : rehold.fromPickup ?? null),
+        fromReturn:
+          rehold.historyMetadata?.fromReturn ??
+          (rehold.fromReturn instanceof Date
+            ? rehold.fromReturn.toISOString()
+            : rehold.fromReturn ?? null),
+        toPickup: startDate.toISOString(),
+        toReturn: endDate.toISOString(),
       },
     });
 

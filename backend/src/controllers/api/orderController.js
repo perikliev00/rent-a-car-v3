@@ -187,18 +187,26 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
       return respondForExistingSessionHold(existingForSession);
     }
 
-    const { overlappingReservation, bookedOverlap } = await createPendingReservation({
-      carId: car.id,
-      sessionId,
-      startDate,
-      endDate,
-      pickupTime,
-      returnTime,
-      pickupLocation,
-      returnLocation,
-      pricing,
-      now,
-    }, req);
+    const { overlappingReservation, bookedOverlap, existingActiveReservation } =
+      await createPendingReservation(
+        {
+          carId: car.id,
+          sessionId,
+          startDate,
+          endDate,
+          pickupTime,
+          returnTime,
+          pickupLocation,
+          returnLocation,
+          pricing,
+          now,
+        },
+        req
+      );
+
+    if (existingActiveReservation) {
+      return respondForExistingSessionHold(existingActiveReservation);
+    }
 
     if (overlappingReservation) {
       const sessionHoldAfterOverlap = await findActiveReservationBySession(req);

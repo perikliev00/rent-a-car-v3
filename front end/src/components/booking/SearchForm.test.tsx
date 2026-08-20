@@ -24,6 +24,10 @@ describe('SearchForm', () => {
       <SearchForm values={values} onChange={vi.fn()} onSubmit={onSubmit} />,
     );
 
+    await waitFor(() => {
+      expect(getLocations).toHaveBeenCalled();
+    });
+
     expect(screen.getByLabelText('Pickup date')).toBeInTheDocument();
     expect(screen.getByLabelText('Return date')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Pickup time/i })).toBeInTheDocument();
@@ -32,10 +36,6 @@ describe('SearchForm', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Get your quote' }));
     expect(onSubmit).toHaveBeenCalledTimes(1);
-
-    await waitFor(() => {
-      expect(getLocations).toHaveBeenCalled();
-    });
   });
 
   it('updates pickup date via calendar and keeps return on or after pickup', () => {

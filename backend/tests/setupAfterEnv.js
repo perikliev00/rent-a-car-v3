@@ -19,3 +19,11 @@ jest.mock('../src/db/pool', () => {
     on: jest.fn(),
   };
 });
+
+afterAll(async () => {
+  if (process.env.RUN_DB_TESTS !== 'true') return;
+  const pool = jest.requireActual('../src/db/pool');
+  if (pool && typeof pool.end === 'function' && !pool.ended && !pool.ending) {
+    await pool.end();
+  }
+});

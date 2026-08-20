@@ -130,6 +130,41 @@ async function countActiveReservationsForCar(carId) {
   return result.rows[0].count;
 }
 
+async function countActiveReservationsForSession(sessionId) {
+  const result = await pool.query(
+    `
+    SELECT COUNT(*)::int AS count
+    FROM reservations
+    WHERE session_id = $1
+      AND status IN ('pending_payment', 'processing_payment')
+      AND hold_expires_at > NOW()
+    `,
+    [sessionId]
+  );
+  return result.rows[0].count;
+}
+
+async function countReservationsForSession(sessionId) {
+  const result = await pool.query(
+    `SELECT COUNT(*)::int AS count FROM reservations WHERE session_id = $1`,
+    [sessionId]
+  );
+  return result.rows[0].count;
+}
+
+async function countReholdHistory(reservationId) {
+  const result = await pool.query(
+    `
+    SELECT COUNT(*)::int AS count
+    FROM reservation_status_history
+    WHERE reservation_id = $1
+      AND reason = 'customer_reheld'
+    `,
+    [reservationId]
+  );
+  return result.rows[0].count;
+}
+
 async function setHoldExpired(reservationId, expiredAt = new Date('2020-01-01T00:00:00.000Z')) {
   await pool.query(
     `
@@ -283,6 +318,9 @@ module.exports = {
   getOrderByReservationId,
   getDateBlocksForCar,
   countActiveReservationsForCar,
+  countActiveReservationsForSession,
+  countReservationsForSession,
+  countReholdHistory,
   setHoldExpired,
   insertDateBlock,
   countProcessedStripeEvents,

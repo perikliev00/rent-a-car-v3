@@ -2,7 +2,12 @@ const {
   isUniqueViolation,
   isCarDateBlockOverlapViolation,
   isReservationHoldOverlapViolation,
+  isActiveSessionHoldUniqueViolation,
   acquireCarAdvisoryLock,
+  acquireCarAdvisoryLocks,
+  acquireSessionAdvisoryLock,
+  ADVISORY_LOCK_NS,
+  ACTIVE_SESSION_HOLD_UNIQUE_INDEX,
 } = require('../../src/db/transaction');
 
 describe('transaction error helpers', () => {
@@ -29,12 +34,31 @@ describe('transaction error helpers', () => {
     ).toBe(true);
   });
 
-  test('acquireCarAdvisoryLock queries pg_advisory_xact_lock for valid car id', async () => {
+  test('isActiveSessionHoldUniqueViolation detects the session hold unique index', () => {
+    expect(
+      isActiveSessionHoldUniqueViolation({
+        code: '23505',
+        constraint: ACTIVE_SESSION_HOLD_UNIQUE_INDEX,
+      })
+    ).toBe(true);
+    expect(
+      isActiveSessionHoldUniqueViolation({
+        code: '23505',
+        constraint: 'idx_reservations_stripe_session_unique',
+      })
+    ).toBe(false);
+    expect(isActiveSessionHoldUniqueViolation({ code: '23505' })).toBe(false);
+  });
+
+  test('acquireCarAdvisoryLock queries namespaced pg_advisory_xact_lock', async () => {
     const client = { query: jest.fn().mockResolvedValue({ rows: [] }) };
 
     await acquireCarAdvisoryLock(client, 42);
 
-    expect(client.query).toHaveBeenCalledWith('SELECT pg_advisory_xact_lock($1)', [42]);
+    expect(client.query).toHaveBeenCalledWith('SELECT pg_advisory_xact_lock($1, $2)', [
+      ADVISORY_LOCK_NS.CAR,
+      42,
+    ]);
   });
 
   test('acquireCarAdvisoryLock rejects invalid car id', async () => {
@@ -42,6 +66,38 @@ describe('transaction error helpers', () => {
 
     await expect(acquireCarAdvisoryLock(client, 'bad')).rejects.toThrow(
       'Invalid car id for advisory lock'
+    );
+    expect(client.query).not.toHaveBeenCalled();
+  });
+
+  test('acquireCarAdvisoryLocks locks unique ids in sorted order', async () => {
+    const client = { query: jest.fn().mockResolvedValue({ rows: [] }) };
+
+    await acquireCarAdvisoryLocks(client, [9, 3, 9, 1]);
+
+    expect(client.query.mock.calls).toEqual([
+      ['SELECT pg_advisory_xact_lock($1, $2)', [ADVISORY_LOCK_NS.CAR, 1]],
+      ['SELECT pg_advisory_xact_lock($1, $2)', [ADVISORY_LOCK_NS.CAR, 3]],
+      ['SELECT pg_advisory_xact_lock($1, $2)', [ADVISORY_LOCK_NS.CAR, 9]],
+    ]);
+  });
+
+  test('acquireSessionAdvisoryLock uses namespaced hashtext', async () => {
+    const client = { query: jest.fn().mockResolvedValue({ rows: [] }) };
+
+    await acquireSessionAdvisoryLock(client, 'sess-abc');
+
+    expect(client.query).toHaveBeenCalledWith('SELECT pg_advisory_xact_lock($1, hashtext($2))', [
+      ADVISORY_LOCK_NS.SESSION,
+      'sess-abc',
+    ]);
+  });
+
+  test('acquireSessionAdvisoryLock rejects invalid session id', async () => {
+    const client = { query: jest.fn() };
+
+    await expect(acquireSessionAdvisoryLock(client, '')).rejects.toThrow(
+      'Invalid session id for advisory lock'
     );
     expect(client.query).not.toHaveBeenCalled();
   });
