@@ -102,6 +102,7 @@ jobs:
 
       - name: Install E2E dependencies
         run: |
+          npm --prefix "front end" ci
           npm --prefix e2e ci
           npm run e2e:install
 
