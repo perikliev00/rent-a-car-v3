@@ -1,6 +1,6 @@
 const request = require('supertest');
-const bcrypt = require('bcrypt');
-const { createApiTestApp, initTestAgent, withCsrf } = require('../../helpers/apiTestApp');
+const { createApiTestApp, withCsrf } = require('../../helpers/apiTestApp');
+const { loginAsAdmin } = require('../../helpers/apiAdminLogin');
 const { ALL_PERMISSIONS } = require('../../helpers/rbacTestAccess');
 
 jest.mock('../../../src/services/reservationService', () => ({}));
@@ -48,30 +48,11 @@ jest.mock('bcrypt', () => ({
   hash: jest.fn(),
 }));
 
-const userSql = require('../../../src/services/sql/userSqlService');
 const reservationAdminService = require('../../../src/services/admin/reservationAdminService');
 const {
   requestReservationRefund,
 } = require('../../../src/services/payment/refund/reservationRefundService');
 const rbacService = require('../../../src/services/rbac/rbacService');
-
-const adminUser = {
-  id: 1,
-  email: 'admin@example.com',
-  password: 'hashed-password',
-  role: 'admin',
-};
-
-async function loginAsAdmin(app) {
-  const agent = await initTestAgent(app);
-  userSql.findUserByEmail.mockResolvedValue(adminUser);
-  bcrypt.compare.mockResolvedValue(true);
-  const loginRes = await withCsrf(agent, agent.post('/api/auth/login'))
-    .send({ email: 'admin@example.com', password: 'Secret123' })
-    .expect(200);
-  agent.csrfToken = loginRes.body.data.csrfToken;
-  return agent;
-}
 
 describe('POST /api/admin/reservations/:id/refund', () => {
   beforeEach(() => {

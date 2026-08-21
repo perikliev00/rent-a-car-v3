@@ -11,6 +11,8 @@ const result = spawnSync(
     '--config',
     require.resolve('../jest.integration.config.js'),
     '--runInBand',
+    '--json',
+    '--outputFile=test-results/jest-integration-results.json',
   ],
   { stdio: 'inherit', env: process.env, shell: false }
 );

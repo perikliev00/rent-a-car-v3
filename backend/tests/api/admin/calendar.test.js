@@ -1,6 +1,7 @@
 const request = require('supertest');
 const bcrypt = require('bcrypt');
 const { createApiTestApp, initTestAgent, withCsrf } = require('../../helpers/apiTestApp');
+const { loginAsAdmin } = require('../../helpers/apiAdminLogin');
 const { ALL_PERMISSIONS } = require('../../helpers/rbacTestAccess');
 
 jest.mock('../../../src/services/reservationService', () => ({}));
@@ -49,24 +50,6 @@ jest.mock('bcrypt', () => ({
 const userSql = require('../../../src/services/sql/userSqlService');
 const calendarService = require('../../../src/modules/calendar/calendar.service');
 const rbacService = require('../../../src/services/rbac/rbacService');
-
-const adminUser = {
-  id: 1,
-  email: 'admin@example.com',
-  password: 'hashed-password',
-  role: 'admin',
-};
-
-async function loginAsAdmin(app) {
-  const agent = await initTestAgent(app);
-  userSql.findUserByEmail.mockResolvedValue(adminUser);
-  bcrypt.compare.mockResolvedValue(true);
-  const loginRes = await withCsrf(agent, agent.post('/api/auth/login'))
-    .send({ email: 'admin@example.com', password: 'Secret123' })
-    .expect(200);
-  agent.csrfToken = loginRes.body.data.csrfToken;
-  return agent;
-}
 
 describe('Admin calendar API', () => {
   beforeEach(() => {

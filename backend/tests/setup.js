@@ -1,3 +1,8 @@
+const fs = require('fs');
+const path = require('path');
+
+fs.mkdirSync(path.join(__dirname, '..', 'test-results'), { recursive: true });
+
 process.env.NODE_ENV = 'test';
 process.env.STRIPE_SECRET =
   process.env.STRIPE_SECRET || 'sk_test_jest_placeholder_key_1234567890';

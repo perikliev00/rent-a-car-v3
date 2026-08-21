@@ -21,7 +21,23 @@ jobs:
           cache-dependency-path: backend/package-lock.json
 
       - run: npm ci
-      - run: npm test
+      - run: npm run test:coverage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backend-unit-coverage
+          path: |
+            backend/coverage/coverage-summary.json
+            backend/coverage/lcov.info
+            backend/coverage/lcov-report
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-unit-jest-results
+          path: backend/test-results/jest-results.json
+          if-no-files-found: error
+          retention-days: 14
 
   frontend:
     runs-on: ubuntu-latest
@@ -40,6 +56,22 @@ jobs:
 
       - run: npm ci
       - run: npm run check
+      - run: npm run test:coverage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-unit-coverage
+          path: |
+            front end/coverage/coverage-summary.json
+            front end/coverage/lcov.info
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: frontend-unit-vitest-results
+          path: front end/test-results/vitest-results.json
+          if-no-files-found: error
+          retention-days: 14
 
   integration-e2e:
     runs-on: ubuntu-latest
@@ -104,3 +136,27 @@ jobs:
 
       - name: Run Playwright E2E tests
         run: npm run e2e
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-integration-jest-results
+          path: backend/test-results/jest-integration-results.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-playwright-json
+          path: e2e/test-results/results.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-playwright-html
+          path: e2e/playwright-report/
+          if-no-files-found: warn
+          retention-days: 14

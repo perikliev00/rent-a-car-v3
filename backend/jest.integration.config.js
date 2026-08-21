@@ -9,4 +9,5 @@ module.exports = {
   setupFilesAfterEnv: ['<rootDir>/tests/integration/setupIntegrationAfterEnv.js'],
   testMatch: ['**/tests/integration/**/*.test.js'],
   testPathIgnorePatterns: ['/node_modules/'],
+  slowTestThreshold: 8000,
 };

@@ -1,6 +1,6 @@
 const request = require('supertest');
-const bcrypt = require('bcrypt');
-const { createApiTestApp, initTestAgent, withCsrf } = require('../../helpers/apiTestApp');
+const { createApiTestApp, withCsrf } = require('../../helpers/apiTestApp');
+const { loginAsAdmin } = require('../../helpers/apiAdminLogin');
 
 jest.mock('../../../src/services/reservationService', () => ({}));
 jest.mock('../../../src/middleware/rateLimit', () => ({
@@ -32,32 +32,13 @@ jest.mock('bcrypt', () => ({
   hash: jest.fn(),
 }));
 
-const userSql = require('../../../src/services/sql/userSqlService');
 const paymentAdminService = require('../../../src/services/admin/paymentAdminService');
-
-const adminUser = {
-  id: 1,
-  email: 'admin@example.com',
-  password: 'hashed-password',
-  role: 'admin',
-};
 
 const mockMonitoringData = {
   events: [{ id: 1, event_type: 'checkout.session.completed' }],
   failures: [{ id: 2, reason: 'overlap_after_payment' }],
   unresolvedFailureCount: 1,
 };
-
-async function loginAsAdmin(app) {
-  const agent = await initTestAgent(app);
-  userSql.findUserByEmail.mockResolvedValue(adminUser);
-  bcrypt.compare.mockResolvedValue(true);
-  const loginRes = await withCsrf(agent, agent.post('/api/auth/login'))
-    .send({ email: 'admin@example.com', password: 'Secret123' })
-    .expect(200);
-  agent.csrfToken = loginRes.body.data.csrfToken;
-  return agent;
-}
 
 describe('GET /api/admin/payments', () => {
   beforeEach(() => {

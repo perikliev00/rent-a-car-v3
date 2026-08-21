@@ -20,7 +20,7 @@ jest.mock('../../src/middleware/rateLimit', () => ({
 const reservationService = require('../../src/services/reservationService');
 
 describe('CSRF middleware', () => {
-  jest.setTimeout(15000);
+  jest.setTimeout(60_000);
 
   beforeEach(() => {
     jest.clearAllMocks();

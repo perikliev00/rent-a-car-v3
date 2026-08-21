@@ -1,6 +1,6 @@
 const request = require('supertest');
-const bcrypt = require('bcrypt');
-const { createApiTestApp, initTestAgent, withCsrf } = require('../../helpers/apiTestApp');
+const { createApiTestApp } = require('../../helpers/apiTestApp');
+const { loginAsAdmin } = require('../../helpers/apiAdminLogin');
 const { ALL_PERMISSIONS } = require('../../helpers/rbacTestAccess');
 
 jest.mock('../../../src/middleware/rateLimit', () => ({
@@ -32,27 +32,8 @@ jest.mock('bcrypt', () => ({
   hash: jest.fn(),
 }));
 
-const userSql = require('../../../src/services/sql/userSqlService');
 const notificationsService = require('../../../src/modules/notifications/notifications.service');
 const rbacService = require('../../../src/services/rbac/rbacService');
-
-const adminUser = {
-  id: 1,
-  email: 'admin@example.com',
-  password: 'hashed-password',
-  role: 'admin',
-};
-
-async function loginAsAdmin(app) {
-  const agent = await initTestAgent(app);
-  userSql.findUserByEmail.mockResolvedValue(adminUser);
-  bcrypt.compare.mockResolvedValue(true);
-  const loginRes = await withCsrf(agent, agent.post('/api/auth/login'))
-    .send({ email: 'admin@example.com', password: 'Secret123' })
-    .expect(200);
-  agent.csrfToken = loginRes.body.data.csrfToken;
-  return agent;
-}
 
 describe('Admin notifications API', () => {
   beforeEach(() => {

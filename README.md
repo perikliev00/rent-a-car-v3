@@ -76,6 +76,7 @@ npm run dev            # http://localhost:3000
 | `npm run dev` | Start API with nodemon |
 | `npm start` | Start API (production) |
 | `npm test` | Run Jest tests |
+| `npm run test:coverage` | Run Jest with coverage reports and global floors |
 | `npm run test:db` | Run DB consistency tests (`RUN_DB_TESTS=1`) |
 | `npm run test:integration` | Run concurrency + webhook integration tests (`RUN_INTEGRATION_TESTS=1`) |
 | `npm run db:schema` | Apply initial SQL schema |
@@ -104,6 +105,7 @@ npm run dev            # http://localhost:5173
 | `npm run build` | Typecheck + production build |
 | `npm run preview` | Preview production build |
 | `npm test` | Run Vitest tests |
+| `npm run test:coverage` | Run Vitest with coverage reports and global floors |
 | `npm run check` | Lint + typecheck + test |
 
 ## Database Setup
@@ -253,9 +255,10 @@ npm run test:e2e
 ```bash
 cd backend
 npm test
+npm run test:coverage
 ```
 
-Jest runs integration tests in `backend/tests/` with `--runInBand`. Tests use a mocked environment (see `tests/setup.js`).
+Jest runs unit tests in `backend/tests/` with `--runInBand`. Tests use a mocked environment (see `tests/setup.js`). Coverage reports land in `backend/coverage/` and `front end/coverage/`; CI uploads them as artifacts. Unit coverage floors are enforced by Jest `coverageThreshold` and Vitest `coverage.thresholds`. Local `npm test` and `npm run check` do not apply the gate. Floors are global integers from the 2026-08-22 baseline; raise them later when coverage actually goes up — do not lower them to make a PR green. Slow tests are printed via Jest/Vitest `slowTestThreshold` (500ms unit, 8000ms integration). Playwright JSON and HTML reports are CI artifacts; retries in the JSON are the flake signal.
 
 Optional database consistency tests (from repo root, uses `.env.test`):
 
@@ -305,7 +308,8 @@ E2E starts backend (`STRIPE_STUB=1`) and frontend via Playwright `webServer`, or
 cd "front end"
 npm test          # single run
 npm run test:watch
-npm run check     # lint + typecheck + test
+npm run test:coverage
+npm run check     # lint + typecheck + test (no coverage)
 ```
 
 Tests are co-located under `front end/src/` (API client, routes, utilities).
@@ -516,9 +520,9 @@ Production validation (in `backend/src/config/env.js`) enforces:
 
 GitHub Actions (`.github/workflows/ci.yml`) runs on push/PR:
 
-- **Backend:** `npm test` (Jest unit tests)
-- **Frontend:** `npm run check` (lint + typecheck + Vitest)
-- **Integration + E2E:** PostgreSQL service, `npm run test:integration`, Playwright `booking-happy-path` spec
+- **Backend:** `npm run test:coverage` (Jest unit tests + coverage artifact; fails if coverage drops below the floor). Jest JSON results upload as `backend-unit-jest-results` even if the job fails.
+- **Frontend:** `npm run check` (lint + typecheck + Vitest, no coverage floor), then `npm run test:coverage` (coverage artifact + floor). Vitest JSON results upload as `frontend-unit-vitest-results`.
+- **Integration + E2E:** PostgreSQL service, `npm run test:integration`, Playwright. JSON + HTML reports and integration Jest results upload as artifacts (`if: always()`). Playwright retries in the JSON are the flake signal.
 
 ### 5. Post-deploy operations
 

@@ -1,6 +1,6 @@
 const request = require('supertest');
-const bcrypt = require('bcrypt');
-const { createApiTestApp, initTestAgent, withCsrf } = require('../../helpers/apiTestApp');
+const { createApiTestApp, withCsrf } = require('../../helpers/apiTestApp');
+const { loginAsAdmin, loginAsCustomer } = require('../../helpers/apiAdminLogin');
 
 jest.mock('../../../src/services/reservationService', () => ({}));
 jest.mock('../../../src/middleware/rateLimit', () => ({
@@ -45,15 +45,7 @@ jest.mock('bcrypt', () => ({
   hash: jest.fn(),
 }));
 
-const userSql = require('../../../src/services/sql/userSqlService');
 const carAdminService = require('../../../src/services/admin/carAdminService');
-
-const adminUser = {
-  id: 1,
-  email: 'admin@example.com',
-  password: 'hashed-password',
-  role: 'admin',
-};
 
 const mockCar = {
   id: 7,
@@ -64,33 +56,6 @@ const mockCar = {
   price: 45,
   availability: true,
 };
-
-async function loginAsAdmin(app) {
-  const agent = await initTestAgent(app);
-  userSql.findUserByEmail.mockResolvedValue(adminUser);
-  bcrypt.compare.mockResolvedValue(true);
-  const loginRes = await withCsrf(agent, agent.post('/api/auth/login'))
-    .send({ email: 'admin@example.com', password: 'Secret123' })
-    .expect(200);
-  agent.csrfToken = loginRes.body.data.csrfToken;
-  return agent;
-}
-
-async function loginAsCustomer(app) {
-  const agent = await initTestAgent(app);
-  userSql.findUserByEmail.mockResolvedValue({
-    id: 2,
-    email: 'user@example.com',
-    password: 'hashed-password',
-    role: 'customer',
-  });
-  bcrypt.compare.mockResolvedValue(true);
-  const loginRes = await withCsrf(agent, agent.post('/api/auth/login'))
-    .send({ email: 'user@example.com', password: 'Secret123' })
-    .expect(200);
-  agent.csrfToken = loginRes.body.data.csrfToken;
-  return agent;
-}
 
 const validCarBody = {
   name: 'Toyota Yaris',
