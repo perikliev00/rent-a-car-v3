@@ -19,6 +19,7 @@ const canViewOps = requirePermission('can_view_reservations_ops');
 const canChangeStatus = requirePermission('can_change_reservation_status');
 const canManageChecklists = requirePermission('can_manage_checklists');
 const canCancelOrders = requirePermission('can_cancel_orders');
+const canRefundPayments = requirePermission('can_refund_payments');
 
 router.get('/ops-dashboard', canViewOps, reservationOpsController.getOpsDashboard);
 
@@ -73,5 +74,7 @@ router.post(
   validateRequest,
   reservationController.changeStatus
 );
+
+router.post('/:id/refund', canRefundPayments, reservationController.refundReservation);
 
 module.exports = router;

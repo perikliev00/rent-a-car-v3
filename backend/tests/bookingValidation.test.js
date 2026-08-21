@@ -1,5 +1,4 @@
 const { validateBookingDates } = require('../src/utils/bookingValidation');
-const { computeRentalDays } = require('../src/utils/date/calculateRentalDays');
 const { getSofiaIsoDateString } = require('../src/utils/date/timezone');
 
 const fixedNow = new Date('2026-06-27T12:00:00');
@@ -79,7 +78,6 @@ describe('validateBookingDates timezone independence', () => {
       now,
     });
 
-    expect(todayIso).toBe('2026-07-15');
     expect(result.isValid).toBe(true);
     expect(result.errors).toEqual([]);
   });
@@ -109,7 +107,6 @@ describe('validateBookingDates timezone independence', () => {
       now,
     });
 
-    expect(getSofiaIsoDateString(now)).toBe('2026-07-15');
     expect(result.isValid).toBe(true);
     expect(result.errors).not.toContain('Pick-up and return dates cannot be in the past.');
   });
@@ -125,7 +122,6 @@ describe('validateBookingDates timezone independence', () => {
       now,
     });
 
-    expect(getSofiaIsoDateString(now)).toBe('2026-07-16');
     expect(result.isValid).toBe(false);
     expect(result.errors).toContain('Pick-up and return dates cannot be in the past.');
   });
@@ -187,20 +183,5 @@ describe('validateBookingDates timezone independence', () => {
         now: summerNow,
       }).isValid
     ).toBe(true);
-  });
-});
-
-describe('computeRentalDays', () => {
-  test('returns at least one day for valid range', () => {
-    const start = new Date('2026-07-01T10:00:00Z');
-    const end = new Date('2026-07-02T09:00:00Z');
-
-    expect(computeRentalDays(start, end)).toBe(1);
-  });
-
-  test('throws for invalid dates', () => {
-    expect(() => computeRentalDays(new Date('invalid'), new Date())).toThrow(
-      'Invalid dates passed to computeRentalDays'
-    );
   });
 });

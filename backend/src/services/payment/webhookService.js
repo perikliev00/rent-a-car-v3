@@ -4,6 +4,33 @@ const logEvent = require('../../monitoring/logEvent');
 const { trackWebhookFailure } = require('../../monitoring/track');
 const paymentEventSql = require('../sql/paymentEventSqlService');
 const { processStripeWebhookEvent } = require('../bookingFinalizationService');
+const {
+  applyRefundFromStripeObject,
+} = require('./refund/reservationRefundService');
+
+async function handleRefundWebhookEvent(event, req) {
+  const obj = event.data?.object;
+  if (!obj) {
+    return { statusCode: 200, body: { received: true } };
+  }
+
+  try {
+    await applyRefundFromStripeObject(obj, { eventType: event.type });
+  } catch (err) {
+    logger.error(
+      { err, eventId: event.id, eventType: event.type, requestId: req.requestId },
+      'Failed to apply Stripe refund webhook'
+    );
+    trackWebhookFailure('refund_apply_failed', {
+      requestId: req.requestId,
+      eventId: event.id,
+      eventType: event.type,
+      message: err.message,
+    });
+  }
+
+  return { statusCode: 200, body: { received: true } };
+}
 
 async function handleStripeWebhookFlow(req) {
   const logPrefix = '🌐 [StripeWebhook]';
@@ -57,6 +84,10 @@ async function handleStripeWebhookFlow(req) {
     .catch((err) => {
       logger.error({ err, eventId: event.id }, 'Failed to persist payment event');
     });
+
+  if (event.type === 'charge.refunded' || event.type === 'refund.updated') {
+    return handleRefundWebhookEvent(event, req);
+  }
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data && event.data.object;

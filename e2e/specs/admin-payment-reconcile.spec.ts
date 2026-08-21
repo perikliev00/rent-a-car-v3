@@ -106,6 +106,15 @@ test.describe('MONEY-010 Payments monitor + dry-run/live reconcile', () => {
     const order = await getOrderByGuestEmail(guestEmail);
     expect(order).toBeTruthy();
     expect(order.status).toBe('active');
+
+    const live = await reconcilePaymentsViaApi(request, session, false);
+    expect(live.status).toBe(200);
+
+    await adminPage.goto('/admin/payments');
+    await expect(adminPage.getByRole('heading', { name: 'Payments', exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(adminPage.getByText(stripeSessionId)).toHaveCount(0);
   });
 
   test('live reconcile leaves unpaid stub session processing', async ({ page, request }) => {

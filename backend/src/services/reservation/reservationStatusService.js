@@ -127,8 +127,8 @@ async function changeStatusCore({
       await bookingSync.removeRange(carId, storedStart, storedEnd, client);
     }
 
-    // Soft-delete linked order only on cancel (not no_show / refunded).
-    if (newStatus === 'cancelled') {
+    // Soft-delete linked order on cancel and refund (not no_show).
+    if (newStatus === 'cancelled' || newStatus === 'refunded') {
       const {
         softDeleteOrderForReservation,
       } = require('../admin/order/orderReservationSync');

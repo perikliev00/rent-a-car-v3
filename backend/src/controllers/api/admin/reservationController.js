@@ -55,6 +55,48 @@ exports.changeStatus = asyncHandler(async (req, res, next) => {
   }
 });
 
+exports.refundReservation = asyncHandler(async (req, res, next) => {
+  try {
+    const {
+      requestReservationRefund,
+    } = require('../../../services/payment/refund/reservationRefundService');
+
+    const result = await requestReservationRefund(req, {
+      reservationId: req.params.id,
+      reason: req.body?.reason || null,
+    });
+
+    return apiResponse.success(res, {
+      status: result.status,
+      refundOperation: result.refundOperation,
+      reservation: result.reservation,
+      idempotent: Boolean(result.idempotent),
+    });
+  } catch (err) {
+    if (err.code === 'NOT_FOUND' || err.status === 404) {
+      return apiResponse.error(res, 'NOT_FOUND', err.message || 'Reservation not found.', 404);
+    }
+    if (
+      err.code === 'REFUND_NOT_ALLOWED' ||
+      err.code === 'REFUND_NO_PAYMENT_INTENT' ||
+      err.code === 'REFUND_NO_AMOUNT' ||
+      err.code === 'VALIDATION_ERROR'
+    ) {
+      return apiResponse.error(res, err.code, err.message, 422);
+    }
+    if (err.code === 'REFUND_FAILED') {
+      return apiResponse.error(res, 'REFUND_FAILED', err.message, 502);
+    }
+    if (err.code === 'FORBIDDEN' || err.status === 403) {
+      return apiResponse.error(res, 'FORBIDDEN', err.message, 403);
+    }
+    return forwardControllerError(err, req, next, {
+      context: 'api.adminRefundReservation',
+      publicMessage: 'Error refunding reservation.',
+    });
+  }
+});
+
 exports.getReservation = asyncHandler(async (req, res, next) => {
   try {
     const data = await getReservationDetail(req.params.id);

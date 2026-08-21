@@ -3,11 +3,13 @@ import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ADMIN_OPS_STATUS_OPTIONS,
+  REFUNDABLE_OPS_STATUSES,
   changeReservationStatus,
   getReservationChecklists,
   getReservationDetail,
   getReservationOpsDashboard,
   listCancellationRequests,
+  refundReservation,
   reviewCancellationRequest,
   submitPickupChecklist,
   submitReturnChecklist,
@@ -15,6 +17,8 @@ import {
   type ReservationOpsStatus,
   type ReservationStatusHistoryEntry,
 } from '../../api/admin/reservations';
+import { useAuth } from '../../auth/useAuth';
+import { hasPermission } from '../../auth/permissions';
 import { Button } from '../../components/ui/Button';
 import { Card, CardBody } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
@@ -95,6 +99,11 @@ function StatusActions({
   row: OpsReservationRow;
   onChanged: () => void;
 }) {
+  const { user } = useAuth();
+  const canRefund = hasPermission(user, 'can_refund_payments');
+  const showRefund =
+    canRefund && REFUNDABLE_OPS_STATUSES.includes(row.status) && row.status !== 'refunded';
+
   const [status, setStatus] = useState<ReservationOpsStatus | ''>('');
   const mutation = useMutation({
     mutationFn: () =>
@@ -105,6 +114,20 @@ function StatusActions({
     onSuccess: () => {
       toast('Status updated', 'success');
       setStatus('');
+      onChanged();
+    },
+    onError: (err) => toast((err as Error).message, 'error'),
+  });
+
+  const refundMutation = useMutation({
+    mutationFn: () =>
+      refundReservation(row.id, { reason: 'admin_ops_dashboard_refund' }),
+    onSuccess: (result) => {
+      if (result.status === 'pending') {
+        toast('Refund in progress — waiting for Stripe confirmation', 'info');
+      } else {
+        toast('Refund completed', 'success');
+      }
       onChanged();
     },
     onError: (err) => toast((err as Error).message, 'error'),
@@ -131,12 +154,23 @@ function StatusActions({
       />
       <Button
         size="sm"
-        disabled={!status || mutation.isPending}
+        disabled={!status || mutation.isPending || refundMutation.isPending}
         loading={mutation.isPending}
         onClick={() => mutation.mutate()}
       >
         Apply
       </Button>
+      {showRefund ? (
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={mutation.isPending || refundMutation.isPending}
+          loading={refundMutation.isPending}
+          onClick={() => refundMutation.mutate()}
+        >
+          Refund
+        </Button>
+      ) : null}
     </div>
   );
 }

@@ -296,4 +296,14 @@ describeIfDb('DB consistency', () => {
       await cleanupCar(carId);
     }
   });
+
+  test('refund_operations table exists', async () => {
+    const result = await pool.query(`
+      SELECT 1
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+        AND table_name = 'refund_operations'
+    `);
+    expect(result.rowCount).toBe(1);
+  });
 });

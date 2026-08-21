@@ -1,5 +1,6 @@
 const express = require('express');
 const session = require('express-session');
+const pgSession = require('connect-pg-simple')(session);
 const { requestContext } = require('../../../src/middleware/requestContext');
 const { errorHandler, handleNotFound } = require('../../../src/middleware/errorHandler');
 const { createCorsMiddleware } = require('../../../src/config/cors');
@@ -7,6 +8,7 @@ const { ensureCsrfToken, requireCsrfToken } = require('../../../src/middleware/c
 const { optionalApiKeyAuth } = require('../../../src/middleware/apiKeyAuth');
 const paymentController = require('../../../src/controllers/payment');
 const env = require('../../../src/config/env');
+const { pool } = require('../../helpers/dbTestHarness');
 
 let cachedApiRoutes;
 
@@ -17,7 +19,18 @@ function getApiRoutes() {
   return cachedApiRoutes;
 }
 
-function createIntegrationTestApp() {
+function createSessionStore(usePgSessionStore) {
+  if (!usePgSessionStore) {
+    return new session.MemoryStore();
+  }
+  return new pgSession({
+    pool,
+    tableName: 'session',
+    createTableIfMissing: true,
+  });
+}
+
+function createIntegrationTestApp({ usePgSessionStore = false } = {}) {
   env.validateEnv();
   const { config } = env;
   const app = express();
@@ -40,7 +53,7 @@ function createIntegrationTestApp() {
       secret: process.env.SESSION_SECRET || 'test-session-secret-32-chars-minimum!!',
       resave: false,
       saveUninitialized: true,
-      store: new session.MemoryStore(),
+      store: createSessionStore(usePgSessionStore),
     })
   );
   app.use((req, _res, next) => {

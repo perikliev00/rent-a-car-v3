@@ -295,6 +295,7 @@ export type SeedLinkedBookingOptions = {
   guest?: Partial<typeof E2E_GUEST>;
   sessionId?: string;
   stripeSessionId?: string | null;
+  stripePaymentIntentId?: string | null;
   holdExpiresAt?: Date;
   withHistory?: boolean;
   /** When set, reservation (and order if created) are owned by this user. */
@@ -379,7 +380,7 @@ export async function insertLinkedBooking(
           pickup_location, return_location,
           rental_days, delivery_price, return_price, total_price,
           full_name, phone_number, email, address, hotel_name,
-          status, hold_expires_at, stripe_session_id, price_snapshot
+          status, hold_expires_at, stripe_session_id, stripe_payment_intent_id, price_snapshot
         )
         VALUES (
           $1, $2, $3,
@@ -387,7 +388,7 @@ export async function insertLinkedBooking(
           $8, $9,
           $10, $11, $12, $13,
           $14, $15, $16, $17, $18,
-          $19, $20, $21, $22::jsonb
+          $19, $20, $21, $22, $23::jsonb
         )
         RETURNING id
         `,
@@ -413,6 +414,7 @@ export async function insertLinkedBooking(
           options.status,
           holdExpiresAt,
           options.stripeSessionId ?? null,
+          options.stripePaymentIntentId ?? null,
           JSON.stringify(priceSnapshot),
         ]
       );
@@ -591,9 +593,29 @@ export async function getOrderByReservationId(reservationId: number) {
   return withDb(async (client) => {
     const result = await client.query(
       `
-      SELECT id, car_id, reservation_id, status, stripe_session_id, email, total_price, price_snapshot
+      SELECT id, car_id, reservation_id, status, stripe_session_id, email, total_price,
+             price_snapshot, is_deleted, deleted_at
       FROM orders
       WHERE reservation_id = $1
+      ORDER BY id DESC
+      LIMIT 1
+      `,
+      [reservationId]
+    );
+    return result.rows[0] || null;
+  });
+}
+
+export async function getRefundOperationByReservationId(reservationId: number) {
+  return withDb(async (client) => {
+    const result = await client.query(
+      `
+      SELECT id, reservation_id, status, stripe_refund_id, stripe_payment_intent_id,
+             amount_cents, idempotency_key
+      FROM refund_operations
+      WHERE reservation_id = $1
+      ORDER BY id DESC
+      LIMIT 1
       `,
       [reservationId]
     );

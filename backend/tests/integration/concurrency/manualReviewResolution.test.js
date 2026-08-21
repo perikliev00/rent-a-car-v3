@@ -5,6 +5,7 @@ const {
   postOrder,
   postCheckout,
   postAdminReservationStatus,
+  postAdminReservationRefund,
 } = require('../helpers/sessionAgentFactory');
 const {
   buildCheckoutCompletedEvent,
@@ -107,16 +108,18 @@ describeIf('MONEY-007: manualReviewResolution', () => {
 
   test('admin refund from manual_review leaves booking without order', async () => {
     const reservation = await forceManualReview();
+    expect(reservation.stripe_payment_intent_id || reservation.stripe_session_id).toBeTruthy();
+
     const admin = await loginAsAdmin(app);
-    const res = await postAdminReservationStatus(admin, reservation.id, {
-      status: 'refunded',
+    const res = await postAdminReservationRefund(admin, reservation.id, {
       reason: 'admin_manual_review_refund',
     });
-    expect(res.status).toBe(200);
+    expect({ status: res.status, body: res.body }).toMatchObject({ status: 200 });
+    expect(res.body.data.status).toBe('succeeded');
 
     const refunded = await getReservationById(reservation.id);
     expect(refunded.status).toBe('refunded');
-    expect(await getOrderByReservationId(reservation.id)).toBeNull();
+    expect(await getOrderByReservationId(reservation.id)).toBeFalsy();
     expect(await countOrdersForCar(carId)).toBe(0);
   });
 });

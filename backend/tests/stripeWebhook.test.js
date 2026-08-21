@@ -21,13 +21,20 @@ jest.mock('../src/monitoring/track', () => ({
   trackPaymentFailure: jest.fn(),
 }));
 
-const stripe = require('../src/config/stripe');
-const { handleStripeWebhookFlow } = require('../src/services/payment/webhookService');
-const { processStripeWebhookEvent } = require('../src/services/bookingFinalizationService');
-
 jest.mock('../src/services/bookingFinalizationService', () => ({
   processStripeWebhookEvent: jest.fn(),
 }));
+
+jest.mock('../src/services/payment/refund/reservationRefundService', () => ({
+  applyRefundFromStripeObject: jest.fn().mockResolvedValue({ handled: true, status: 'succeeded' }),
+}));
+
+const stripe = require('../src/config/stripe');
+const { handleStripeWebhookFlow } = require('../src/services/payment/webhookService');
+const { processStripeWebhookEvent } = require('../src/services/bookingFinalizationService');
+const {
+  applyRefundFromStripeObject,
+} = require('../src/services/payment/refund/reservationRefundService');
 
 function buildSignedWebhookRequest(overrides = {}) {
   return {
@@ -205,6 +212,30 @@ describe('handleStripeWebhookFlow', () => {
       'reservation_not_active',
       expect.objectContaining({ reservationId: '42', status: 'expired' })
     );
+    expect(result).toEqual({ statusCode: 200, body: { received: true } });
+  });
+
+  test('applies refund.updated webhook via refund service', async () => {
+    stripe.webhooks.constructEvent.mockReturnValue({
+      id: 'evt_refund_1',
+      type: 'refund.updated',
+      data: {
+        object: {
+          id: 're_123',
+          object: 'refund',
+          status: 'succeeded',
+          payment_intent: 'pi_123',
+        },
+      },
+    });
+
+    const result = await handleStripeWebhookFlow(buildSignedWebhookRequest());
+
+    expect(applyRefundFromStripeObject).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 're_123', status: 'succeeded' }),
+      expect.objectContaining({ eventType: 'refund.updated' })
+    );
+    expect(processStripeWebhookEvent).not.toHaveBeenCalled();
     expect(result).toEqual({ statusCode: 200, body: { received: true } });
   });
 });

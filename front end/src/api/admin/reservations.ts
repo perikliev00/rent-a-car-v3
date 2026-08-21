@@ -56,8 +56,14 @@ export const ADMIN_OPS_STATUS_OPTIONS: ReservationOpsStatus[] = [
   'completed',
   'cancelled',
   'no_show',
-  'refunded',
   'confirmed',
+];
+
+export const REFUNDABLE_OPS_STATUSES: ReservationOpsStatus[] = [
+  'paid',
+  'manual_review',
+  'confirmed',
+  'car_prepared',
 ];
 
 export interface ReservationStatusHistoryEntry {
@@ -98,6 +104,21 @@ export async function changeReservationStatus(
   return api(`/api/admin/reservations/${id}/status`, {
     method: 'POST',
     body: JSON.stringify(body),
+  });
+}
+
+export async function refundReservation(
+  id: string,
+  body?: { reason?: string }
+): Promise<{
+  status: 'succeeded' | 'pending' | 'failed';
+  refundOperation: Record<string, unknown> | null;
+  reservation: OpsReservationRow & Record<string, unknown>;
+  idempotent?: boolean;
+}> {
+  return api(`/api/admin/reservations/${id}/refund`, {
+    method: 'POST',
+    body: JSON.stringify(body || {}),
   });
 }
 

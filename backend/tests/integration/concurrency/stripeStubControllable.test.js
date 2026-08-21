@@ -66,4 +66,29 @@ describe('H-06: controllable Stripe stub', () => {
     expect(orphan.metadata.reservationId).toBeUndefined();
     expect(orphan.client_reference_id).toBeNull();
   });
+
+  test('supports refund create / retrieve / fail / pending', () => {
+    const session = stripeTestStub.createSession({
+      pricing: { totalPrice: 80 },
+      reservationId: 3,
+    });
+
+    stripeTestStub.setNextRefundStatus('pending');
+    const pending = stripeTestStub.createRefund({
+      paymentIntentId: session.payment_intent,
+      idempotencyKey: 'k-pending',
+    });
+    expect(pending.status).toBe('pending');
+
+    stripeTestStub.setRefundState(pending.id, { status: 'succeeded' });
+    expect(stripeTestStub.retrieveRefund(pending.id).status).toBe('succeeded');
+
+    stripeTestStub.failNextCreateRefund();
+    expect(() =>
+      stripeTestStub.createRefund({
+        paymentIntentId: session.payment_intent,
+        idempotencyKey: 'k-fail',
+      })
+    ).toThrow(/forced refund failure/i);
+  });
 });

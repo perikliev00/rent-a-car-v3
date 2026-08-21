@@ -7,15 +7,6 @@ const { ADMIN_OPS_STATUSES, isValidStatus } = require('../../domain/reservationS
 const historySql = require('../sql/reservationStatusHistorySqlService');
 const reservationRepository = require('../../repositories/reservationRepository');
 const { runWithTransaction } = require('../../db/transaction');
-const rbacService = require('../rbac/rbacService');
-
-function sessionAccess(req) {
-  const user = req?.session?.user || {};
-  return {
-    roles: Array.isArray(user.roles) ? user.roles : [],
-    permissions: Array.isArray(user.permissions) ? user.permissions : [],
-  };
-}
 
 async function confirmManualReviewReservation(req, reservation, reason) {
   return runWithTransaction(async (client) => {
@@ -71,15 +62,14 @@ async function changeReservationStatus(req, { reservationId, status, reason }) {
     throw err;
   }
 
-  // Refunds require finance permission (receptionist can change ops status but not refund).
+  // Refunds must go through POST /api/admin/reservations/:id/refund (Stripe money movement).
   if (status === 'refunded') {
-    const access = sessionAccess(req);
-    if (!rbacService.userHasPermission(access, 'can_refund_payments')) {
-      const err = new Error('You do not have permission to refund reservations.');
-      err.code = 'FORBIDDEN';
-      err.status = 403;
-      throw err;
-    }
+    const err = new Error(
+      'Use POST /api/admin/reservations/:id/refund to refund. Status-only refunds are not allowed.'
+    );
+    err.code = 'VALIDATION_ERROR';
+    err.status = 422;
+    throw err;
   }
 
   const existing = await reservationRepository.findById(reservationId);

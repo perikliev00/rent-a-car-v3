@@ -2,6 +2,7 @@ const {
   assertTransition,
   canTransition,
   ACTIVE_HOLD_STATUSES,
+  ADMIN_OPS_STATUSES,
   TRANSITIONS,
 } = require('../../src/domain/reservationStatus');
 
@@ -23,9 +24,19 @@ describe('reservationStatus domain', () => {
     expect(canTransition('completed', 'returned')).toBe(false);
   });
 
-  test('ops path from confirmed', () => {
+  test('ops path from confirmed includes refund', () => {
     expect(TRANSITIONS.confirmed).toEqual(
-      expect.arrayContaining(['car_prepared', 'cancelled', 'no_show'])
+      expect.arrayContaining(['car_prepared', 'cancelled', 'no_show', 'refunded'])
     );
+  });
+
+  test('allows confirmed and car_prepared to refunded', () => {
+    expect(canTransition('confirmed', 'refunded')).toBe(true);
+    expect(canTransition('car_prepared', 'refunded')).toBe(true);
+    expect(canTransition('picked_up', 'refunded')).toBe(false);
+  });
+
+  test('refunded is not an admin ops status', () => {
+    expect(ADMIN_OPS_STATUSES).not.toContain('refunded');
   });
 });

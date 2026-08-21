@@ -38,6 +38,7 @@
 --   029 notifications
 --   030 notifications rbac
 --   031 one active hold per session
+--   032 refund operations
 
 --
 -- Legacy destructive drops (e.g. bookings) live in migrations/ only.
@@ -73,3 +74,4 @@
 \ir schema/029_notifications.sql
 \ir schema/030_notifications_rbac.sql
 \ir schema/031_reservations_one_active_hold_per_session.sql
+\ir schema/032_refund_operations.sql

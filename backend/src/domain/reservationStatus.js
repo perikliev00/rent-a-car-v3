@@ -44,8 +44,8 @@ const TRANSITIONS = Object.freeze({
   ]),
   paid: Object.freeze(['confirmed', 'manual_review', 'refunded', 'cancelled']),
   manual_review: Object.freeze(['confirmed', 'refunded', 'cancelled']),
-  confirmed: Object.freeze(['car_prepared', 'cancelled', 'no_show']),
-  car_prepared: Object.freeze(['picked_up', 'cancelled', 'no_show']),
+  confirmed: Object.freeze(['car_prepared', 'cancelled', 'no_show', 'refunded']),
+  car_prepared: Object.freeze(['picked_up', 'cancelled', 'no_show', 'refunded']),
   picked_up: Object.freeze(['active_rental', 'returned']),
   active_rental: Object.freeze(['returned']),
   returned: Object.freeze(['completed']),
@@ -64,7 +64,6 @@ const ADMIN_OPS_STATUSES = Object.freeze([
   'completed',
   'cancelled',
   'no_show',
-  'refunded',
   'confirmed',
 ]);
 

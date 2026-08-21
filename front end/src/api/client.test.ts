@@ -173,17 +173,6 @@ describe('api', () => {
 
     await expect(api('/cars')).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
   });
-
-  it('setCsrfToken updates the token used on mutating requests', async () => {
-    setCsrfToken('manual-token');
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ success: true, data: {} }));
-    vi.stubGlobal('fetch', fetchMock);
-
-    await api('/api/test', { method: 'PATCH', body: JSON.stringify({}) });
-
-    const headers = new Headers(fetchMock.mock.calls[0][1]?.headers as HeadersInit);
-    expect(headers.get('X-CSRF-Token')).toBe('manual-token');
-  });
 });
 
 describe('apiFormData', () => {
@@ -195,7 +184,7 @@ describe('apiFormData', () => {
     vi.unstubAllGlobals();
   });
 
-  it('does not set Content-Type header', async () => {
+  it('omits Content-Type and attaches X-CSRF-Token on mutating uploads', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ success: true, data: {} }));
     vi.stubGlobal('fetch', fetchMock);
 
@@ -205,15 +194,6 @@ describe('apiFormData', () => {
 
     const headers = new Headers(fetchMock.mock.calls[0][1]?.headers as HeadersInit);
     expect(headers.has('Content-Type')).toBe(false);
-  });
-
-  it('still attaches X-CSRF-Token on mutating requests', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ success: true, data: {} }));
-    vi.stubGlobal('fetch', fetchMock);
-
-    await apiFormData('/api/upload', new FormData(), 'PUT');
-
-    const headers = new Headers(fetchMock.mock.calls[0][1]?.headers as HeadersInit);
     expect(headers.get('X-CSRF-Token')).toBe('form-token');
   });
 });

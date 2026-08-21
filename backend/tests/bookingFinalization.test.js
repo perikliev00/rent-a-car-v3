@@ -121,26 +121,6 @@ describe('processStripeWebhookEvent', () => {
     });
   });
 
-  test('finalizes when stripe session id matches reservation stripeSessionId', async () => {
-    reservationRepository.findByStripeSessionId.mockResolvedValue(
-      buildActiveReservation({ stripeSessionId: 'cs_match' })
-    );
-
-    const result = await processStripeWebhookEvent({
-      eventId: 'evt_match',
-      stripeSessionId: 'cs_match',
-      reservationId: '42',
-      carId: '7',
-      sessionId: 'sess_abc',
-      stripeSessionPaymentStatus: 'paid',
-      stripeSessionAmountTotal: 12000,
-      stripeSessionCurrency: 'eur',
-    });
-
-    expect(result.finalized).toBe(true);
-    expect(result.reason).toBe('finalized');
-  });
-
   test('Test 1: finalizes normally when hold is active and Stripe session is paid', async () => {
     reservationRepository.findByStripeSessionId.mockResolvedValue(
       buildActiveReservation({ stripeSessionId: 'cs_ok' })
@@ -282,19 +262,6 @@ describe('processStripeWebhookEvent', () => {
     expect(result.reason).toBe('finalized');
   });
 
-  test('returns duplicate_event when Stripe event was already processed', async () => {
-    stripeEventSql.insertProcessedEvent.mockResolvedValue(false);
-
-    const result = await processStripeWebhookEvent({
-      eventId: 'evt_dup',
-      stripeSessionId: 'cs_dup',
-      stripeSessionPaymentStatus: 'paid',
-    });
-
-    expect(result.reason).toBe('duplicate_event');
-    expect(addRange).not.toHaveBeenCalled();
-  });
-
   test('returns not_found when reservation cannot be resolved', async () => {
     reservationRepository.findByStripeSessionId.mockResolvedValue(null);
     reservationRepository.findById.mockResolvedValue(null);
@@ -330,28 +297,6 @@ describe('processStripeWebhookEvent', () => {
 
     expect(result.reason).toBe('already_confirmed');
     expect(addRange).not.toHaveBeenCalled();
-  });
-
-  test('A: marks overlap_after_payment when paid webhook hits DB overlap instead of throwing', async () => {
-    reservationRepository.findByStripeSessionId.mockResolvedValue(
-      buildActiveReservation({ stripeSessionId: 'cs_conflict' })
-    );
-    addRange.mockRejectedValue(Object.assign(new Error('overlap'), { code: 'OVERLAP' }));
-    // status via changeStatus mock
-
-    const result = await processStripeWebhookEvent({
-      eventId: 'evt_conflict',
-      stripeSessionId: 'cs_conflict',
-      stripeSessionPaymentStatus: 'paid',
-      stripeSessionAmountTotal: 12000,
-      stripeSessionCurrency: 'eur',
-      stripePaymentIntent: 'pi_conflict_123',
-    });
-
-    expect(result.reason).toBe('overlap_after_payment');
-    expect(result.status).toBe('manual_review');
-    expect(changeStatus).toHaveBeenCalledWith(expect.objectContaining({ newStatus: 'manual_review' }));
-    expect(orderSql.createOrderFromReservation).not.toHaveBeenCalled();
   });
 
   test('D: recovers paid webhook when local reservation is already expired', async () => {

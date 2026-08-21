@@ -20,11 +20,14 @@ function isHoldExpired(reservation, now = new Date()) {
 async function completeReservationFinalization({
   reservation,
   stripeSessionId,
+  stripePaymentIntent = null,
   logPrefix,
   client,
   recoveryContext = null,
 }) {
   const resolvedCarId = reservation.carId?.id || reservation.carId;
+  const paymentIntentId =
+    stripePaymentIntent || reservation.stripePaymentIntentId || null;
 
   const { reservation: paidReservation } = await changeStatus({
     reservationId: reservation.id,
@@ -34,6 +37,7 @@ async function completeReservationFinalization({
     patch: {
       stripeSessionId,
       holdExpiresAt: new Date(),
+      ...(paymentIntentId ? { stripePaymentIntentId: paymentIntentId } : {}),
     },
     client,
   });

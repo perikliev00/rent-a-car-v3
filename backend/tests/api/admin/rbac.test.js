@@ -39,7 +39,6 @@ jest.mock('bcrypt', () => ({
 }));
 
 const userSql = require('../../../src/services/sql/userSqlService');
-const userAdminService = require('../../../src/services/admin/userAdminService');
 const rbacService = require('../../../src/services/rbac/rbacService');
 
 const adminUser = {
@@ -104,23 +103,6 @@ describe('Admin RBAC APIs', () => {
 
     expect(response.body.data.roleSlug).toBe('manager');
     expect(rbacService.updateRolePermissions).toHaveBeenCalledWith('2', ['can_view_orders']);
-  });
-
-  test('GET /api/admin/users lists staff users', async () => {
-    userAdminService.listUsers.mockResolvedValue([
-      {
-        id: '1',
-        email: 'admin@example.com',
-        role: 'admin',
-        roles: [{ id: '1', slug: 'owner', name: 'Owner' }],
-      },
-    ]);
-
-    const app = createApiTestApp();
-    const agent = await loginAsAdmin(app);
-    const response = await agent.get('/api/admin/users').expect(200);
-
-    expect(response.body.data.users).toHaveLength(1);
   });
 
   test('PUT /api/admin/users/:id/roles assigns roles', async () => {

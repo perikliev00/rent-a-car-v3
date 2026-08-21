@@ -51,14 +51,49 @@ async function postAdminReservationStatus(agent, reservationId, body) {
   );
 }
 
+async function postAdminReservationRefund(agent, reservationId, body = {}) {
+  return withCsrf(agent, agent.post(`/api/admin/reservations/${reservationId}/refund`)).send(
+    body
+  );
+}
+
+async function loginAsStaff(app, credentials) {
+  const agent = await createSessionAgent(app);
+  const loginRes = await withCsrf(agent, agent.post('/api/auth/login'))
+    .send({
+      email: credentials.email,
+      password: credentials.password,
+    })
+    .expect(200);
+
+  agent.csrfToken = loginRes.body.data?.csrfToken || agent.csrfToken;
+  return agent;
+}
+
+async function putUserRoles(agent, userId, roleIds) {
+  return withCsrf(agent, agent.put(`/api/admin/users/${userId}/roles`)).send({
+    roleIds: (roleIds || []).map(String),
+  });
+}
+
+async function updateRolePermissions(agent, roleId, permissionKeys) {
+  return withCsrf(agent, agent.put(`/api/admin/rbac/roles/${roleId}/permissions`)).send({
+    permissionKeys,
+  });
+}
+
 module.exports = {
   createSessionAgent,
   createTwoSessionAgents,
   loginAsAdmin,
+  loginAsStaff,
+  putUserRoles,
+  updateRolePermissions,
   postOrder,
   postCheckout,
   postReleaseAndRehold,
   postRelease,
   postAdminReservationStatus,
+  postAdminReservationRefund,
   withCsrf,
 };

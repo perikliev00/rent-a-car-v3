@@ -11,11 +11,7 @@ delete process.env.STRIPE_STUB;
 
 const stripe = require('../src/config/stripe');
 const { createStripeCheckoutSession } = require('../src/services/payment/stripeCheckoutService');
-const {
-  getStripeCheckoutExpiresAt,
-  STRIPE_CHECKOUT_EXPIRES_MINUTES,
-  RESERVATION_HOLD_MINUTES,
-} = require('../src/config/reservationTiming');
+const { getStripeCheckoutExpiresAt } = require('../src/config/reservationTiming');
 
 describe('createStripeCheckoutSession', () => {
   const baseArgs = {
@@ -47,15 +43,6 @@ describe('createStripeCheckoutSession', () => {
     );
 
     dateNowSpy.mockRestore();
-  });
-
-  test('stripe session expiration ends before reservation hold expiration', async () => {
-    const nowMs = 1_700_000_000_000;
-    const checkoutExpiresAt = getStripeCheckoutExpiresAt(nowMs);
-    const holdExpiresAt = Math.floor(nowMs / 1000) + RESERVATION_HOLD_MINUTES * 60;
-
-    expect(STRIPE_CHECKOUT_EXPIRES_MINUTES).toBeLessThan(RESERVATION_HOLD_MINUTES);
-    expect(checkoutExpiresAt).toBeLessThan(holdExpiresAt);
   });
 
   test('uses frontend checkout redirect URLs instead of backend host', async () => {

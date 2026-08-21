@@ -72,6 +72,28 @@ export async function changeOpsStatusViaApi(
   return { ok: res.ok(), status: res.status(), body };
 }
 
+export async function refundReservationViaApi(
+  request: APIRequestContext,
+  reservationId: number | string,
+  session?: ApiSession,
+  reason = 'admin_ops_dashboard_refund'
+): Promise<{ ok: boolean; status: number; body: unknown }> {
+  const auth = session || (await loginAsAdmin(request));
+  const res = await apiPost(
+    request,
+    `/api/admin/reservations/${reservationId}/refund`,
+    { reason },
+    auth
+  );
+  let body: unknown = null;
+  try {
+    body = await res.json();
+  } catch {
+    body = await res.text();
+  }
+  return { ok: res.ok(), status: res.status(), body };
+}
+
 export async function fillAndSavePickupChecklist(
   page: Page,
   reservationId: number | string,

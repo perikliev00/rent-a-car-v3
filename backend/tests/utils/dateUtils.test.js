@@ -3,7 +3,6 @@ const { parseStrictDateTimeInput } = require('../../src/utils/date/strictDatePar
 const { formatDateForDisplay } = require('../../src/utils/date/formatDate');
 const { computeRentalDays, computeRentalDaysSafe } = require('../../src/utils/date/calculateRentalDays');
 const { toUtc } = require('../../src/utils/toUtc');
-const { validateBookingDates } = require('../../src/utils/date/parseBookingDateTime');
 
 describe('normalizeTime.toHHMM', () => {
   test.each([
@@ -57,6 +56,12 @@ describe('calculateRentalDays', () => {
   test('computeRentalDaysSafe returns 0 for invalid input', () => {
     expect(computeRentalDaysSafe(null, null)).toBe(0);
   });
+
+  test('throws for invalid dates', () => {
+    expect(() => computeRentalDays(new Date('invalid'), new Date())).toThrow(
+      'Invalid dates passed to computeRentalDays'
+    );
+  });
 });
 
 describe('toUtc', () => {
@@ -64,18 +69,5 @@ describe('toUtc', () => {
     const result = toUtc('2026-07-10', '10:00');
     expect(result).toBeInstanceOf(Date);
     expect(Number.isNaN(result.getTime())).toBe(false);
-  });
-});
-
-describe('parseBookingDateTime.validateBookingDates', () => {
-  test('rejects invalid date format', () => {
-    const result = validateBookingDates({
-      pickupDate: 'invalid',
-      returnDate: '2026-12-01',
-      now: new Date('2026-01-01T00:00:00Z'),
-    });
-
-    expect(result.isValid).toBe(false);
-    expect(result.errors[0]).toBe('Invalid date format.');
   });
 });

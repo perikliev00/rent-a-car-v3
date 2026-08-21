@@ -245,6 +245,8 @@ async function finalizeReservationCore(stripeSessionId, options = {}, client = n
     const finalized = await completeReservationFinalization({
       reservation,
       stripeSessionId,
+      stripePaymentIntent:
+        options.stripePaymentIntent ?? reservation.stripePaymentIntentId ?? null,
       logPrefix,
       client,
     });

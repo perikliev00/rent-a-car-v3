@@ -101,7 +101,8 @@ async function syncLinkedReservationAfterOrderUpdate(order, { client = null } = 
 }
 
 /**
- * Soft-delete linked order for a cancelled reservation (removeRange already done by caller).
+ * Soft-delete linked order for a cancelled/refunded reservation (removeRange already done by caller).
+ * Also marks order status cancelled so it is not left "active".
  */
 async function softDeleteOrderForReservation(reservationId, client = null) {
   const order = await orderSql.findOrderByReservationId(reservationId, client);
@@ -110,6 +111,7 @@ async function softDeleteOrderForReservation(reservationId, client = null) {
   }
   order.isDeleted = true;
   order.deletedAt = new Date();
+  order.status = 'cancelled';
   await orderSql.updateOrderFromDoc(order, client);
   return order;
 }

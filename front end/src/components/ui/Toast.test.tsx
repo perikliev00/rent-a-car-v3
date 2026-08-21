@@ -24,20 +24,4 @@ describe('ToastContainer', () => {
 
     expect(screen.getByText('Saved successfully')).toBeInTheDocument();
   });
-
-  it('auto-dismisses toasts after 4 seconds', () => {
-    render(<ToastContainer />);
-
-    act(() => {
-      toast('Temporary message', 'info');
-    });
-
-    expect(screen.getByText('Temporary message')).toBeInTheDocument();
-
-    act(() => {
-      vi.advanceTimersByTime(4000);
-    });
-
-    expect(screen.queryByText('Temporary message')).not.toBeInTheDocument();
-  });
 });

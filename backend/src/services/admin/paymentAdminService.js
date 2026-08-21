@@ -32,7 +32,17 @@ async function getPaymentMonitoringData() {
 }
 
 async function runPaymentReconciliation({ dryRun = false, limit = 50 } = {}) {
-  const result = await reconcileStripeSessions({ dryRun, limit });
+  const { reconcilePendingRefunds } = require('../payment/refund/reservationRefundService');
+  const sessionsResult = await reconcileStripeSessions({ dryRun, limit });
+  const refundsResult = await reconcilePendingRefunds({
+    dryRun,
+    olderThanMinutes: 0,
+    limit,
+  });
+  const result = {
+    sessions: sessionsResult,
+    refunds: refundsResult,
+  };
   return {
     stdout: JSON.stringify(result),
     stderr: '',

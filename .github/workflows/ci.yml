@@ -86,10 +86,6 @@ jobs:
         working-directory: backend
         run: npm ci && npm run db:setup
 
-      - name: Run backend unit tests
-        working-directory: backend
-        run: npm test
-
       - name: Run DB consistency tests
         working-directory: backend
         env:

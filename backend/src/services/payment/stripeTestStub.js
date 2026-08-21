@@ -4,8 +4,13 @@
  */
 
 const sessions = new Map();
+const refunds = new Map();
+const refundsByIdempotency = new Map();
 let counter = 0;
+let refundCounter = 0;
 let failNextCreate = false;
+let failNextRefund = false;
+let nextRefundStatus = null;
 let createOverrides = null;
 
 function buildSuccessUrl(sessionId) {
@@ -143,10 +148,90 @@ function createOrphanPaidSession({ amountTotal = 10000, currency = 'eur' } = {})
   });
 }
 
+function failNextCreateRefund() {
+  failNextRefund = true;
+}
+
+function setNextRefundStatus(status) {
+  nextRefundStatus = status || null;
+}
+
+function createRefund({ paymentIntentId, amountCents = null, idempotencyKey }) {
+  if (idempotencyKey && refundsByIdempotency.has(idempotencyKey)) {
+    return { ...refundsByIdempotency.get(idempotencyKey) };
+  }
+
+  if (failNextRefund) {
+    failNextRefund = false;
+    const err = new Error('Stripe stub forced refund failure');
+    err.type = 'StripeAPIError';
+    err.code = 'refund_failed';
+    throw err;
+  }
+
+  refundCounter += 1;
+  const status = nextRefundStatus || 'succeeded';
+  nextRefundStatus = null;
+
+  let amount = amountCents;
+  if (amount == null) {
+    for (const session of sessions.values()) {
+      if (String(session.payment_intent) === String(paymentIntentId)) {
+        amount = session.amount_total;
+        break;
+      }
+    }
+  }
+  if (amount == null) {
+    amount = 10000;
+  }
+
+  const refund = {
+    id: `re_test_${refundCounter}${Date.now()}`,
+    object: 'refund',
+    amount: Number(amount),
+    currency: 'eur',
+    payment_intent: String(paymentIntentId),
+    status,
+  };
+
+  refunds.set(refund.id, refund);
+  if (idempotencyKey) {
+    refundsByIdempotency.set(idempotencyKey, refund);
+  }
+  return { ...refund };
+}
+
+function retrieveRefund(refundId) {
+  const refund = refunds.get(refundId);
+  if (!refund) {
+    const err = new Error(`No such refund: ${refundId}`);
+    err.type = 'StripeInvalidRequestError';
+    throw err;
+  }
+  return { ...refund };
+}
+
+function setRefundState(refundId, patch = {}) {
+  const refund = refunds.get(refundId);
+  if (!refund) {
+    const err = new Error(`No such refund: ${refundId}`);
+    err.type = 'StripeInvalidRequestError';
+    throw err;
+  }
+  Object.assign(refund, patch);
+  return { ...refund };
+}
+
 function clearSessions() {
   sessions.clear();
+  refunds.clear();
+  refundsByIdempotency.clear();
   counter = 0;
+  refundCounter = 0;
   failNextCreate = false;
+  failNextRefund = false;
+  nextRefundStatus = null;
   createOverrides = null;
 }
 
@@ -164,7 +249,13 @@ module.exports = {
   failNextCreateSession,
   setNextCreateOverrides,
   createOrphanPaidSession,
+  createRefund,
+  retrieveRefund,
+  setRefundState,
+  failNextCreateRefund,
+  setNextRefundStatus,
   clearSessions,
   isStubEnabled,
   sessions,
+  refunds,
 };
