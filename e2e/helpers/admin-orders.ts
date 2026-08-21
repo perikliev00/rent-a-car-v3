@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import { E2E_GUEST } from './test-env';
 
 export type AdminOrderFormValues = {
@@ -56,6 +56,19 @@ export function confirmDeleteDialog(page: Page): void {
   page.once('dialog', async (dialog) => {
     await dialog.accept();
   });
+}
+
+export async function expectToast(
+  page: Page,
+  text: string | RegExp,
+  options: { timeout?: number; waitForHide?: boolean } = {}
+): Promise<void> {
+  const timeout = options.timeout ?? 15_000;
+  const locator = page.getByText(text);
+  await expect(locator.last()).toBeVisible({ timeout });
+  if (options.waitForHide !== false) {
+    await expect(locator).toHaveCount(0, { timeout: 10_000 });
+  }
 }
 
 export async function openOrderRowAction(

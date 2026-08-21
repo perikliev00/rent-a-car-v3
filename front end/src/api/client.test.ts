@@ -111,7 +111,37 @@ describe('api', () => {
     expect(headers.get('X-CSRF-Token')).toBe('cached-token');
   });
 
-  it('refetches CSRF token on CSRF_INVALID without retrying the request', async () => {
+  it('retries a mutating request once after CSRF_INVALID', async () => {
+    setCsrfToken('stale-token');
+    const postTokens: Array<string | null> = [];
+    const fetchMock = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      const urlStr = typeof url === 'string' ? url : url.toString();
+      if (urlStr.endsWith('/api/v1/auth/csrf')) {
+        return jsonResponse({ success: true, data: { csrfToken: 'new-token' } });
+      }
+      const headers = new Headers(init?.headers);
+      postTokens.push(headers.get('X-CSRF-Token'));
+      if (headers.get('X-CSRF-Token') === 'stale-token') {
+        return jsonResponse(
+          {
+            success: false,
+            error: { code: 'CSRF_INVALID', message: 'Invalid CSRF token' },
+          },
+          403,
+        );
+      }
+      return jsonResponse({ success: true, data: { ok: true } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(api('/api/test', { method: 'POST', body: JSON.stringify({}) })).resolves.toEqual({
+      ok: true,
+    });
+
+    expect(postTokens).toEqual(['stale-token', 'new-token']);
+  });
+
+  it('does not retry CSRF_INVALID more than once', async () => {
     setCsrfToken('stale-token');
     let postCount = 0;
     const fetchMock = vi.fn(async (url: string | URL | Request) => {
@@ -135,8 +165,7 @@ describe('api', () => {
       status: 403,
     });
 
-    expect(postCount).toBe(1);
-    expect(fetchMock.mock.calls.some((call) => String(call[0]).endsWith('/api/v1/auth/csrf'))).toBe(true);
+    expect(postCount).toBe(2);
   });
 
   it('throws INVALID_JSON for malformed JSON', async () => {

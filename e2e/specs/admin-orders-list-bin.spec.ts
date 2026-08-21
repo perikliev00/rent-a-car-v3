@@ -13,7 +13,7 @@ import {
   addSofiaCalendarDays,
 } from '../helpers/dates';
 import { uniqueEmail, E2E_GUEST } from '../helpers/test-env';
-import { confirmDeleteDialog, openOrderRowAction } from '../helpers/admin-orders';
+import { confirmDeleteDialog, expectToast, openOrderRowAction } from '../helpers/admin-orders';
 
 const CAR_NAME = `E2E Admin List Bin ${Date.now()}`;
 
@@ -111,13 +111,13 @@ test.describe('ADMIN-011 Orders filters, expired tab, retention bin', () => {
 
     confirmDeleteDialog(adminPage);
     await openOrderRowAction(adminPage, emailBin, 'Delete');
-    await expect(adminPage.getByText('Order moved to bin')).toBeVisible({ timeout: 15_000 });
+    await expectToast(adminPage, 'Order moved to bin');
 
     await adminPage.getByRole('button', { name: 'Deleted' }).click();
     await expect(adminPage.getByText(emailBin)).toBeVisible({ timeout: 10_000 });
 
     await openOrderRowAction(adminPage, emailBin, 'Restore');
-    await expect(adminPage.getByText('Order restored')).toBeVisible({ timeout: 15_000 });
+    await expectToast(adminPage, 'Order restored');
 
     await adminPage.getByRole('button', { name: 'Active' }).click();
     await adminPage.getByLabel('Search').fill(emailBin);
@@ -125,21 +125,28 @@ test.describe('ADMIN-011 Orders filters, expired tab, retention bin', () => {
 
     confirmDeleteDialog(adminPage);
     await openOrderRowAction(adminPage, emailBin, 'Delete');
-    await expect(adminPage.getByText('Order moved to bin')).toBeVisible({ timeout: 15_000 });
+    await expectToast(adminPage, 'Order moved to bin');
 
     const old = new Date();
     old.setDate(old.getDate() - 60);
     await setOrderDeletedAt(binOrderId, old);
+    await expect
+      .poll(async () => {
+        const row = await getOrderById(binOrderId);
+        if (!row?.deleted_at) return 0;
+        return Date.now() - new Date(row.deleted_at).getTime();
+      })
+      .toBeGreaterThan(50 * 24 * 60 * 60 * 1000);
 
+    await adminPage.goto('/admin/orders');
     await adminPage.getByRole('button', { name: 'Deleted' }).click();
     await expect(adminPage.getByText(/Deleted orders are kept for/i)).toBeVisible();
+    await expect(adminPage.getByText(emailBin)).toBeVisible({ timeout: 10_000 });
 
     const confirmText = 'EMPTY DELETED ORDERS';
     await adminPage.getByLabel(new RegExp(confirmText)).fill(confirmText);
     await adminPage.getByRole('button', { name: 'Empty bin' }).click();
-    await expect(adminPage.getByText(/Permanently deleted \d+ orders/)).toBeVisible({
-      timeout: 15_000,
-    });
+    await expectToast(adminPage, /Permanently deleted \d+ orders/, { waitForHide: false });
 
     const gone = await getOrderById(binOrderId);
     expect(gone).toBeNull();

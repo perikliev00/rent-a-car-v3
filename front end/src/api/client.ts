@@ -195,7 +195,7 @@ async function parseResponseBody(res: Response): Promise<ApiResponse<unknown>> {
   return body;
 }
 
-async function request<T>(url: string, options: RequestInit): Promise<T> {
+async function request<T>(url: string, options: RequestInit, retriedCsrf = false): Promise<T> {
   const method = (options.method ?? 'GET').toUpperCase();
   const csrfToken = await ensureCsrfToken(method);
 
@@ -220,9 +220,14 @@ async function request<T>(url: string, options: RequestInit): Promise<T> {
 
   if (!body.success) {
     const errorBody = body as ApiErrorBody;
-    if (errorBody.error?.code === 'CSRF_INVALID' && isMutatingMethod(method)) {
+    if (
+      !retriedCsrf &&
+      errorBody.error?.code === 'CSRF_INVALID' &&
+      isMutatingMethod(method)
+    ) {
       cachedCsrfToken = null;
       await fetchCsrfToken();
+      return request<T>(url, options, true);
     }
     throw new ApiError(
       errorBody.error?.code ?? 'UNKNOWN',

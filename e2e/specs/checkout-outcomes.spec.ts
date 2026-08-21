@@ -296,6 +296,9 @@ test.describe("checkout-cancel-noop", () => {
 
       const { page, context } = await openCancelInFreshContext(browser);
       try {
+        await expect(page.getByRole('heading', { name: 'Payment cancelled' })).toBeVisible({
+          timeout: 15_000,
+        });
         await expect(page.getByTestId('checkout-cancel-message')).toHaveText(
           /No active reservation hold to cancel/i,
           { timeout: 15_000 }
