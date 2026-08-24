@@ -20,7 +20,20 @@ jest.mock('../../../src/services/sql/userSqlService', () => ({
 jest.mock('../../../src/services/account/accountClaimService', () => ({
   claimReservationsForUser: jest.fn().mockResolvedValue({ reservations: 0, orders: 0 }),
 }));
-jest.mock('../../../src/services/admin/order');
+jest.mock('../../../src/services/admin/order', () => ({
+  getOrdersList: jest.fn(),
+  getExpiredOrders: jest.fn(),
+  getDeletedOrders: jest.fn(),
+  emptyDeletedOrders: jest.fn(),
+  getCreateOrderForm: jest.fn(),
+  getCarAvailability: jest.fn(),
+  createOrder: jest.fn(),
+  getOrderDetails: jest.fn(),
+  getOrderEditData: jest.fn(),
+  updateOrder: jest.fn(),
+  deleteOrder: jest.fn(),
+  restoreOrder: jest.fn(),
+}));
 jest.mock('../../../src/services/admin/adminAuditService', () => ({
   logAdminAction: jest.fn().mockResolvedValue(undefined),
 }));

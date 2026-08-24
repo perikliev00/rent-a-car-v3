@@ -6,6 +6,25 @@ const asyncHandler = require('../../../utils/asyncHandler');
 const { forwardControllerError } = require('../../../utils/controllerError');
 const stripeTestStub = require('../../../services/payment/stripeTestStub');
 
+exports.getPaymentRefundQueue = asyncHandler(async (req, res, next) => {
+  try {
+    const data = await paymentAdminService.listPaymentRefundQueue({
+      q: req.query.q,
+      status: req.query.status,
+      refundState: req.query.refundState,
+      pickupFrom: req.query.pickupFrom,
+      pickupTo: req.query.pickupTo,
+      limit: req.query.limit,
+    });
+    return apiResponse.success(res, data);
+  } catch (err) {
+    return forwardControllerError(err, req, next, {
+      context: 'api.getPaymentRefundQueue',
+      publicMessage: 'Error loading payment refund queue.',
+    });
+  }
+});
+
 exports.getPaymentMonitoring = asyncHandler(async (req, res, next) => {
   try {
     const data = await paymentAdminService.getPaymentMonitoringData();

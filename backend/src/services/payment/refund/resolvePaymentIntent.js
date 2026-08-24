@@ -1,11 +1,5 @@
 const { retrieveStripeCheckoutSession } = require('../stripeCheckoutService');
-
-function refundError(code, message, status = 422) {
-  const err = new Error(message);
-  err.code = code;
-  err.status = status;
-  return err;
-}
+const { refundError } = require('./refundErrors');
 
 /**
  * Resolve Stripe Payment Intent id for a reservation.

@@ -19,3 +19,11 @@ CREATE INDEX IF NOT EXISTS idx_payment_events_reservation
 
 CREATE INDEX IF NOT EXISTS idx_payment_events_created_at
   ON payment_events(created_at DESC);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_payment_events_event_id_unique
+  ON payment_events (event_id)
+  WHERE event_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_payment_events_received_created
+  ON payment_events (created_at)
+  WHERE status = 'received';

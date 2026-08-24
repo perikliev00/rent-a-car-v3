@@ -26,6 +26,8 @@ import { PageLoader } from '../../components/ui/Loading';
 import { Select } from '../../components/ui/Select';
 import { Textarea } from '../../components/ui/Textarea';
 import { toast } from '../../components/ui/toastStore';
+import { RefundConfirmModal } from './refund/RefundConfirmModal';
+import { RefundLedgerBadge } from './refund/RefundLedgerBadge';
 
 const WIDGET_META: { key: keyof ReturnType<typeof emptyWidgets>; title: string; hint: string }[] = [
   { key: 'todaysPickups', title: "Today's Pickups", hint: 'Confirmed / prepared for pickup today' },
@@ -95,16 +97,25 @@ function formatChangedBy(entry: ReservationStatusHistoryEntry) {
 function StatusActions({
   row,
   onChanged,
+  allowRefund = false,
 }: {
   row: OpsReservationRow;
   onChanged: () => void;
+  allowRefund?: boolean;
 }) {
   const { user } = useAuth();
   const canRefund = hasPermission(user, 'can_refund_payments');
+  const ledgerStatus = row.refundOperation?.status;
+  const refundPending = ledgerStatus === 'pending';
   const showRefund =
-    canRefund && REFUNDABLE_OPS_STATUSES.includes(row.status) && row.status !== 'refunded';
+    allowRefund &&
+    canRefund &&
+    REFUNDABLE_OPS_STATUSES.includes(row.status) &&
+    row.status !== 'refunded' &&
+    ledgerStatus !== 'succeeded';
 
   const [status, setStatus] = useState<ReservationOpsStatus | ''>('');
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const mutation = useMutation({
     mutationFn: () =>
       changeReservationStatus(row.id, {
@@ -120,14 +131,14 @@ function StatusActions({
   });
 
   const refundMutation = useMutation({
-    mutationFn: () =>
-      refundReservation(row.id, { reason: 'admin_ops_dashboard_refund' }),
+    mutationFn: (reason: string) => refundReservation(row.id, { reason }),
     onSuccess: (result) => {
       if (result.status === 'pending') {
         toast('Refund in progress — waiting for Stripe confirmation', 'info');
       } else {
         toast('Refund completed', 'success');
       }
+      setConfirmOpen(false);
       onChanged();
     },
     onError: (err) => toast((err as Error).message, 'error'),
@@ -164,13 +175,25 @@ function StatusActions({
         <Button
           size="sm"
           variant="secondary"
-          disabled={mutation.isPending || refundMutation.isPending}
+          disabled={refundPending || mutation.isPending || refundMutation.isPending}
           loading={refundMutation.isPending}
-          onClick={() => refundMutation.mutate()}
+          title={refundPending ? 'Refund already in progress' : undefined}
+          onClick={() => {
+            if (!refundPending) setConfirmOpen(true);
+          }}
         >
-          Refund
+          {ledgerStatus === 'failed' ? 'Retry refund' : 'Refund'}
         </Button>
       ) : null}
+      <RefundConfirmModal
+        open={confirmOpen}
+        row={row}
+        isPending={refundMutation.isPending}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={(reason) =>
+          refundMutation.mutate(reason || 'admin_ops_dashboard_refund')
+        }
+      />
     </div>
   );
 }
@@ -532,12 +555,14 @@ function OpsTable({
   selectedId,
   onSelect,
   showCancelReason = false,
+  allowRefund = false,
 }: {
   rows: OpsReservationRow[];
   onChanged: () => void;
   selectedId: string | null;
   onSelect: (id: string) => void;
   showCancelReason?: boolean;
+  allowRefund?: boolean;
 }) {
   if (!rows.length) {
     return <p className="text-sm text-[var(--color-muted)]">No items</p>;
@@ -599,12 +624,13 @@ function OpsTable({
                   >
                     {row.status}
                   </span>
+                  <RefundLedgerBadge row={row} className="ml-1" />
                 </td>
                 {showCancelReason ? (
                   <td className="py-1.5 pr-3 text-[var(--color-muted)]">{row.cancelReason || '—'}</td>
                 ) : null}
                 <td className="py-1.5">
-                  <StatusActions row={row} onChanged={onChanged} />
+                  <StatusActions row={row} onChanged={onChanged} allowRefund={allowRefund} />
                 </td>
               </tr>
             );
@@ -708,6 +734,7 @@ export function AdminReservationOpsPage() {
                 selectedId={selectedId}
                 onSelect={toggleSelect}
                 showCancelReason={widget.key === 'cancelled'}
+                allowRefund={widget.key === 'todaysPickups' || widget.key === 'manualReview'}
               />
             </CardBody>
           </Card>

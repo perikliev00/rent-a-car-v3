@@ -36,6 +36,16 @@ function contact(name, email, phone) {
 async function clearPreviousSeed(client) {
   await client.query(
     `
+    DELETE FROM refund_operations
+    WHERE reservation_id IN (
+      SELECT id FROM reservations WHERE session_id LIKE $1
+    )
+    `,
+    [`${SESSION_PREFIX}%`]
+  );
+
+  await client.query(
+    `
     DELETE FROM orders
     WHERE reservation_id IN (
       SELECT id FROM reservations WHERE session_id LIKE $1

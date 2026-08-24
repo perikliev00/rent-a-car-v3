@@ -34,6 +34,7 @@ describe('reservationStatus domain', () => {
     expect(canTransition('confirmed', 'refunded')).toBe(true);
     expect(canTransition('car_prepared', 'refunded')).toBe(true);
     expect(canTransition('picked_up', 'refunded')).toBe(false);
+    expect(canTransition('cancelled', 'refunded')).toBe(false);
   });
 
   test('refunded is not an admin ops status', () => {

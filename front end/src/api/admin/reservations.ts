@@ -31,6 +31,15 @@ export interface OpsReservationRow {
   totalPrice?: number | null;
   cancelReason?: string | null;
   updatedAt?: string;
+  refundOperation?: {
+    id: number;
+    status: 'pending' | 'succeeded' | 'failed';
+    amountCents: number;
+    currency: string;
+    failureCode?: string | null;
+    failureMessage?: string | null;
+    updatedAt?: string | null;
+  } | null;
 }
 
 export interface OpsDashboardData {

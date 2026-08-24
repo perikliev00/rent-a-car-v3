@@ -10,6 +10,7 @@ let counter = 0;
 let refundCounter = 0;
 let failNextCreate = false;
 let failNextRefund = false;
+let throwNextRefundAfterRecording = false;
 let nextRefundStatus = null;
 let createOverrides = null;
 
@@ -152,6 +153,10 @@ function failNextCreateRefund() {
   failNextRefund = true;
 }
 
+function throwNextCreateRefundAfterRecording() {
+  throwNextRefundAfterRecording = true;
+}
+
 function setNextRefundStatus(status) {
   nextRefundStatus = status || null;
 }
@@ -199,6 +204,15 @@ function createRefund({ paymentIntentId, amountCents = null, idempotencyKey }) {
   if (idempotencyKey) {
     refundsByIdempotency.set(idempotencyKey, refund);
   }
+
+  if (throwNextRefundAfterRecording) {
+    throwNextRefundAfterRecording = false;
+    const err = new Error('Stripe stub timeout after recording refund');
+    err.type = 'StripeConnectionError';
+    err.code = 'ETIMEDOUT';
+    throw err;
+  }
+
   return { ...refund };
 }
 
@@ -231,6 +245,7 @@ function clearSessions() {
   refundCounter = 0;
   failNextCreate = false;
   failNextRefund = false;
+  throwNextRefundAfterRecording = false;
   nextRefundStatus = null;
   createOverrides = null;
 }
@@ -253,6 +268,7 @@ module.exports = {
   retrieveRefund,
   setRefundState,
   failNextCreateRefund,
+  throwNextCreateRefundAfterRecording,
   setNextRefundStatus,
   clearSessions,
   isStubEnabled,

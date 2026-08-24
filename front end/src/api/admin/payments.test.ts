@@ -6,7 +6,7 @@ vi.mock('../client', () => ({
   api: (...args: unknown[]) => mockApi(...args),
 }));
 
-import { getPayments, reconcilePayments } from './payments';
+import { getPayments, reconcilePayments, getPaymentRefundQueue } from './payments';
 
 describe('admin payments API', () => {
   beforeEach(() => {
@@ -41,5 +41,23 @@ describe('admin payments API', () => {
       method: 'POST',
       body: JSON.stringify({ dryRun: true }),
     });
+  });
+
+  it('getPaymentRefundQueue fetches queue with filters', async () => {
+    const data = { refundable: [], recentRefunds: [], limit: 50 };
+    mockApi.mockResolvedValue(data);
+
+    const result = await getPaymentRefundQueue({
+      q: '512',
+      status: 'confirmed',
+      refundState: 'none',
+      pickupFrom: '2026-08-01',
+      pickupTo: '2026-08-31',
+    });
+
+    expect(mockApi).toHaveBeenCalledWith(
+      '/api/admin/payments/refund-queue?q=512&status=confirmed&refundState=none&pickupFrom=2026-08-01&pickupTo=2026-08-31'
+    );
+    expect(result).toEqual(data);
   });
 });

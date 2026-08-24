@@ -39,6 +39,9 @@ exports.changeStatus = asyncHandler(async (req, res, next) => {
     if (err.code === 'INVALID_STATUS_TRANSITION') {
       return apiResponse.error(res, 'INVALID_STATUS_TRANSITION', err.message, 422);
     }
+    if (err.code === 'REFUND_IN_PROGRESS') {
+      return apiResponse.error(res, 'REFUND_IN_PROGRESS', err.message, 409);
+    }
     if (err.code === 'FORBIDDEN' || err.status === 403) {
       return apiResponse.error(res, 'FORBIDDEN', err.message, 403);
     }
@@ -76,6 +79,12 @@ exports.refundReservation = asyncHandler(async (req, res, next) => {
     if (err.code === 'NOT_FOUND' || err.status === 404) {
       return apiResponse.error(res, 'NOT_FOUND', err.message || 'Reservation not found.', 404);
     }
+    if (err.code === 'REFUND_IN_PROGRESS') {
+      return apiResponse.error(res, 'REFUND_IN_PROGRESS', err.message, 409);
+    }
+    if (err.code === 'REFUND_LEDGER_INCONSISTENT') {
+      return apiResponse.error(res, 'REFUND_LEDGER_INCONSISTENT', err.message, 409);
+    }
     if (
       err.code === 'REFUND_NOT_ALLOWED' ||
       err.code === 'REFUND_NO_PAYMENT_INTENT' ||
@@ -86,6 +95,9 @@ exports.refundReservation = asyncHandler(async (req, res, next) => {
     }
     if (err.code === 'REFUND_FAILED') {
       return apiResponse.error(res, 'REFUND_FAILED', err.message, 502);
+    }
+    if (err.code === 'REFUND_INDETERMINATE') {
+      return apiResponse.error(res, 'REFUND_INDETERMINATE', err.message, 503);
     }
     if (err.code === 'FORBIDDEN' || err.status === 403) {
       return apiResponse.error(res, 'FORBIDDEN', err.message, 403);

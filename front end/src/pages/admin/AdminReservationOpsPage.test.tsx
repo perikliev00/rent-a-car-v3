@@ -4,6 +4,7 @@ import {
   getReservationOpsDashboard,
   listCancellationRequests,
   refundReservation,
+  type OpsReservationRow,
 } from '../../api/admin/reservations';
 import { renderWithRouter } from '../../test/test-utils';
 import { AdminReservationOpsPage } from './AdminReservationOpsPage';
@@ -33,31 +34,37 @@ vi.mock('../../api/admin/reservations', () => ({
   submitReturnChecklist: vi.fn(),
 }));
 
+const baseRow: OpsReservationRow = {
+  id: '42',
+  status: 'manual_review',
+  pickupDate: '2026-08-10',
+  returnDate: '2026-08-12',
+  fullName: 'Refund Guest',
+  carName: 'Test Car',
+  totalPrice: 100,
+};
+
+function dashboardWith(row: OpsReservationRow) {
+  return {
+    today: '2026-08-04',
+    limit: 20,
+    widgets: {
+      todaysPickups: [],
+      todaysReturns: [],
+      activeRentals: [],
+      overdueReturns: [],
+      manualReview: [row],
+      paidNotConfirmed: [],
+      cancelled: [],
+      failedPayments: [],
+    },
+  };
+}
+
 describe('AdminReservationOpsPage', () => {
   beforeEach(() => {
-    vi.mocked(getReservationOpsDashboard).mockResolvedValue({
-      today: '2026-08-04',
-      limit: 20,
-      widgets: {
-        todaysPickups: [],
-        todaysReturns: [],
-        activeRentals: [],
-        overdueReturns: [],
-        manualReview: [
-          {
-            id: '42',
-            status: 'manual_review',
-            pickupDate: '2026-08-10',
-            returnDate: '2026-08-12',
-            fullName: 'Refund Guest',
-            carName: 'Test Car',
-          },
-        ],
-        paidNotConfirmed: [],
-        cancelled: [],
-        failedPayments: [],
-      },
-    });
+    vi.clearAllMocks();
+    vi.mocked(getReservationOpsDashboard).mockResolvedValue(dashboardWith(baseRow));
     vi.mocked(listCancellationRequests).mockResolvedValue({ requests: [] });
     vi.mocked(refundReservation).mockResolvedValue({
       status: 'succeeded',
@@ -77,7 +84,7 @@ describe('AdminReservationOpsPage', () => {
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
   });
 
-  it('shows Refund action and calls refundReservation', async () => {
+  it('opens confirm dialog without calling the API; cancel stays no-op', async () => {
     renderWithRouter(<AdminReservationOpsPage />);
 
     await waitFor(() => {
@@ -90,10 +97,117 @@ describe('AdminReservationOpsPage', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Refund' }));
+    expect(refundReservation).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText('#42')).toBeInTheDocument();
+    expect(screen.getByText('100.00 EUR')).toBeInTheDocument();
+    expect(
+      screen.getByText('This returns the money via Stripe and cannot be undone.')
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(refundReservation).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('confirm sends refundReservation with reason', async () => {
+    renderWithRouter(<AdminReservationOpsPage />);
+
     await waitFor(() => {
-      expect(refundReservation).toHaveBeenCalledWith('42', {
-        reason: 'admin_ops_dashboard_refund',
-      });
+      expect(screen.getByRole('button', { name: 'Refund' })).toBeInTheDocument();
     });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refund' }));
+    fireEvent.change(screen.getByLabelText(/reason/i), { target: { value: ' guest asked ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm refund' }));
+
+    await waitFor(() => {
+      expect(refundReservation).toHaveBeenCalledWith('42', { reason: 'guest asked' });
+    });
+  });
+
+  it('pending ledger disables refund and does not open confirm', async () => {
+    vi.mocked(getReservationOpsDashboard).mockResolvedValue(
+      dashboardWith({
+        ...baseRow,
+        refundOperation: {
+          id: 9,
+          status: 'pending',
+          amountCents: 10000,
+          currency: 'eur',
+        },
+      })
+    );
+
+    renderWithRouter(<AdminReservationOpsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Refund pending')).toBeInTheDocument();
+    });
+
+    const refundBtn = screen.getByRole('button', { name: 'Refund' });
+    expect(refundBtn).toBeDisabled();
+    fireEvent.click(refundBtn);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(refundReservation).not.toHaveBeenCalled();
+  });
+
+  it('failed ledger shows Retry refund and still requires confirm', async () => {
+    vi.mocked(getReservationOpsDashboard).mockResolvedValue(
+      dashboardWith({
+        ...baseRow,
+        refundOperation: {
+          id: 9,
+          status: 'failed',
+          amountCents: 10000,
+          currency: 'eur',
+          failureMessage: 'Stripe refund failed',
+        },
+      })
+    );
+
+    renderWithRouter(<AdminReservationOpsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Refund failed/)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry refund' }));
+    expect(refundReservation).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText('100.00 EUR')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm refund' }));
+    await waitFor(() => {
+      expect(refundReservation).toHaveBeenCalledWith(
+        '42',
+        expect.objectContaining({ reason: expect.any(String) })
+      );
+    });
+  });
+
+  it('does not show refund on paid-not-confirmed rows', async () => {
+    vi.mocked(getReservationOpsDashboard).mockResolvedValue({
+      today: '2026-08-04',
+      limit: 20,
+      widgets: {
+        todaysPickups: [],
+        todaysReturns: [],
+        activeRentals: [],
+        overdueReturns: [],
+        manualReview: [],
+        paidNotConfirmed: [{ ...baseRow, id: '99', status: 'paid' }],
+        cancelled: [],
+        failedPayments: [],
+      },
+    });
+
+    renderWithRouter(<AdminReservationOpsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('99')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole('button', { name: 'Refund' })).not.toBeInTheDocument();
   });
 });

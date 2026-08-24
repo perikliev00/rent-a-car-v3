@@ -21,6 +21,10 @@ async function insertCar() {
 }
 
 async function cleanupCar(carId) {
+  await pool.query(
+    'DELETE FROM refund_operations WHERE reservation_id IN (SELECT id FROM reservations WHERE car_id = $1)',
+    [carId]
+  );
   await pool.query('DELETE FROM reservations WHERE car_id = $1', [carId]);
   await pool.query('DELETE FROM car_date_blocks WHERE car_id = $1', [carId]);
   await pool.query('DELETE FROM orders WHERE car_id = $1', [carId]);
@@ -303,6 +307,152 @@ describeIfDb('DB consistency', () => {
       FROM information_schema.tables
       WHERE table_schema = 'public'
         AND table_name = 'refund_operations'
+    `);
+    expect(result.rowCount).toBe(1);
+  });
+
+  test('refund_operations unique stripe_refund_id and one-active indexes exist', async () => {
+    const uniqueStripe = await pool.query(`
+      SELECT 1
+      FROM pg_indexes
+      WHERE schemaname = 'public'
+        AND tablename = 'refund_operations'
+        AND indexname = 'idx_refund_operations_stripe_refund_id_unique'
+    `);
+    expect(uniqueStripe.rowCount).toBe(1);
+
+    const oneActive = await pool.query(`
+      SELECT 1
+      FROM pg_indexes
+      WHERE schemaname = 'public'
+        AND tablename = 'refund_operations'
+        AND indexname = 'idx_refund_operations_one_active_per_reservation'
+    `);
+    expect(oneActive.rowCount).toBe(1);
+  });
+
+  test('refund_operations unique id, restrict delete, and monotonic status', async () => {
+    const carId = await insertCar();
+    const start = new Date('2031-01-01T10:00:00.000Z');
+    const end = new Date('2031-01-05T10:00:00.000Z');
+
+    try {
+      const holdExpiresAt = new Date('2031-01-01T10:00:00.000Z');
+      const resA = await pool.query(
+        `
+        INSERT INTO reservations (
+          car_id, session_id, pickup_date, return_date,
+          pickup_location, return_location, rental_days, total_price,
+          status, stripe_payment_intent_id, hold_expires_at
+        )
+        VALUES ($1, $2, $3, $4, 'office', 'office', 4, 200, 'confirmed', 'pi_integrity_a', $5)
+        RETURNING id
+        `,
+        [carId, `integrity-a-${carId}`, start, end, holdExpiresAt]
+      );
+      const resB = await pool.query(
+        `
+        INSERT INTO reservations (
+          car_id, session_id, pickup_date, return_date,
+          pickup_location, return_location, rental_days, total_price,
+          status, stripe_payment_intent_id, hold_expires_at
+        )
+        VALUES ($1, $2, $3, $4, 'office', 'office', 4, 200, 'confirmed', 'pi_integrity_b', $5)
+        RETURNING id
+        `,
+        [carId, `integrity-b-${carId}`, start, new Date('2031-02-05T10:00:00.000Z'), holdExpiresAt]
+      );
+      const reservationA = Number(resA.rows[0].id);
+      const reservationB = Number(resB.rows[0].id);
+
+      const opA = await pool.query(
+        `
+        INSERT INTO refund_operations (
+          reservation_id, stripe_payment_intent_id, stripe_refund_id,
+          amount_cents, currency, status, idempotency_key
+        )
+        VALUES ($1, 'pi_integrity_a', 're_dup', 10000, 'eur', 'succeeded', $2)
+        RETURNING id
+        `,
+        [reservationA, `refund:reservation:${reservationA}:full`]
+      );
+      const opId = Number(opA.rows[0].id);
+
+      await expect(
+        pool.query(
+          `
+          INSERT INTO refund_operations (
+            reservation_id, stripe_payment_intent_id, stripe_refund_id,
+            amount_cents, currency, status, idempotency_key
+          )
+          VALUES ($1, 'pi_integrity_b', 're_dup', 10000, 'eur', 'failed', $2)
+          `,
+          [reservationB, `refund:reservation:${reservationB}:full`]
+        )
+      ).rejects.toMatchObject({ code: '23505' });
+
+      await pool.query(
+        `
+        INSERT INTO refund_operations (
+          reservation_id, stripe_payment_intent_id, stripe_refund_id,
+          amount_cents, currency, status, idempotency_key
+        )
+        VALUES ($1, 'pi_integrity_b', NULL, 10000, 'eur', 'failed', $2),
+               ($1, 'pi_integrity_b', NULL, 10000, 'eur', 'failed', $3)
+        `,
+        [
+          reservationB,
+          `refund:reservation:${reservationB}:full:null1`,
+          `refund:reservation:${reservationB}:full:null2`,
+        ]
+      );
+
+      await expect(
+        pool.query('DELETE FROM reservations WHERE id = $1', [reservationA])
+      ).rejects.toMatchObject({ code: '23001' });
+
+      await expect(
+        pool.query(
+          `UPDATE refund_operations SET status = 'failed' WHERE id = $1 AND status = 'succeeded'`,
+          [opId]
+        )
+      ).rejects.toMatchObject({ code: 'P0001' });
+
+      const stillSucceeded = await pool.query(
+        'SELECT status FROM refund_operations WHERE id = $1',
+        [opId]
+      );
+      expect(stillSucceeded.rows[0].status).toBe('succeeded');
+
+      await pool.query(
+        `
+        UPDATE refund_operations
+        SET failure_code = 'DOMAIN_TRANSITION_FAILED', failure_message = 'picked_up → refunded'
+        WHERE id = $1
+        `,
+        [opId]
+      );
+      const patched = await pool.query(
+        'SELECT status, failure_code FROM refund_operations WHERE id = $1',
+        [opId]
+      );
+      expect(patched.rows[0].status).toBe('succeeded');
+      expect(patched.rows[0].failure_code).toBe('DOMAIN_TRANSITION_FAILED');
+
+      await pool.query('DELETE FROM refund_operations WHERE reservation_id = $1', [reservationA]);
+      await pool.query('DELETE FROM reservations WHERE id = $1', [reservationA]);
+    } finally {
+      await cleanupCar(carId);
+    }
+  });
+
+  test('payment_events.event_id unique index exists', async () => {
+    const result = await pool.query(`
+      SELECT 1
+      FROM pg_indexes
+      WHERE schemaname = 'public'
+        AND tablename = 'payment_events'
+        AND indexname = 'idx_payment_events_event_id_unique'
     `);
     expect(result.rowCount).toBe(1);
   });

@@ -98,6 +98,56 @@ describe('POST /api/admin/reservations/:id/refund', () => {
     expect(response.body.error.code).toBe('REFUND_NO_PAYMENT_INTENT');
   });
 
+  test('maps REFUND_FAILED to 502', async () => {
+    const err = new Error('Stripe refund failed');
+    err.code = 'REFUND_FAILED';
+    err.status = 502;
+    requestReservationRefund.mockRejectedValue(err);
+
+    const app = createApiTestApp();
+    const agent = await loginAsAdmin(app);
+
+    const response = await withCsrf(agent, agent.post('/api/admin/reservations/5/refund'))
+      .send({})
+      .expect(502);
+
+    expect(response.body.error.code).toBe('REFUND_FAILED');
+  });
+
+  test('maps REFUND_INDETERMINATE to 503', async () => {
+    const err = new Error('Stripe refund result is indeterminate');
+    err.code = 'REFUND_INDETERMINATE';
+    err.status = 503;
+    requestReservationRefund.mockRejectedValue(err);
+
+    const app = createApiTestApp();
+    const agent = await loginAsAdmin(app);
+
+    const response = await withCsrf(agent, agent.post('/api/admin/reservations/5/refund'))
+      .send({})
+      .expect(503);
+
+    expect(response.body.error.code).toBe('REFUND_INDETERMINATE');
+  });
+
+  test('maps REFUND_LEDGER_INCONSISTENT to 409', async () => {
+    const err = new Error(
+      'Reservation is marked refunded but has no succeeded refund ledger row. Do not treat this as a Stripe refund.'
+    );
+    err.code = 'REFUND_LEDGER_INCONSISTENT';
+    err.status = 409;
+    requestReservationRefund.mockRejectedValue(err);
+
+    const app = createApiTestApp();
+    const agent = await loginAsAdmin(app);
+
+    const response = await withCsrf(agent, agent.post('/api/admin/reservations/5/refund'))
+      .send({})
+      .expect(409);
+
+    expect(response.body.error.code).toBe('REFUND_LEDGER_INCONSISTENT');
+  });
+
   test('status-only refunded is rejected by admin service', async () => {
     const err = new Error('Use POST .../refund');
     err.code = 'VALIDATION_ERROR';

@@ -12,9 +12,70 @@ jest.mock('../src/config/stripe', () => ({
   },
 }));
 
-jest.mock('../src/services/sql/paymentEventSqlService', () => ({
-  insertPaymentEvent: jest.fn().mockResolvedValue(null),
-}));
+jest.mock('../src/services/sql/paymentEventSqlService', () => {
+  const store = new Map();
+  let seq = 1;
+  return {
+    _reset() {
+      store.clear();
+      seq = 1;
+    },
+    _get(eventId) {
+      return store.get(eventId);
+    },
+    _seed(row) {
+      store.set(row.event_id, { ...row });
+      if (row.id >= seq) {
+        seq = row.id + 1;
+      }
+    },
+    insertPaymentEvent: jest.fn(
+      async ({
+        eventId,
+        eventType,
+        stripeSessionId,
+        reservationId,
+        status = 'received',
+        payload = null,
+      }) => {
+        if (eventId && store.has(eventId)) {
+          const err = new Error('duplicate key value violates unique constraint');
+          err.code = '23505';
+          throw err;
+        }
+        const row = {
+          id: seq,
+          event_id: eventId,
+          event_type: eventType,
+          stripe_session_id: stripeSessionId || null,
+          reservation_id: reservationId || null,
+          status,
+          payload,
+        };
+        seq += 1;
+        if (eventId) {
+          store.set(eventId, row);
+        }
+        return { ...row };
+      }
+    ),
+    findByEventId: jest.fn(async (eventId) => {
+      const row = store.get(eventId);
+      return row ? { ...row } : null;
+    }),
+    updatePaymentEventStatus: jest.fn(async (id, status) => {
+      for (const row of store.values()) {
+        if (row.id === id) {
+          row.status = status;
+          return { ...row };
+        }
+      }
+      return null;
+    }),
+    listStuckReceivedRefundEvents: jest.fn().mockResolvedValue([]),
+    listRecentPaymentEvents: jest.fn().mockResolvedValue([]),
+  };
+});
 
 jest.mock('../src/monitoring/track', () => ({
   trackWebhookFailure: jest.fn(),
@@ -25,7 +86,7 @@ jest.mock('../src/services/bookingFinalizationService', () => ({
   processStripeWebhookEvent: jest.fn(),
 }));
 
-jest.mock('../src/services/payment/refund/reservationRefundService', () => ({
+jest.mock('../src/services/payment/refund/refundWebhookService', () => ({
   applyRefundFromStripeObject: jest.fn().mockResolvedValue({ handled: true, status: 'succeeded' }),
 }));
 
@@ -34,7 +95,8 @@ const { handleStripeWebhookFlow } = require('../src/services/payment/webhookServ
 const { processStripeWebhookEvent } = require('../src/services/bookingFinalizationService');
 const {
   applyRefundFromStripeObject,
-} = require('../src/services/payment/refund/reservationRefundService');
+} = require('../src/services/payment/refund/refundWebhookService');
+const paymentEventSql = require('../src/services/sql/paymentEventSqlService');
 
 function buildSignedWebhookRequest(overrides = {}) {
   return {
@@ -66,9 +128,26 @@ function buildCheckoutCompletedEvent(sessionOverrides = {}) {
   };
 }
 
+function buildRefundEvent({ id = 'evt_refund_1', type = 'refund.updated', object } = {}) {
+  return {
+    id,
+    type,
+    data: {
+      object: object || {
+        id: 're_123',
+        object: 'refund',
+        status: 'succeeded',
+        payment_intent: 'pi_123',
+      },
+    },
+  };
+}
+
 describe('handleStripeWebhookFlow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    paymentEventSql._reset();
+    applyRefundFromStripeObject.mockResolvedValue({ handled: true, status: 'succeeded' });
   });
 
   test('returns 400 with received:false when Stripe signature is invalid', async () => {
@@ -216,18 +295,7 @@ describe('handleStripeWebhookFlow', () => {
   });
 
   test('applies refund.updated webhook via refund service', async () => {
-    stripe.webhooks.constructEvent.mockReturnValue({
-      id: 'evt_refund_1',
-      type: 'refund.updated',
-      data: {
-        object: {
-          id: 're_123',
-          object: 'refund',
-          status: 'succeeded',
-          payment_intent: 'pi_123',
-        },
-      },
-    });
+    stripe.webhooks.constructEvent.mockReturnValue(buildRefundEvent());
 
     const result = await handleStripeWebhookFlow(buildSignedWebhookRequest());
 
@@ -237,5 +305,146 @@ describe('handleStripeWebhookFlow', () => {
     );
     expect(processStripeWebhookEvent).not.toHaveBeenCalled();
     expect(result).toEqual({ statusCode: 200, body: { received: true } });
+    expect(paymentEventSql._get('evt_refund_1').status).toBe('processed');
+    expect(paymentEventSql._get('evt_refund_1').payload).toBeTruthy();
+  });
+
+  test('routes refund.created webhook via refund service', async () => {
+    stripe.webhooks.constructEvent.mockReturnValue({
+      id: 'evt_refund_created_1',
+      type: 'refund.created',
+      data: {
+        object: {
+          id: 're_created',
+          object: 'refund',
+          status: 'pending',
+          payment_intent: 'pi_123',
+        },
+      },
+    });
+
+    const result = await handleStripeWebhookFlow(buildSignedWebhookRequest());
+
+    expect(applyRefundFromStripeObject).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 're_created', status: 'pending' }),
+      expect.objectContaining({ eventType: 'refund.created' })
+    );
+    expect(processStripeWebhookEvent).not.toHaveBeenCalled();
+    expect(result).toEqual({ statusCode: 200, body: { received: true } });
+  });
+
+  test('routes refund.failed webhook via refund service', async () => {
+    stripe.webhooks.constructEvent.mockReturnValue({
+      id: 'evt_refund_failed_1',
+      type: 'refund.failed',
+      data: {
+        object: {
+          id: 're_failed',
+          object: 'refund',
+          status: 'failed',
+          payment_intent: 'pi_123',
+        },
+      },
+    });
+
+    const result = await handleStripeWebhookFlow(buildSignedWebhookRequest());
+
+    expect(applyRefundFromStripeObject).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 're_failed', status: 'failed' }),
+      expect.objectContaining({ eventType: 'refund.failed' })
+    );
+    expect(processStripeWebhookEvent).not.toHaveBeenCalled();
+    expect(result).toEqual({ statusCode: 200, body: { received: true } });
+  });
+
+  test('inbox insert throw returns 500 and does not apply', async () => {
+    stripe.webhooks.constructEvent.mockReturnValue(buildRefundEvent());
+    paymentEventSql.insertPaymentEvent.mockRejectedValueOnce(new Error('inbox insert failed'));
+
+    const result = await handleStripeWebhookFlow(buildSignedWebhookRequest());
+
+    expect(result.statusCode).toBe(500);
+    expect(result.body).toEqual({ received: false });
+    expect(applyRefundFromStripeObject).not.toHaveBeenCalled();
+  });
+
+  test('apply throw returns 500 not 200', async () => {
+    const { trackWebhookFailure } = require('../src/monitoring/track');
+    stripe.webhooks.constructEvent.mockReturnValue(buildRefundEvent());
+    applyRefundFromStripeObject.mockRejectedValue(new Error('db down'));
+
+    const result = await handleStripeWebhookFlow(buildSignedWebhookRequest());
+
+    expect(result.statusCode).toBe(500);
+    expect(result.body).toEqual({ received: false });
+    expect(trackWebhookFailure).toHaveBeenCalledWith(
+      'refund_apply_failed',
+      expect.objectContaining({ eventId: 'evt_refund_1' })
+    );
+    expect(paymentEventSql._get('evt_refund_1').status).toBe('received');
+  });
+
+  test('no_matching_operation returns 200 and ignored', async () => {
+    stripe.webhooks.constructEvent.mockReturnValue(buildRefundEvent());
+    applyRefundFromStripeObject.mockResolvedValue({
+      handled: false,
+      reason: 'no_matching_operation',
+    });
+
+    const result = await handleStripeWebhookFlow(buildSignedWebhookRequest());
+
+    expect(result).toEqual({ statusCode: 200, body: { received: true } });
+    expect(paymentEventSql._get('evt_refund_1').status).toBe('ignored');
+  });
+
+  test('partial_or_amount_mismatch returns 200 and ignored', async () => {
+    stripe.webhooks.constructEvent.mockReturnValue(buildRefundEvent());
+    applyRefundFromStripeObject.mockResolvedValue({
+      handled: false,
+      reason: 'partial_or_amount_mismatch',
+    });
+
+    const result = await handleStripeWebhookFlow(buildSignedWebhookRequest());
+
+    expect(result).toEqual({ statusCode: 200, body: { received: true } });
+    expect(paymentEventSql._get('evt_refund_1').status).toBe('ignored');
+  });
+
+  test('duplicate terminal event returns 200 without applying again', async () => {
+    stripe.webhooks.constructEvent.mockReturnValue(buildRefundEvent());
+
+    const first = await handleStripeWebhookFlow(buildSignedWebhookRequest());
+    expect(first.statusCode).toBe(200);
+    expect(applyRefundFromStripeObject).toHaveBeenCalledTimes(1);
+
+    applyRefundFromStripeObject.mockClear();
+    const second = await handleStripeWebhookFlow(buildSignedWebhookRequest());
+
+    expect(second).toEqual({ statusCode: 200, body: { received: true } });
+    expect(applyRefundFromStripeObject).not.toHaveBeenCalled();
+  });
+
+  test('stuck received is retried, not ACK-as-done', async () => {
+    paymentEventSql._seed({
+      id: 99,
+      event_id: 'evt_refund_1',
+      event_type: 'refund.updated',
+      status: 'received',
+      payload: { id: 'evt_refund_1', type: 'refund.updated' },
+    });
+
+    stripe.webhooks.constructEvent.mockReturnValue(buildRefundEvent());
+    applyRefundFromStripeObject.mockRejectedValueOnce(new Error('still failing'));
+
+    const failing = await handleStripeWebhookFlow(buildSignedWebhookRequest());
+    expect(failing.statusCode).toBe(500);
+    expect(applyRefundFromStripeObject).toHaveBeenCalledTimes(1);
+    expect(paymentEventSql._get('evt_refund_1').status).toBe('received');
+
+    applyRefundFromStripeObject.mockResolvedValueOnce({ handled: true, status: 'succeeded' });
+    const recovered = await handleStripeWebhookFlow(buildSignedWebhookRequest());
+    expect(recovered).toEqual({ statusCode: 200, body: { received: true } });
+    expect(applyRefundFromStripeObject).toHaveBeenCalledTimes(2);
+    expect(paymentEventSql._get('evt_refund_1').status).toBe('processed');
   });
 });

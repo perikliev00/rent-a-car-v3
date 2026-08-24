@@ -1,7 +1,9 @@
 const { runWithTransaction } = require('../../db/transaction');
 const reservationSql = require('../sql/reservationSqlService');
 const historySql = require('../sql/reservationStatusHistorySqlService');
+const refundOpSql = require('../sql/refundOperationSqlService');
 const { assertTransition } = require('../../domain/reservationStatus');
+const { isAllowedDuringPendingRefund } = require('../payment/refund/refundPolicy');
 const { logAdminAction, logSystemAction, logCustomerAction } = require('../admin/adminAuditService');
 const logger = require('../../utils/logger');
 
@@ -74,6 +76,19 @@ async function changeStatusCore({
   }
 
   const oldStatus = reservation.status;
+
+  if (oldStatus !== newStatus) {
+    const activeRefund = await refundOpSql.findActiveByReservationId(reservationId, client);
+    if (activeRefund?.status === 'pending' && !isAllowedDuringPendingRefund(newStatus)) {
+      const err = new Error(
+        'A refund is pending for this reservation. Pickup and cancellation are blocked until the refund completes.'
+      );
+      err.code = 'REFUND_IN_PROGRESS';
+      err.status = 409;
+      throw err;
+    }
+  }
+
   assertTransition(oldStatus, newStatus);
 
   if (oldStatus === newStatus && !patch) {

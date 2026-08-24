@@ -267,6 +267,10 @@ async function cleanupTestCar(carId) {
   if (!carId) return;
 
   await pool.query(
+    'DELETE FROM refund_operations WHERE reservation_id IN (SELECT id FROM reservations WHERE car_id = $1)',
+    [carId]
+  );
+  await pool.query(
     'DELETE FROM payment_events WHERE reservation_id IN (SELECT id FROM reservations WHERE car_id = $1)',
     [carId]
   );
@@ -366,6 +370,10 @@ async function getStatusHistory(reservationId) {
 async function cleanupReservationsForCar(carId) {
   if (!carId) return;
 
+  await pool.query(
+    'DELETE FROM refund_operations WHERE reservation_id IN (SELECT id FROM reservations WHERE car_id = $1)',
+    [carId]
+  );
   await pool.query(
     'DELETE FROM payment_events WHERE reservation_id IN (SELECT id FROM reservations WHERE car_id = $1)',
     [carId]

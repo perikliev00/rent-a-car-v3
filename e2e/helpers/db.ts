@@ -23,6 +23,10 @@ async function deleteReservationChildren(
   params: unknown[]
 ): Promise<void> {
   await client.query(
+    `DELETE FROM refund_operations WHERE reservation_id IN (${reservationIdsSql})`,
+    params
+  );
+  await client.query(
     `DELETE FROM payment_events WHERE reservation_id IN (${reservationIdsSql})`,
     params
   );

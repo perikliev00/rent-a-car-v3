@@ -39,7 +39,7 @@ const adminNav: NavItem[] = [
   {
     to: '/admin/payments',
     label: 'Payments',
-    anyOf: ['can_manage_payments_monitor', 'can_view_revenue'],
+    anyOf: ['can_manage_payments_monitor', 'can_view_revenue', 'can_refund_payments'],
   },
   {
     to: '/admin/analytics',

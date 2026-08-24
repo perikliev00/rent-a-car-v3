@@ -27,6 +27,10 @@ async function main() {
       await client.query('DELETE FROM car_date_blocks WHERE car_id = ANY($1::bigint[])', [
         demoCarIds,
       ]);
+      await client.query(
+        'DELETE FROM refund_operations WHERE reservation_id IN (SELECT id FROM reservations WHERE car_id = ANY($1::bigint[]))',
+        [demoCarIds]
+      );
       await client.query('DELETE FROM reservations WHERE car_id = ANY($1::bigint[])', [
         demoCarIds,
       ]);

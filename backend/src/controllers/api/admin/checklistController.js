@@ -15,6 +15,9 @@ exports.submitPickupChecklist = asyncHandler(async (req, res, next) => {
     if (err.code === 'INVALID_STATUS_TRANSITION') {
       return apiResponse.error(res, 'INVALID_STATUS_TRANSITION', err.message, 422);
     }
+    if (err.code === 'REFUND_IN_PROGRESS') {
+      return apiResponse.error(res, 'REFUND_IN_PROGRESS', err.message, 409);
+    }
     return forwardControllerError(err, req, next, {
       context: 'api.adminSubmitPickupChecklist',
       publicMessage: 'Error saving pickup checklist.',
@@ -91,6 +94,12 @@ exports.reviewCancellationRequest = asyncHandler(async (req, res, next) => {
   } catch (err) {
     if (err.code === 'INVALID_STATUS_TRANSITION') {
       return apiResponse.error(res, 'INVALID_STATUS_TRANSITION', err.message, 422);
+    }
+    if (err.code === 'REFUND_IN_PROGRESS') {
+      return apiResponse.error(res, 'REFUND_IN_PROGRESS', err.message, 409);
+    }
+    if (err.code === 'REFUND_FAILED') {
+      return apiResponse.error(res, 'REFUND_FAILED', err.message, 502);
     }
     return forwardControllerError(err, req, next, {
       context: 'api.adminReviewCancellationRequest',

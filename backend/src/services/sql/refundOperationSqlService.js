@@ -74,6 +74,16 @@ async function insertRefundOperation(
   return mapRow(result.rows[0]);
 }
 
+async function findById(id, client = null) {
+  if (id == null) return null;
+  const result = await clientQuery(
+    client,
+    `SELECT * FROM refund_operations WHERE id = $1 LIMIT 1`,
+    [id]
+  );
+  return mapRow(result.rows[0]);
+}
+
 async function findByIdempotencyKey(idempotencyKey, client = null) {
   const result = await clientQuery(
     client,
@@ -125,6 +135,40 @@ async function findByPaymentIntentId(paymentIntentId, client = null) {
   return mapRow(result.rows[0]);
 }
 
+async function findLatestByReservationId(reservationId, client = null) {
+  const result = await clientQuery(
+    client,
+    `
+    SELECT * FROM refund_operations
+    WHERE reservation_id = $1
+    ORDER BY id DESC
+    LIMIT 1
+    `,
+    [reservationId]
+  );
+  return mapRow(result.rows[0]);
+}
+
+async function findFailedWithRefundIdOlderThan(
+  { olderThanMinutes = 5, limit = 50 } = {},
+  client = null
+) {
+  const minutes = Math.max(0, Number(olderThanMinutes) || 0);
+  const result = await clientQuery(
+    client,
+    `
+    SELECT * FROM refund_operations
+    WHERE status = 'failed'
+      AND stripe_refund_id IS NOT NULL
+      AND updated_at <= NOW() - ($1::int * INTERVAL '1 minute')
+    ORDER BY updated_at ASC
+    LIMIT $2
+    `,
+    [minutes, limit]
+  );
+  return result.rows.map(mapRow);
+}
+
 async function findPendingOlderThan({ olderThanMinutes = 5, limit = 50 } = {}, client = null) {
   const minutes = Math.max(0, Number(olderThanMinutes) || 0);
   const result = await clientQuery(
@@ -141,8 +185,21 @@ async function findPendingOlderThan({ olderThanMinutes = 5, limit = 50 } = {}, c
   return result.rows.map(mapRow);
 }
 
+const REGRESSING_RAW_STATUSES = new Set(['pending', 'failed', 'canceled']);
+
+function shouldGuardSucceeded(patch, has) {
+  if (has('status') && (patch.status === 'pending' || patch.status === 'failed')) {
+    return true;
+  }
+  if (has('stripeRawStatus') && REGRESSING_RAW_STATUSES.has(String(patch.stripeRawStatus))) {
+    return true;
+  }
+  return false;
+}
+
 async function updateRefundOperation(id, patch, client = null) {
   const has = (key) => Object.prototype.hasOwnProperty.call(patch, key);
+  const guardSucceeded = shouldGuardSucceeded(patch, has);
   const result = await clientQuery(
     client,
     `
@@ -156,6 +213,7 @@ async function updateRefundOperation(id, patch, client = null) {
       order_id = CASE WHEN $12::boolean THEN $13 ELSE order_id END,
       updated_at = NOW()
     WHERE id = $1
+      ${guardSucceeded ? "AND status <> 'succeeded'" : ''}
     RETURNING *
     `,
     [
@@ -179,10 +237,13 @@ async function updateRefundOperation(id, patch, client = null) {
 
 module.exports = {
   insertRefundOperation,
+  findById,
   findByIdempotencyKey,
   findActiveByReservationId,
   findByStripeRefundId,
   findByPaymentIntentId,
+  findLatestByReservationId,
+  findFailedWithRefundIdOlderThan,
   findPendingOlderThan,
   updateRefundOperation,
   mapRow,
