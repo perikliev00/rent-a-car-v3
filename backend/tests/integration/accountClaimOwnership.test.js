@@ -4,6 +4,7 @@ const {
   DEFAULT_ADMIN,
   insertIsolatedTestCar,
   insertLinkedBooking,
+  insertTestAdmin,
   insertTestCustomer,
   deleteTestUser,
   getReservationOwner,
@@ -658,6 +659,8 @@ describeIf('P0-01/AUTH-01: guest booking ownership requires a claim token', () =
     });
 
     test('staff logins are unaffected and stay verified', async () => {
+      // CI DBs are migrate-only; other suites seed admin in beforeEach — this one must too.
+      await insertTestAdmin();
       const admin = await loginAsAdmin(app);
       const me = await admin.get('/api/auth/me');
 
