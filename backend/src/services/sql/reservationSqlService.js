@@ -30,7 +30,8 @@ const {
   listByUserId,
   findByIdForUser,
   updateTravelDetails,
-  claimByEmail,
+  lockOwnershipForClaim,
+  assignOwnerIfUnclaimed,
 } = require('./reservation/reservationAccountRepository');
 
 module.exports = {
@@ -57,5 +58,6 @@ module.exports = {
   listByUserId,
   findByIdForUser,
   updateTravelDetails,
-  claimByEmail,
+  lockOwnershipForClaim,
+  assignOwnerIfUnclaimed,
 };

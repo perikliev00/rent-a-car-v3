@@ -2,7 +2,14 @@ const express = require('express');
 const authController = require('../../controllers/api/authController');
 const { authLoginValidationRules } = require('../../validators/authLoginValidationRules');
 const { authSignupValidationRules } = require('../../validators/authSignupValidationRules');
-const { loginLimiter, signupLimiter } = require('../../middleware/rateLimit');
+const {
+  authVerifyEmailValidationRules,
+} = require('../../validators/authVerificationValidationRules');
+const {
+  loginLimiter,
+  signupLimiter,
+  verificationLimiter,
+} = require('../../middleware/rateLimit');
 const { apiLoginAttemptGuard } = require('../../middleware/apiLoginAttemptGuard');
 
 const router = express.Router();
@@ -20,6 +27,19 @@ router.post(
   signupLimiter,
   authSignupValidationRules,
   authController.postSignup
+);
+
+router.post(
+  '/verify-email',
+  verificationLimiter,
+  authVerifyEmailValidationRules,
+  authController.postVerifyEmail
+);
+
+router.post(
+  '/verify-email/resend',
+  verificationLimiter,
+  authController.postResendVerification
 );
 
 router.post('/logout', authController.postLogout);

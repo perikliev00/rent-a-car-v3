@@ -498,6 +498,32 @@ async function updateOrderFromDoc(order, client = null) {
   return mapSqlOrder(result.rows[0]);
 }
 
+/**
+ * Links the order belonging to a reservation to a user, but only while it is still
+ * unowned or already owned by that same user. Used by the explicit claim flow so the
+ * reservation and its order change owner inside one transaction.
+ */
+async function assignOwnerByReservationIdIfUnclaimed(reservationId, userId, client) {
+  const rid = Number(reservationId);
+  const uid = Number(userId);
+  if (!Number.isInteger(rid) || rid <= 0 || !Number.isInteger(uid) || uid <= 0) {
+    return 0;
+  }
+
+  const result = await clientQuery(
+    client,
+    `
+    UPDATE orders
+    SET user_id = $2, updated_at = NOW()
+    WHERE reservation_id = $1
+      AND (user_id IS NULL OR user_id = $2)
+    `,
+    [rid, uid]
+  );
+
+  return result.rowCount || 0;
+}
+
 async function permanentlyDeleteSoftDeletedOrders(
   { retentionDays = 30 } = {},
   client = null
@@ -527,5 +553,6 @@ module.exports = {
   createOrderFromReservation,
   createAdminOrder,
   updateOrderFromDoc,
+  assignOwnerByReservationIdIfUnclaimed,
   permanentlyDeleteSoftDeletedOrders,
 };

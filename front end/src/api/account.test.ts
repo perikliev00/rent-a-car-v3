@@ -10,12 +10,14 @@ vi.mock('./client', () => ({
 }));
 
 import {
+  claimReservation,
   deleteCustomerDocument,
   getAccountDashboard,
   getAccountReservation,
   listAccountReservations,
   listCustomerDocuments,
   requestCancellation,
+  requestClaimLink,
   updateTravelDetails,
   uploadCustomerDocument,
 } from './account';
@@ -83,5 +85,28 @@ describe('account API', () => {
     await deleteCustomerDocument(5);
 
     expect(mockApi).toHaveBeenCalledWith('/api/account/documents/5', { method: 'DELETE' });
+  });
+
+  it('claimReservation posts the token to the reservation claim endpoint', async () => {
+    mockApi.mockResolvedValue({ reservationId: '10', claimed: true, alreadyOwned: false });
+    const token = 'b'.repeat(64);
+
+    await claimReservation('10', token);
+
+    expect(mockApi).toHaveBeenCalledWith('/api/account/reservations/10/claim', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    });
+  });
+
+  it('requestClaimLink posts reservation id and booking email', async () => {
+    mockApi.mockResolvedValue({ requested: true });
+
+    await requestClaimLink('10', 'guest@example.com');
+
+    expect(mockApi).toHaveBeenCalledWith('/api/account/reservations/claim-request', {
+      method: 'POST',
+      body: JSON.stringify({ reservationId: 10, bookingEmail: 'guest@example.com' }),
+    });
   });
 });

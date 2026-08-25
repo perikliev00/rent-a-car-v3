@@ -61,6 +61,12 @@ User:
       type: array
       items:
         type: string
+    emailVerified:
+      type: boolean
+      description: >
+        Whether the account email address has been confirmed. Unverified accounts receive
+        `403 EMAIL_VERIFICATION_REQUIRED` from every `/api/v1/account/*` endpoint and
+        cannot claim guest bookings.
     createdAt:
       type: string
       format: date-time

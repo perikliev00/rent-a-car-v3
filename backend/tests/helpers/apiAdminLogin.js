@@ -7,6 +7,7 @@ const DEFAULT_API_ADMIN = {
   email: 'admin@example.com',
   password: 'hashed-password',
   role: 'admin',
+  emailVerified: true,
 };
 
 const DEFAULT_API_CUSTOMER = {
@@ -14,6 +15,7 @@ const DEFAULT_API_CUSTOMER = {
   email: 'user@example.com',
   password: 'hashed-password',
   role: 'customer',
+  emailVerified: true,
 };
 
 async function loginAsAdmin(app) {

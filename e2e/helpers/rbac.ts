@@ -79,13 +79,19 @@ export async function insertTestStaff(options: {
     if (existing.rows[0]) {
       id = Number(existing.rows[0].id);
       await client.query(
-        `UPDATE users SET password = $2, role = $3, updated_at = NOW() WHERE id = $1`,
+        `UPDATE users
+         SET password = $2,
+             role = $3,
+             email_verified_at = COALESCE(email_verified_at, NOW()),
+             updated_at = NOW()
+         WHERE id = $1`,
         [id, hashedPassword, legacyRole]
       );
       await client.query(`DELETE FROM user_roles WHERE user_id = $1`, [id]);
     } else {
       const inserted = await client.query(
-        `INSERT INTO users (email, password, role) VALUES ($1, $2, $3) RETURNING id`,
+        `INSERT INTO users (email, password, role, email_verified_at)
+         VALUES ($1, $2, $3, NOW()) RETURNING id`,
         [email, hashedPassword, legacyRole]
       );
       id = Number(inserted.rows[0].id);

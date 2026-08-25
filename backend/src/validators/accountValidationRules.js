@@ -62,9 +62,35 @@ const accountPdfKindValidationRules = [
     .withMessage('Invalid PDF document kind.'),
 ];
 
+// 32 random bytes rendered as hex.
+const CLAIM_TOKEN_PATTERN = /^[0-9a-fA-F]{64}$/;
+
+const accountClaimValidationRules = [
+  param('id').isInt({ min: 1 }).withMessage('Invalid reservation id.'),
+  body('token')
+    .isString()
+    .withMessage('A claim token is required.')
+    .bail()
+    .trim()
+    .matches(CLAIM_TOKEN_PATTERN)
+    .withMessage('A claim token is required.'),
+];
+
+const accountClaimRequestValidationRules = [
+  body('reservationId').isInt({ min: 1 }).withMessage('Invalid reservation id.'),
+  body('bookingEmail')
+    .trim()
+    .isEmail()
+    .withMessage('Please enter a valid email address.')
+    .normalizeEmail(),
+];
+
 module.exports = {
+  CLAIM_TOKEN_PATTERN,
   accountTravelValidationRules,
   accountCancelRequestValidationRules,
   accountDocumentUploadValidationRules,
   accountPdfKindValidationRules,
+  accountClaimValidationRules,
+  accountClaimRequestValidationRules,
 };

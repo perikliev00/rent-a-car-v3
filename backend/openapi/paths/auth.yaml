@@ -2,7 +2,11 @@
   post:
     tags: [Auth]
     summary: Log in with email and password
-    description: Creates a session cookie (`sid`). Subject to rate limiting.
+    description: >
+      Creates a session cookie (`sid`). Subject to rate limiting. Login never assigns
+      ownership of reservations or orders; guest bookings are linked only through the
+      explicit claim flow. If the account email is not yet confirmed the session is
+      limited and `verificationRequired` is true.
     security: []
     requestBody:
       required: true
@@ -33,6 +37,8 @@
                       properties:
                         user:
                           $ref: '#/components/schemas/User'
+                        verificationRequired:
+                          type: boolean
       '401':
         description: Invalid credentials
         content:
@@ -56,7 +62,10 @@
   post:
     tags: [Auth]
     summary: Register a new customer account
-    description: Creates a user and session. Subject to rate limiting.
+    description: >
+      Creates a user and a limited session, and mails a confirmation link. Subject to rate
+      limiting. Signup never assigns ownership of existing reservations or orders — knowing
+      an email address grants nothing.
     security: []
     requestBody:
       required: true
@@ -93,8 +102,122 @@
                       properties:
                         user:
                           $ref: '#/components/schemas/User'
+                        verificationRequired:
+                          type: boolean
+      '409':
+        description: Email already in use
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
       '422':
         description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '429':
+        description: Rate limited
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RateLimitedError'
+
+/api/v1/auth/verify-email:
+  post:
+    tags: [Auth]
+    summary: Confirm an email address with a verification token
+    description: >
+      Consumes a single-use verification token that was mailed to the account address.
+      Only the SHA-256 hash of the token is stored server-side. Idempotent: replaying a
+      link for an already-confirmed account succeeds. Invalid, used and revoked tokens all
+      return the same `VERIFICATION_TOKEN_INVALID` response so token existence cannot be
+      probed. Subject to rate limiting.
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [token]
+            properties:
+              token:
+                type: string
+                description: 64-character hex verification token from the emailed link.
+                pattern: '^[0-9a-fA-F]{64}$'
+    responses:
+      '200':
+        description: Email confirmed
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+                      properties:
+                        emailVerified:
+                          type: boolean
+                        alreadyVerified:
+                          type: boolean
+      '400':
+        description: Token invalid, already used, or revoked
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '410':
+        description: Token expired
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '429':
+        description: Rate limited
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RateLimitedError'
+
+/api/v1/auth/verify-email/resend:
+  post:
+    tags: [Auth]
+    summary: Resend the email confirmation link
+    description: >
+      Issues a new verification token for the signed-in account and revokes the previous
+      unused one. The response is uniform whether a mail was sent, throttled by the
+      per-account cooldown, or the account was already verified. Subject to rate limiting.
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    responses:
+      '200':
+        description: Request accepted
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+                      properties:
+                        requested:
+                          type: boolean
+                        emailVerified:
+                          type: boolean
+      '401':
+        description: Not authenticated
         content:
           application/json:
             schema:
@@ -170,6 +293,8 @@
                       properties:
                         user:
                           $ref: '#/components/schemas/User'
+                        verificationRequired:
+                          type: boolean
       '401':
         description: Not authenticated
         content:

@@ -2,27 +2,35 @@ const bcrypt = require('bcrypt');
 const { PassThrough } = require('stream');
 const { createApiTestApp, initTestAgent, withCsrf } = require('../helpers/apiTestApp');
 
-jest.mock('../../src/middleware/rateLimit', () => ({
-  authLimiter: (_req, _res, next) => next(),
-  loginLimiter: (_req, _res, next) => next(),
-  signupLimiter: (_req, _res, next) => next(),
-  adminLimiter: (_req, _res, next) => next(),
-  adminUploadLimiter: (_req, _res, next) => next(),
-  accountUploadLimiter: (_req, _res, next) => next(),
-  checkoutLimiter: (_req, _res, next) => next(),
-  bookingLimiter: (_req, _res, next) => next(),
-  chatLimiter: (_req, _res, next) => next(),
-  contactLimiter: (_req, _res, next) => next(),
-}));
+jest.mock('../../src/middleware/rateLimit', () =>
+  require('../helpers/rateLimitPassthrough')()
+);
 
 jest.mock('../../src/services/sql/userSqlService', () => ({
   findUserByEmail: jest.fn(),
+  findUserById: jest.fn(),
   createUser: jest.fn(),
+  markEmailVerified: jest.fn(),
 }));
 
-jest.mock('../../src/services/account/accountClaimService', () => ({
-  claimReservationsForUser: jest.fn().mockResolvedValue({ reservations: 2, orders: 1 }),
-}));
+jest.mock('../../src/services/auth/emailVerificationService', () => {
+  const actual = jest.requireActual('../../src/services/auth/emailVerificationService');
+  return {
+    OUTCOMES: actual.OUTCOMES,
+    issueAndSendVerification: jest.fn().mockResolvedValue({ sent: true }),
+    verifyToken: jest.fn(),
+    resendVerification: jest.fn().mockResolvedValue({ status: 'sent' }),
+  };
+});
+
+jest.mock('../../src/services/account/reservationClaimService', () => {
+  const actual = jest.requireActual('../../src/services/account/reservationClaimService');
+  return {
+    OUTCOMES: actual.OUTCOMES,
+    claimReservation: jest.fn(),
+    requestClaimToken: jest.fn().mockResolvedValue({ status: 'ignored' }),
+  };
+});
 
 jest.mock('../../src/services/account/accountReservationService', () => ({
   getDashboard: jest.fn(),
@@ -63,27 +71,33 @@ jest.mock('bcrypt', () => ({
 
 const userSql = require('../../src/services/sql/userSqlService');
 const loginAttemptService = require('../../src/services/auth/loginAttemptService');
-const { claimReservationsForUser } = require('../../src/services/account/accountClaimService');
+const reservationSql = require('../../src/services/sql/reservationSqlService');
+const reservationClaimService = require('../../src/services/account/reservationClaimService');
 const accountReservationService = require('../../src/services/account/accountReservationService');
 const accountDocumentService = require('../../src/services/account/accountDocumentService');
 const { generatePdf } = require('../../src/services/pdf/pdfDocumentService');
+
+const { OUTCOMES } = reservationClaimService;
+const VALID_TOKEN = 'b'.repeat(64);
 
 const mockUser = {
   id: 7,
   email: 'demo@luxride.local',
   password: 'hashed',
   role: 'user',
+  emailVerified: true,
 };
 
-async function loginAgent() {
+async function loginAgent({ user = mockUser } = {}) {
   const app = createApiTestApp();
   const agent = await initTestAgent(app);
-  userSql.findUserByEmail.mockResolvedValue(mockUser);
+  userSql.findUserByEmail.mockResolvedValue(user);
+  userSql.findUserById.mockResolvedValue(user);
   bcrypt.compare.mockResolvedValue(true);
   loginAttemptService.resetForTests?.();
 
   const loginRes = await withCsrf(agent, agent.post('/api/auth/login'))
-    .send({ email: mockUser.email, password: 'Demo123!' })
+    .send({ email: user.email, password: 'Demo123!' })
     .expect(200);
 
   agent.csrfToken = loginRes.body.data?.csrfToken || agent.csrfToken;
@@ -93,7 +107,6 @@ async function loginAgent() {
 describe('Customer account API', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    claimReservationsForUser.mockResolvedValue({ reservations: 2, orders: 1 });
   });
 
   test('GET /api/account/dashboard requires auth', async () => {
@@ -103,9 +116,13 @@ describe('Customer account API', () => {
     expect(response.body.error.code).toBe('UNAUTHORIZED');
   });
 
-  test('login claims reservations by email', async () => {
+  test('login does not claim any reservation or order', async () => {
     await loginAgent();
-    expect(claimReservationsForUser).toHaveBeenCalledWith(7, 'demo@luxride.local');
+
+    // The dangerous email-based auto-claim is gone: no ownership primitive is reachable
+    // from the login path at all.
+    expect(reservationSql.claimByEmail).toBeUndefined();
+    expect(reservationClaimService.claimReservation).not.toHaveBeenCalled();
   });
 
   test('GET /api/account/dashboard returns summary for logged-in user', async () => {
@@ -242,5 +259,163 @@ describe('Customer account API', () => {
 
     expect(response.body.data.document.id).toBe(5);
     expect(accountDocumentService.deleteDocument).toHaveBeenCalledWith(7, '5');
+  });
+});
+
+describe('Unverified accounts are fail-closed on the account portal', () => {
+  const unverifiedUser = { ...mockUser, emailVerified: false };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test.each([
+    ['dashboard', '/api/account/dashboard'],
+    ['booking history', '/api/account/reservations'],
+    ['reservation details', '/api/account/reservations/10'],
+    ['invoice PDF', '/api/account/reservations/10/pdf/invoice'],
+    ['documents', '/api/account/documents'],
+    ['document download', '/api/account/documents/5/download'],
+  ])('%s is refused for an unverified session', async (_label, path) => {
+    const agent = await loginAgent({ user: unverifiedUser });
+
+    const response = await agent.get(path).expect(403);
+
+    expect(response.body.error.code).toBe('EMAIL_VERIFICATION_REQUIRED');
+  });
+
+  test('no account service is reached for an unverified session', async () => {
+    const agent = await loginAgent({ user: unverifiedUser });
+
+    await agent.get('/api/account/reservations/10').expect(403);
+
+    expect(accountReservationService.getReservationDetail).not.toHaveBeenCalled();
+  });
+
+  test('an unverified session cannot claim a booking', async () => {
+    const agent = await loginAgent({ user: unverifiedUser });
+
+    const response = await withCsrf(
+      agent,
+      agent.post('/api/account/reservations/10/claim')
+    )
+      .send({ token: VALID_TOKEN })
+      .expect(403);
+
+    expect(response.body.error.code).toBe('EMAIL_VERIFICATION_REQUIRED');
+    expect(reservationClaimService.claimReservation).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /api/account/reservations/:id/claim', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('links the booking for a valid token', async () => {
+    reservationClaimService.claimReservation.mockResolvedValue({
+      outcome: OUTCOMES.CLAIMED,
+      reservationId: 10,
+    });
+    const agent = await loginAgent();
+
+    const response = await withCsrf(agent, agent.post('/api/account/reservations/10/claim'))
+      .send({ token: VALID_TOKEN })
+      .expect(200);
+
+    expect(response.body.data).toEqual({
+      reservationId: '10',
+      claimed: true,
+      alreadyOwned: false,
+    });
+  });
+
+  test('is idempotent for the existing owner', async () => {
+    reservationClaimService.claimReservation.mockResolvedValue({
+      outcome: OUTCOMES.ALREADY_OWNED,
+      reservationId: 10,
+    });
+    const agent = await loginAgent();
+
+    const response = await withCsrf(agent, agent.post('/api/account/reservations/10/claim'))
+      .send({ token: VALID_TOKEN })
+      .expect(200);
+
+    expect(response.body.data.alreadyOwned).toBe(true);
+  });
+
+  test('returns 409 when another account already owns the booking', async () => {
+    reservationClaimService.claimReservation.mockResolvedValue({ outcome: OUTCOMES.CONFLICT });
+    const agent = await loginAgent();
+
+    const response = await withCsrf(agent, agent.post('/api/account/reservations/10/claim'))
+      .send({ token: VALID_TOKEN })
+      .expect(409);
+
+    expect(response.body.error.code).toBe('CLAIM_CONFLICT');
+  });
+
+  test.each([
+    ['invalid token', OUTCOMES.INVALID_TOKEN],
+    ['expired token', OUTCOMES.EXPIRED],
+    ['email mismatch', OUTCOMES.EMAIL_MISMATCH],
+  ])('returns an indistinguishable error for %s', async (_label, outcome) => {
+    reservationClaimService.claimReservation.mockResolvedValue({ outcome });
+    const agent = await loginAgent();
+
+    const response = await withCsrf(agent, agent.post('/api/account/reservations/10/claim'))
+      .send({ token: VALID_TOKEN })
+      .expect(400);
+
+    expect(response.body.error.code).toBe('CLAIM_TOKEN_INVALID');
+  });
+
+  test('rejects a malformed token before touching the service', async () => {
+    const agent = await loginAgent();
+
+    const response = await withCsrf(agent, agent.post('/api/account/reservations/10/claim'))
+      .send({ token: 'nope' })
+      .expect(422);
+
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    expect(reservationClaimService.claimReservation).not.toHaveBeenCalled();
+  });
+
+  test('requires a CSRF token', async () => {
+    const agent = await loginAgent();
+
+    const response = await agent
+      .post('/api/account/reservations/10/claim')
+      .send({ token: VALID_TOKEN })
+      .expect(403);
+
+    expect(response.body.error.code).toBe('CSRF_INVALID');
+    expect(reservationClaimService.claimReservation).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /api/account/reservations/claim-request', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    reservationClaimService.requestClaimToken.mockResolvedValue({ status: 'ignored' });
+  });
+
+  test('returns the same response whether or not a link was sent', async () => {
+    const agent = await loginAgent();
+
+    const ignored = await withCsrf(
+      agent,
+      agent.post('/api/account/reservations/claim-request')
+    )
+      .send({ reservationId: 10, bookingEmail: 'demo@luxride.local' })
+      .expect(200);
+
+    reservationClaimService.requestClaimToken.mockResolvedValue({ status: 'sent' });
+    const sent = await withCsrf(agent, agent.post('/api/account/reservations/claim-request'))
+      .send({ reservationId: 11, bookingEmail: 'demo@luxride.local' })
+      .expect(200);
+
+    expect(ignored.body).toEqual(sent.body);
+    expect(sent.body.data).toEqual({ requested: true });
   });
 });

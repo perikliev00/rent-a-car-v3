@@ -38,10 +38,12 @@ async function seedUser({ email, password, role }) {
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
+  // Seeded accounts are provisioned by an operator, so their addresses count as verified.
   const user = await userSql.createUser({
     email,
     password: hashedPassword,
     role,
+    emailVerified: true,
   });
 
   console.log(`→ created ${role} user ${email}`);

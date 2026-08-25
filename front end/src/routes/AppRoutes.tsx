@@ -12,6 +12,9 @@ import { CheckoutSuccessPage } from '../pages/public/CheckoutSuccessPage';
 import { CheckoutCancelPage } from '../pages/public/CheckoutCancelPage';
 import { LoginPage } from '../pages/auth/LoginPage';
 import { SignupPage } from '../pages/auth/SignupPage';
+import { VerifyEmailPage } from '../pages/auth/VerifyEmailPage';
+import { VerifyPendingPage } from '../pages/auth/VerifyPendingPage';
+import { ClaimBookingPage } from '../pages/auth/ClaimBookingPage';
 import { AccountDashboardPage } from '../pages/account/AccountDashboardPage';
 import { AccountReservationsPage } from '../pages/account/AccountReservationsPage';
 import { AccountReservationDetailPage } from '../pages/account/AccountReservationDetailPage';
@@ -65,10 +68,20 @@ export function AppRoutes() {
           <Route path="checkout/cancel" element={<CheckoutCancelPage />} />
           <Route path="login" element={<LoginPage />} />
           <Route path="signup" element={<SignupPage />} />
+          <Route path="verify-email" element={<VerifyEmailPage />} />
+          <Route path="claim-booking" element={<ClaimBookingPage />} />
+          <Route
+            path="account/verify-email"
+            element={
+              <ProtectedRoute>
+                <VerifyPendingPage />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="account"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requireVerifiedEmail>
                 <AccountDashboardPage />
               </ProtectedRoute>
             }
@@ -76,7 +89,7 @@ export function AppRoutes() {
           <Route
             path="account/reservations"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requireVerifiedEmail>
                 <AccountReservationsPage />
               </ProtectedRoute>
             }
@@ -84,7 +97,7 @@ export function AppRoutes() {
           <Route
             path="account/reservations/:id"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requireVerifiedEmail>
                 <AccountReservationDetailPage />
               </ProtectedRoute>
             }
@@ -92,7 +105,7 @@ export function AppRoutes() {
           <Route
             path="account/documents"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requireVerifiedEmail>
                 <AccountDocumentsPage />
               </ProtectedRoute>
             }

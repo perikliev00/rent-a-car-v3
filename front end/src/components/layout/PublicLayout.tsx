@@ -2,6 +2,7 @@ import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../../auth/useAuth';
 import { isStaffUser } from '../../auth/permissions';
 import { Button } from '../ui/Button';
+import { VerificationBanner } from './VerificationBanner';
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   `relative text-sm font-semibold uppercase tracking-[0.06em] transition-colors ${
@@ -119,6 +120,8 @@ export function PublicLayout() {
           </div>
         </div>
       </header>
+
+      <VerificationBanner />
 
       <main className="flex-1">
         <Outlet />

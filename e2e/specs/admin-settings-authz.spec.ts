@@ -1,4 +1,5 @@
 import { expect, test } from '../fixtures/base';
+import { signupVerifiedViaUi } from '../helpers/account';
 import { openOrderAndResolveConflict, readOrderSummaryTotal } from '../helpers/booking';
 import { createContactViaApi, deleteContactViaApi, updateContactStatusViaApi } from '../helpers/contacts';
 import { apiGet, apiPost, loginAsAdmin } from '../helpers/csrf';
@@ -28,15 +29,8 @@ test.describe("admin-authz", () => {
 
     test('customer cannot open admin dashboard', async ({ page }) => {
       const email = `customer-e2e-${Date.now()}@example.com`;
-      const password = 'Customer123!';
 
-      await page.goto('/signup');
-      await page.getByLabel('Email').fill(email);
-      await page.getByLabel('Password', { exact: true }).fill(password);
-      await page.getByLabel('Confirm password').fill(password);
-      await page.getByRole('main').getByRole('button', { name: /sign up|create account/i }).click();
-
-      await expect(page).toHaveURL(/\/$/, { timeout: 15_000 });
+      await signupVerifiedViaUi(page, { email, password: 'Customer123!' });
 
       await page.goto('/admin');
       await expect(page.getByRole('heading', { name: 'Access Denied' })).toBeVisible({

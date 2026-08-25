@@ -6,6 +6,7 @@ const OPENAPI_ROOT = path.join(__dirname, '../../openapi');
 
 const PATH_FILES = [
   'auth.yaml',
+  'account.yaml',
   'cars.yaml',
   'reservations.yaml',
   'orders.yaml',

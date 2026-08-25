@@ -3,26 +3,14 @@ const { createApiTestApp } = require('../../helpers/apiTestApp');
 const { loginAsAdmin } = require('../../helpers/apiAdminLogin');
 const { ALL_PERMISSIONS } = require('../../helpers/rbacTestAccess');
 
-jest.mock('../../../src/middleware/rateLimit', () => ({
-  authLimiter: (_req, _res, next) => next(),
-  loginLimiter: (_req, _res, next) => next(),
-  signupLimiter: (_req, _res, next) => next(),
-  adminLimiter: (_req, _res, next) => next(),
-  adminUploadLimiter: (_req, _res, next) => next(),
-  accountUploadLimiter: (_req, _res, next) => next(),
-  checkoutLimiter: (_req, _res, next) => next(),
-  bookingLimiter: (_req, _res, next) => next(),
-  chatLimiter: (_req, _res, next) => next(),
-  contactLimiter: (_req, _res, next) => next(),
-}));
+jest.mock('../../../src/middleware/rateLimit', () =>
+  require('../../helpers/rateLimitPassthrough')()
+);
 jest.mock('../../../src/services/rbac/rbacService', () =>
   require('../../helpers/rbacTestAccess').createOwnerRbacMock()
 );
 jest.mock('../../../src/services/sql/userSqlService', () => ({
   findUserByEmail: jest.fn(),
-}));
-jest.mock('../../../src/services/account/accountClaimService', () => ({
-  claimReservationsForUser: jest.fn().mockResolvedValue({ reservations: 0, orders: 0 }),
 }));
 jest.mock('bcrypt', () => ({
   compare: jest.fn(),

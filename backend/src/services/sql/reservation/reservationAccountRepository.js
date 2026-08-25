@@ -86,46 +86,70 @@ async function updateTravelDetails(reservationId, userId, travel, client = null)
   return findByIdForUser(rid, uid, client);
 }
 
-async function claimByEmail(userId, email, client = null) {
-  const uid = Number(userId);
-  const normalizedEmail = String(email || '').trim().toLowerCase();
-  if (!Number.isInteger(uid) || uid <= 0 || !normalizedEmail) {
-    return { reservations: 0, orders: 0 };
+/**
+ * Locks a single reservation row so ownership can be evaluated and assigned without
+ * racing a concurrent claim. Must be called inside a transaction.
+ */
+async function lockOwnershipForClaim(reservationId, client) {
+  const rid = Number(reservationId);
+  if (!Number.isInteger(rid) || rid <= 0) {
+    return null;
   }
 
-  const reservationResult = await clientQuery(
+  const result = await clientQuery(
+    client,
+    `
+    SELECT id, user_id, email, status
+    FROM reservations
+    WHERE id = $1
+    FOR UPDATE
+    `,
+    [rid]
+  );
+
+  const row = result.rows[0];
+  if (!row) {
+    return null;
+  }
+
+  return {
+    id: String(row.id),
+    userId: row.user_id != null ? String(row.user_id) : null,
+    email: row.email,
+    status: row.status,
+  };
+}
+
+/**
+ * Assigns ownership of a reservation to a user, but only while it is still unowned or
+ * already owned by that same user. Returns the number of rows changed so callers can
+ * detect a lost race as a fail-closed conflict.
+ */
+async function assignOwnerIfUnclaimed(reservationId, userId, client) {
+  const rid = Number(reservationId);
+  const uid = Number(userId);
+  if (!Number.isInteger(rid) || rid <= 0 || !Number.isInteger(uid) || uid <= 0) {
+    return 0;
+  }
+
+  const result = await clientQuery(
     client,
     `
     UPDATE reservations
-    SET user_id = $1, updated_at = NOW()
-    WHERE user_id IS NULL
-      AND email IS NOT NULL
-      AND LOWER(email) = $2
+    SET user_id = $2, updated_at = NOW()
+    WHERE id = $1
+      AND (user_id IS NULL OR user_id = $2)
     `,
-    [uid, normalizedEmail]
+    [rid, uid]
   );
 
-  const orderResult = await clientQuery(
-    client,
-    `
-    UPDATE orders
-    SET user_id = $1, updated_at = NOW()
-    WHERE user_id IS NULL
-      AND email IS NOT NULL
-      AND LOWER(email) = $2
-    `,
-    [uid, normalizedEmail]
-  );
-
-  return {
-    reservations: reservationResult.rowCount || 0,
-    orders: orderResult.rowCount || 0,
-  };
+  return result.rowCount || 0;
 }
 
 module.exports = {
   listByUserId,
   findByIdForUser,
   updateTravelDetails,
-  claimByEmail,
+  lockOwnershipForClaim,
+  assignOwnerIfUnclaimed,
 };

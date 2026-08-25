@@ -1,5 +1,6 @@
 import { Client } from 'pg';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 import { DATABASE_URL, ADMIN_EMAIL, ADMIN_PASSWORD, E2E_GUEST } from './test-env';
 import { allocateFutureRange, getSofiaIsoDateString, parseSofiaDate } from './dates';
 
@@ -214,12 +215,18 @@ export async function insertTestAdmin(): Promise<void> {
     if (existing.rows.length > 0) {
       userId = Number(existing.rows[0].id);
       await client.query(
-        `UPDATE users SET password = $2, role = 'admin', updated_at = NOW() WHERE id = $1`,
+        `UPDATE users
+         SET password = $2,
+             role = 'admin',
+             email_verified_at = COALESCE(email_verified_at, NOW()),
+             updated_at = NOW()
+         WHERE id = $1`,
         [userId, hashedPassword]
       );
     } else {
       const inserted = await client.query(
-        `INSERT INTO users (email, password, role) VALUES ($1, $2, 'admin') RETURNING id`,
+        `INSERT INTO users (email, password, role, email_verified_at)
+         VALUES ($1, $2, 'admin', NOW()) RETURNING id`,
         [email, hashedPassword]
       );
       userId = Number(inserted.rows[0].id);
@@ -235,6 +242,103 @@ export async function insertTestAdmin(): Promise<void> {
       `,
       [userId]
     );
+  });
+}
+
+/**
+ * Confirms an account's email straight in the database.
+ *
+ * The verification mail carries the only copy of the raw token and the server stores just
+ * its SHA-256 hash, so a browser test cannot follow the real link. Suites that are not
+ * about verification itself use this to reach a verified state; the verification flow
+ * itself is covered by the backend integration suite.
+ */
+export async function markUserEmailVerified(userId: number): Promise<void> {
+  await withDb(async (client) => {
+    await client.query(
+      `UPDATE users
+       SET email_verified_at = COALESCE(email_verified_at, NOW()), updated_at = NOW()
+       WHERE id = $1`,
+      [userId]
+    );
+  });
+}
+
+export async function getUserIdByEmail(email: string): Promise<number | null> {
+  return withDb(async (client) => {
+    const result = await client.query('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [
+      email,
+    ]);
+    return result.rows[0] ? Number(result.rows[0].id) : null;
+  });
+}
+
+export async function getUserEmailVerifiedAt(userId: number): Promise<Date | null> {
+  return withDb(async (client) => {
+    const result = await client.query('SELECT email_verified_at FROM users WHERE id = $1', [
+      userId,
+    ]);
+    return (result.rows[0]?.email_verified_at as Date | null) ?? null;
+  });
+}
+
+/**
+ * Mints a claim token the same way the server does — random 32 bytes, only the SHA-256
+ * hash persisted — and returns the raw value so a test can walk the real claim link.
+ */
+export async function issueClaimTokenForReservation(
+  reservationId: number,
+  bookingEmail: string,
+  options?: { expiresAt?: Date; revokeExisting?: boolean }
+): Promise<string> {
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const tokenHash = crypto.createHash('sha256').update(rawToken, 'utf8').digest('hex');
+  const expiresAt = options?.expiresAt ?? new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+  await withDb(async (client) => {
+    if (options?.revokeExisting !== false) {
+      await client.query(
+        `UPDATE reservation_claim_tokens
+         SET revoked_at = NOW()
+         WHERE reservation_id = $1 AND used_at IS NULL AND revoked_at IS NULL`,
+        [reservationId]
+      );
+    }
+    await client.query(
+      `INSERT INTO reservation_claim_tokens
+         (reservation_id, token_hash, booking_email, expires_at)
+       VALUES ($1, $2, LOWER(TRIM($3)), $4)`,
+      [reservationId, tokenHash, bookingEmail, expiresAt]
+    );
+  });
+
+  return rawToken;
+}
+
+export async function getClaimTokenState(reservationId: number) {
+  return withDb(async (client) => {
+    const result = await client.query(
+      `
+      SELECT id, reservation_id, booking_email, expires_at, used_at, revoked_at, used_by_user_id
+      FROM reservation_claim_tokens
+      WHERE reservation_id = $1
+      ORDER BY id DESC
+      LIMIT 1
+      `,
+      [reservationId]
+    );
+    return result.rows[0] || null;
+  });
+}
+
+export async function getOrderUserId(reservationId: number): Promise<number | null> {
+  return withDb(async (client) => {
+    const result = await client.query(
+      'SELECT user_id FROM orders WHERE reservation_id = $1 ORDER BY id DESC LIMIT 1',
+      [reservationId]
+    );
+    const raw = result.rows[0]?.user_id;
+    return raw == null ? null : Number(raw);
   });
 }
 

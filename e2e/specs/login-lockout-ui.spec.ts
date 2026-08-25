@@ -1,6 +1,11 @@
 import { test, expect } from '../fixtures/base';
 import { uniqueEmail } from '../helpers/test-env';
-import { signupCustomer, submitWrongPasswordViaUi, loginViaUi } from '../helpers/account';
+import {
+  signupCustomer,
+  signupVerifiedCustomer,
+  submitWrongPasswordViaUi,
+  loginViaUi,
+} from '../helpers/account';
 
 const PASSWORD = 'Customer123!';
 
@@ -30,7 +35,7 @@ test.describe('Login lockout UI (100)', () => {
 
     // Fresh email for successful login + logout (original may still be locked).
     const okEmail = uniqueEmail('login-ok');
-    await signupCustomer(request, { email: okEmail, password: PASSWORD });
+    await signupVerifiedCustomer(request, { email: okEmail, password: PASSWORD });
     await loginViaUi(page, { email: okEmail, password: PASSWORD });
     await page.goto('/account');
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({

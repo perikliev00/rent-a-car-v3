@@ -9,6 +9,30 @@ function requireAuthApi(req, res, next) {
   return next();
 }
 
+/**
+ * Fail-closed gate for historical account data.
+ *
+ * An authenticated but unverified session must not reach reservations, documents or PDFs,
+ * because ownership of those records is what an email-based pre-hijack used to steal.
+ * Staff and admin accounts are provisioned as verified, so this does not affect them.
+ */
+function requireVerifiedEmailApi(req, res, next) {
+  if (!req.session || !req.session.isLoggedIn || !req.session.user) {
+    return apiResponse.error(res, 'UNAUTHORIZED', 'You are not logged in.', 401);
+  }
+
+  if (!req.session.user.emailVerified) {
+    return apiResponse.error(
+      res,
+      'EMAIL_VERIFICATION_REQUIRED',
+      'Confirm your email address to access your bookings.',
+      403
+    );
+  }
+
+  return next();
+}
+
 function sessionAccess(req) {
   const user = req.session?.user || {};
   return {
@@ -104,6 +128,7 @@ function requireAnyPermission(permissionKeys) {
 
 module.exports = {
   requireAuthApi,
+  requireVerifiedEmailApi,
   requireAdminApi,
   requireStaffApi,
   requirePermission,

@@ -210,6 +210,11 @@ export interface User {
   role: UserRole;
   roles?: string[];
   permissions?: string[];
+  /**
+   * Unverified accounts get a limited session: the account portal is fail-closed and
+   * guest bookings cannot be claimed until the email address is confirmed.
+   */
+  emailVerified?: boolean;
 }
 
 export interface AdminStaffUser {

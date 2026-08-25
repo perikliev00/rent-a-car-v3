@@ -16,6 +16,8 @@ servers:
 tags:
   - name: Auth
     description: Authentication, CSRF, and current session
+  - name: Account
+    description: Customer portal — email verification state and explicit booking claim
   - name: Cars
     description: Public fleet catalog, search, and meta
   - name: Reservations

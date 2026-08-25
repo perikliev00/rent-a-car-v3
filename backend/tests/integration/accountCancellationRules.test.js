@@ -5,13 +5,20 @@ const {
   cleanupTestCar,
   getReservationById,
 } = require('./helpers/dbFixtures');
+const { latestVerificationToken, clearMail } = require('./helpers/securityMail');
 const { pool } = require('../helpers/dbTestHarness');
 
 const runIntegration =
   process.env.RUN_INTEGRATION_TESTS === '1' && process.env.DATABASE_URL;
 const describeIf = runIntegration ? describe : describe.skip;
 
+/**
+ * Signs up and confirms the email, because the account portal is closed to unverified
+ * sessions. Cancellation rules are what this suite is about, so it starts from a fully
+ * verified customer.
+ */
 async function signupAgent(app, email, password = 'Customer123!') {
+  clearMail();
   const agent = await createSessionAgent(app);
   const res = await withCsrf(agent, agent.post('/api/auth/signup')).send({
     email,
@@ -19,6 +26,12 @@ async function signupAgent(app, email, password = 'Customer123!') {
   });
   expect(res.status).toBe(201);
   agent.csrfToken = res.body.data?.csrfToken || agent.csrfToken;
+
+  const token = latestVerificationToken(email);
+  expect(token).toBeTruthy();
+  const verified = await withCsrf(agent, agent.post('/api/auth/verify-email')).send({ token });
+  expect(verified.status).toBe(200);
+
   return {
     agent,
     userId: Number(res.body.data.user.id),

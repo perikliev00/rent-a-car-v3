@@ -1,5 +1,5 @@
 import { expect, test } from '../fixtures/base';
-import { applySessionCookies, signupCustomer } from '../helpers/account';
+import { applySessionCookies, signupVerifiedCustomer } from '../helpers/account';
 import { apiPost } from '../helpers/csrf';
 import {
   assertReservationStatus,
@@ -40,7 +40,7 @@ test.describe("account-cancel-hold", () => {
 
     test('customer cancels pending_payment hold from portal immediately', async ({ page, request }) => {
       const email = uniqueEmail('cancel-hold');
-      const customer = await signupCustomer(request, { email, password: PASSWORD });
+      const customer = await signupVerifiedCustomer(request, { email, password: PASSWORD });
 
       const seeded = await seedLinkedBooking({
         carId,
@@ -95,7 +95,7 @@ test.describe("account-cancel-double-request", () => {
       adminPage,
     }) => {
       const email = uniqueEmail('cancel-double');
-      const customer = await signupCustomer(request, { email, password: PASSWORD });
+      const customer = await signupVerifiedCustomer(request, { email, password: PASSWORD });
 
       const seeded = await seedLinkedBooking({
         carId,
@@ -176,7 +176,7 @@ test.describe("account-cancel-terminal", () => {
     for (const status of ['completed', 'no_show'] as const) {
       test(`${status}: no Request cancellation and API refuses`, async ({ page, request }) => {
         const email = uniqueEmail(`cancel-${status}`);
-        const customer = await signupCustomer(request, { email, password: PASSWORD });
+        const customer = await signupVerifiedCustomer(request, { email, password: PASSWORD });
 
         const seeded = await seedLinkedBooking({
           carId,
@@ -236,7 +236,7 @@ test.describe("cancellation-approval", () => {
 
     test('customer request then admin approve cancels booking', async ({ page, request, adminPage }) => {
       const email = uniqueEmail('cancel-approve');
-      const customer = await signupCustomer(request, { email, password: PASSWORD });
+      const customer = await signupVerifiedCustomer(request, { email, password: PASSWORD });
 
       const seeded = await seedLinkedBooking({
         carId,
@@ -307,7 +307,7 @@ test.describe("cancellation-rejection", () => {
 
     test('admin reject leaves reservation confirmed in portal', async ({ page, request, adminPage }) => {
       const email = uniqueEmail('cancel-reject');
-      const customer = await signupCustomer(request, { email, password: PASSWORD });
+      const customer = await signupVerifiedCustomer(request, { email, password: PASSWORD });
 
       const seeded = await seedLinkedBooking({
         carId,

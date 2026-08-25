@@ -47,15 +47,20 @@ async function insertTestAdmin({
     userId = Number(existing.rows[0].id);
     const hashedPassword = await bcrypt.hash(password, 10);
     await pool.query(
-      `UPDATE users SET password = $2, role = 'admin', updated_at = NOW() WHERE id = $1`,
+      `UPDATE users
+       SET password = $2,
+           role = 'admin',
+           email_verified_at = COALESCE(email_verified_at, NOW()),
+           updated_at = NOW()
+       WHERE id = $1`,
       [userId, hashedPassword]
     );
   } else {
     const hashedPassword = await bcrypt.hash(password, 10);
     const result = await pool.query(
       `
-      INSERT INTO users (email, password, role)
-      VALUES ($1, $2, 'admin')
+      INSERT INTO users (email, password, role, email_verified_at)
+      VALUES ($1, $2, 'admin', NOW())
       RETURNING id
       `,
       [normalizedEmail, hashedPassword]
@@ -75,6 +80,153 @@ async function insertTestAdmin({
   );
 
   return userId;
+}
+
+const CUSTOMER_PASSWORD = 'Customer123!';
+
+/**
+ * Creates a customer account directly, so tests can choose whether the email is verified
+ * without going through the mail round trip.
+ */
+async function insertTestCustomer({
+  email,
+  password = CUSTOMER_PASSWORD,
+  emailVerified = false,
+} = {}) {
+  const normalizedEmail = (
+    email || `customer-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`
+  )
+    .trim()
+    .toLowerCase();
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  // Uniqueness is enforced by a functional index on LOWER(email), so an upsert would need
+  // ON CONFLICT on that expression; an explicit update keeps this readable.
+  const existing = await pool.query('SELECT id FROM users WHERE LOWER(email) = $1', [
+    normalizedEmail,
+  ]);
+
+  const result = existing.rows[0]
+    ? await pool.query(
+        `
+        UPDATE users
+        SET password = $2,
+            email_verified_at = CASE WHEN $3::boolean THEN COALESCE(email_verified_at, NOW()) END,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING id
+        `,
+        [Number(existing.rows[0].id), hashedPassword, emailVerified]
+      )
+    : await pool.query(
+        `
+        INSERT INTO users (email, password, role, email_verified_at)
+        VALUES ($1, $2, 'user', CASE WHEN $3::boolean THEN NOW() END)
+        RETURNING id
+        `,
+        [normalizedEmail, hashedPassword, emailVerified]
+      );
+
+  return {
+    userId: Number(result.rows[0].id),
+    email: normalizedEmail,
+    password,
+    emailVerified,
+  };
+}
+
+async function deleteTestUser(userId) {
+  if (!userId) return;
+  await pool.query('DELETE FROM users WHERE id = $1', [userId]);
+}
+
+async function getReservationOwner(reservationId) {
+  const result = await pool.query('SELECT user_id FROM reservations WHERE id = $1', [
+    reservationId,
+  ]);
+  if (!result.rows[0]) return undefined;
+  const raw = result.rows[0].user_id;
+  return raw === null ? null : Number(raw);
+}
+
+async function getOrderOwnerByReservationId(reservationId) {
+  const result = await pool.query(
+    'SELECT user_id FROM orders WHERE reservation_id = $1 ORDER BY id DESC LIMIT 1',
+    [reservationId]
+  );
+  if (!result.rows[0]) return undefined;
+  const raw = result.rows[0].user_id;
+  return raw === null ? null : Number(raw);
+}
+
+async function getEmailVerifiedAt(userId) {
+  const result = await pool.query('SELECT email_verified_at FROM users WHERE id = $1', [userId]);
+  return result.rows[0] ? result.rows[0].email_verified_at : undefined;
+}
+
+async function getClaimTokenRow(reservationId) {
+  const result = await pool.query(
+    `
+    SELECT id, reservation_id, token_hash, booking_email, expires_at, used_at, revoked_at,
+           used_by_user_id
+    FROM reservation_claim_tokens
+    WHERE reservation_id = $1
+    ORDER BY id DESC
+    LIMIT 1
+    `,
+    [reservationId]
+  );
+  return result.rows[0] || null;
+}
+
+async function countUsedClaimTokens(reservationId) {
+  const result = await pool.query(
+    `
+    SELECT COUNT(*)::int AS count
+    FROM reservation_claim_tokens
+    WHERE reservation_id = $1 AND used_at IS NOT NULL
+    `,
+    [reservationId]
+  );
+  return result.rows[0].count;
+}
+
+async function expireClaimTokens(reservationId) {
+  await pool.query(
+    `UPDATE reservation_claim_tokens SET expires_at = NOW() - INTERVAL '1 hour'
+     WHERE reservation_id = $1`,
+    [reservationId]
+  );
+}
+
+async function expireVerificationTokens(userId) {
+  await pool.query(
+    `UPDATE email_verification_tokens SET expires_at = NOW() - INTERVAL '1 hour'
+     WHERE user_id = $1`,
+    [userId]
+  );
+}
+
+/** Backdates verification tokens so resend-cooldown behaviour can be exercised. */
+async function ageVerificationTokens(userId, seconds = 300) {
+  await pool.query(
+    `UPDATE email_verification_tokens
+     SET created_at = created_at - ($2 || ' seconds')::interval
+     WHERE user_id = $1`,
+    [userId, String(seconds)]
+  );
+}
+
+async function countUsedVerificationTokens(userId) {
+  const result = await pool.query(
+    `
+    SELECT COUNT(*)::int AS count
+    FROM email_verification_tokens
+    WHERE user_id = $1 AND used_at IS NOT NULL
+    `,
+    [userId]
+  );
+  return result.rows[0].count;
 }
 
 async function getReservationByStripeSessionId(stripeSessionId) {
@@ -433,13 +585,19 @@ async function insertTestStaff({
   if (existing.rows[0]) {
     userId = Number(existing.rows[0].id);
     await pool.query(
-      `UPDATE users SET password = $2, role = $3, updated_at = NOW() WHERE id = $1`,
+      `UPDATE users
+       SET password = $2,
+           role = $3,
+           email_verified_at = COALESCE(email_verified_at, NOW()),
+           updated_at = NOW()
+       WHERE id = $1`,
       [userId, hashedPassword, legacyRole]
     );
     await pool.query('DELETE FROM user_roles WHERE user_id = $1', [userId]);
   } else {
     const inserted = await pool.query(
-      `INSERT INTO users (email, password, role) VALUES ($1, $2, $3) RETURNING id`,
+      `INSERT INTO users (email, password, role, email_verified_at)
+       VALUES ($1, $2, $3, NOW()) RETURNING id`,
       [normalizedEmail, hashedPassword, legacyRole]
     );
     userId = Number(inserted.rows[0].id);
@@ -680,9 +838,21 @@ module.exports = {
   DEFAULT_ADMIN,
   DEFAULT_GUEST,
   STAFF_PASSWORD,
+  CUSTOMER_PASSWORD,
   insertIsolatedTestCar,
   insertTestAdmin,
   insertTestStaff,
+  insertTestCustomer,
+  deleteTestUser,
+  getReservationOwner,
+  getOrderOwnerByReservationId,
+  getEmailVerifiedAt,
+  getClaimTokenRow,
+  countUsedClaimTokens,
+  expireClaimTokens,
+  expireVerificationTokens,
+  ageVerificationTokens,
+  countUsedVerificationTokens,
   cleanupTestStaff,
   getRoleBySlug,
   insertLinkedBooking,

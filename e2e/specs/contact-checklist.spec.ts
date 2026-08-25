@@ -1,5 +1,5 @@
 import { expect, test } from '../fixtures/base';
-import { applySessionCookies, signupCustomer } from '../helpers/account';
+import { applySessionCookies, signupVerifiedCustomer } from '../helpers/account';
 import { applyOpsStatus, fillAndSavePickupChecklist, fillAndSaveReturnChecklist } from '../helpers/admin-reservations';
 import { deleteContactViaApi, updateContactStatusViaApi } from '../helpers/contacts';
 import { apiGet, loginAsAdmin } from '../helpers/csrf';
@@ -129,7 +129,7 @@ test.describe("checklist-customer-documents", () => {
       adminPage,
     }) => {
       const email = uniqueEmail('checklist-pdf');
-      const customer = await signupCustomer(request, { email, password: PASSWORD });
+      const customer = await signupVerifiedCustomer(request, { email, password: PASSWORD });
 
       const seeded = await seedLinkedBooking({
         carId,

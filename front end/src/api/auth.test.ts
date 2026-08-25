@@ -19,7 +19,7 @@ vi.mock('./client', () => ({
 }));
 
 import { ApiError } from './client';
-import { getMe, login, logout, signup } from './auth';
+import { getMe, login, logout, resendVerification, signup, verifyEmail } from './auth';
 
 describe('auth API', () => {
   beforeEach(() => {
@@ -68,5 +68,25 @@ describe('auth API', () => {
 
     mockApi.mockRejectedValueOnce(new ApiError('SERVER_ERROR', 'Down', 500));
     await expect(getMe()).rejects.toMatchObject({ code: 'SERVER_ERROR' });
+  });
+
+  it('verifyEmail posts the token to /api/auth/verify-email', async () => {
+    mockApi.mockResolvedValue({ emailVerified: true, alreadyVerified: false });
+
+    const result = await verifyEmail('a'.repeat(64));
+
+    expect(mockApi).toHaveBeenCalledWith('/api/auth/verify-email', {
+      method: 'POST',
+      body: JSON.stringify({ token: 'a'.repeat(64) }),
+    });
+    expect(result).toEqual({ emailVerified: true, alreadyVerified: false });
+  });
+
+  it('resendVerification posts without a body', async () => {
+    mockApi.mockResolvedValue({ requested: true, emailVerified: false });
+
+    await resendVerification();
+
+    expect(mockApi).toHaveBeenCalledWith('/api/auth/verify-email/resend', { method: 'POST' });
   });
 });

@@ -27,7 +27,14 @@ export function LoginPage() {
     setLoading(true);
     try {
       const user = await login(email, password);
-      navigate(isStaffUser(user) ? '/admin' : from || '/account', { replace: true });
+      if (isStaffUser(user)) {
+        navigate('/admin', { replace: true });
+        return;
+      }
+      // Legacy accounts created before verification existed land here on first login.
+      navigate(user.emailVerified === false ? '/account/verify-email' : from || '/account', {
+        replace: true,
+      });
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.code === 'ALREADY_LOGGED_IN') {

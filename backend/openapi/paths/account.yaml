@@ -1,0 +1,164 @@
+/api/v1/account/reservations/{id}/claim:
+  post:
+    tags: [Account]
+    summary: Link a guest booking to the signed-in account
+    description: >
+      The only path by which a reservation and its order change owner after booking.
+
+      Requires an authenticated session whose account email is confirmed and equal to the
+      normalized booking email, plus the single-use claim token that was mailed to that
+      address. The token is bound to this one reservation and cannot be replayed against
+      another. Only the SHA-256 hash of the token is stored server-side.
+
+      The reservation and its linked order are assigned atomically in one transaction.
+      Repeating the request as the rightful owner succeeds with `alreadyOwned: true`;
+      a booking owned by a different account is refused and never transferred.
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Reservation id the claim token was issued for.
+        schema:
+          type: integer
+          minimum: 1
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [token]
+            properties:
+              token:
+                type: string
+                description: 64-character hex claim token from the emailed link.
+                pattern: '^[0-9a-fA-F]{64}$'
+    responses:
+      '200':
+        description: Booking linked to the account
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+                      properties:
+                        reservationId:
+                          type: string
+                        claimed:
+                          type: boolean
+                        alreadyOwned:
+                          type: boolean
+      '400':
+        description: >
+          `CLAIM_TOKEN_INVALID` — the token is unknown, expired, already used, issued for a
+          different reservation, or issued for a different email. These cases share one
+          response so bookings and tokens cannot be enumerated.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: '`EMAIL_VERIFICATION_REQUIRED` — the account email is not confirmed'
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '409':
+        description: '`CLAIM_CONFLICT` — another account already owns this booking'
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '429':
+        description: Rate limited
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RateLimitedError'
+
+/api/v1/account/reservations/claim-request:
+  post:
+    tags: [Account]
+    summary: Request a claim link for a legacy guest booking
+    description: >
+      Recovery path for guest bookings made before claim tokens existed. Requires a
+      confirmed account email. A claim token is only ever mailed to the email stored on the
+      booking itself, never to the requester.
+
+      The response is intentionally uniform whether or not anything was sent, so this
+      endpoint cannot be used to discover which reservation ids or email addresses exist.
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [reservationId, bookingEmail]
+            properties:
+              reservationId:
+                type: integer
+                minimum: 1
+              bookingEmail:
+                type: string
+                format: email
+    responses:
+      '200':
+        description: Request accepted
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+                      properties:
+                        requested:
+                          type: boolean
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '403':
+        description: '`EMAIL_VERIFICATION_REQUIRED` — the account email is not confirmed'
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '429':
+        description: Rate limited
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RateLimitedError'

@@ -38,8 +38,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryClient.clear();
   };
 
+  const emailVerified = user ? user.emailVerified !== false : false;
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, signup, logout, refresh }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        isLoading,
+        emailVerified,
+        verificationRequired: Boolean(user) && !emailVerified,
+        login,
+        signup,
+        logout,
+        refresh,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

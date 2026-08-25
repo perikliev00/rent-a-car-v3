@@ -3,7 +3,7 @@ const bcrypt = require('bcrypt');
 const userSql = require('../../services/sql/userSqlService');
 const rbacService = require('../../services/rbac/rbacService');
 const loginAttemptService = require('../../services/auth/loginAttemptService');
-const { claimReservationsForUser } = require('../../services/account/accountClaimService');
+const emailVerificationService = require('../../services/auth/emailVerificationService');
 const { getCsrfToken, generateCsrfToken } = require('../../middleware/csrf');
 const apiResponse = require('../../utils/apiResponse');
 const asyncHandler = require('../../utils/asyncHandler');
@@ -19,6 +19,7 @@ function toUserPayload(user, access = null) {
     role: user.role,
     roles: access?.roles || user.roles || [],
     permissions: access?.permissions || user.permissions || [],
+    emailVerified: Boolean(user.emailVerified),
   };
 }
 
@@ -34,6 +35,18 @@ async function loadAccessForUser(user) {
   }
 }
 
+/**
+ * Verification mail is best-effort. A failure must not fail the request nor leave the
+ * account looking verified — the account simply stays unverified and can resend.
+ */
+async function sendVerificationSafely(user) {
+  try {
+    await emailVerificationService.issueAndSendVerification(user);
+  } catch (err) {
+    logger.warn({ err, userId: user.id }, 'Failed to send verification email');
+  }
+}
+
 function establishUserSession(req, user, access) {
   return new Promise((resolve, reject) => {
     req.session.regenerate((err) => {
@@ -46,6 +59,9 @@ function establishUserSession(req, user, access) {
         role: user.role,
         roles: access?.roles || [],
         permissions: access?.permissions || [],
+        // An unverified session is intentionally limited: it authenticates the person
+        // but is refused by every /api/account route until the email is confirmed.
+        emailVerified: Boolean(user.emailVerified),
       };
       req.session.csrfToken = generateCsrfToken();
 
@@ -99,10 +115,11 @@ exports.postLogin = asyncHandler(async (req, res, next) => {
     const access = await loadAccessForUser(user);
     await establishUserSession(req, user, access);
 
-    try {
-      await claimReservationsForUser(user.id, user.email);
-    } catch (claimErr) {
-      logger.warn({ err: claimErr, userId: user.id }, 'Failed to claim reservations on login');
+    // Login never assigns ownership of reservations or orders. Guest bookings are linked
+    // only through the explicit, token-based claim flow.
+    if (!user.emailVerified) {
+      // Legacy accounts created before verification existed get a fresh link on login.
+      await sendVerificationSafely(user);
     }
 
     if (rbacService.isStaffAccess(access, user.role)) {
@@ -114,6 +131,7 @@ exports.postLogin = asyncHandler(async (req, res, next) => {
 
     return apiResponse.success(res, {
       user: toUserPayload(user, access),
+      verificationRequired: !user.emailVerified,
       csrfToken: getCsrfToken(req),
     });
   } catch (err) {
@@ -165,16 +183,15 @@ exports.postSignup = asyncHandler(async (req, res, next) => {
     const access = await loadAccessForUser(user);
     await establishUserSession(req, user, access);
 
-    try {
-      await claimReservationsForUser(user.id, user.email);
-    } catch (claimErr) {
-      logger.warn({ err: claimErr, userId: user.id }, 'Failed to claim reservations on signup');
-    }
+    // Signup never assigns ownership of reservations or orders. Knowing an email address
+    // grants nothing; only a claim token mailed to that address does.
+    await sendVerificationSafely(user);
 
     return apiResponse.success(
       res,
       {
         user: toUserPayload(user, access),
+        verificationRequired: !user.emailVerified,
         csrfToken: getCsrfToken(req),
       },
       201
@@ -209,6 +226,7 @@ exports.getMe = asyncHandler(async (req, res) => {
     role: dbUser.role,
     roles: access.roles,
     permissions: access.permissions,
+    emailVerified: Boolean(dbUser.emailVerified),
   };
 
   await new Promise((resolve, reject) => {
@@ -217,8 +235,95 @@ exports.getMe = asyncHandler(async (req, res) => {
 
   return apiResponse.success(res, {
     user: toUserPayload(dbUser, access),
+    verificationRequired: !dbUser.emailVerified,
     csrfToken: getCsrfToken(req),
   });
+});
+
+const { OUTCOMES } = emailVerificationService;
+
+exports.postVerifyEmail = asyncHandler(async (req, res, next) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return apiResponse.error(res, 'VALIDATION_ERROR', errors.array()[0].msg, 422);
+    }
+
+    const result = await emailVerificationService.verifyToken(req.body.token);
+
+    if (
+      result.outcome === OUTCOMES.VERIFIED ||
+      result.outcome === OUTCOMES.ALREADY_VERIFIED
+    ) {
+      // Refresh the live session so the caller immediately gains portal access without
+      // logging out, but only when the verified account is the one already signed in.
+      if (
+        req.session?.isLoggedIn &&
+        req.session.user &&
+        String(req.session.user.id) === String(result.user.id)
+      ) {
+        req.session.user.emailVerified = true;
+        await new Promise((resolve, reject) => {
+          req.session.save((err) => (err ? reject(err) : resolve()));
+        });
+      }
+
+      return apiResponse.success(res, {
+        emailVerified: true,
+        alreadyVerified: result.outcome === OUTCOMES.ALREADY_VERIFIED,
+      });
+    }
+
+    if (result.outcome === OUTCOMES.EXPIRED) {
+      return apiResponse.error(
+        res,
+        'VERIFICATION_TOKEN_EXPIRED',
+        'This confirmation link has expired. Request a new one.',
+        410
+      );
+    }
+
+    // Invalid, used and revoked collapse into one response so a caller cannot probe which
+    // tokens ever existed.
+    return apiResponse.error(
+      res,
+      'VERIFICATION_TOKEN_INVALID',
+      'This confirmation link is not valid. Request a new one.',
+      400
+    );
+  } catch (err) {
+    return forwardControllerError(err, req, next, {
+      context: 'api.postVerifyEmail',
+      publicMessage: 'Something went wrong while confirming your email. Please try again.',
+    });
+  }
+});
+
+exports.postResendVerification = asyncHandler(async (req, res, next) => {
+  try {
+    if (!req.session?.isLoggedIn || !req.session?.user) {
+      return apiResponse.error(res, 'UNAUTHORIZED', 'You are not logged in.', 401);
+    }
+
+    const user = await userSql.findUserById(req.session.user.id);
+    if (!user) {
+      return apiResponse.error(res, 'UNAUTHORIZED', 'You are not logged in.', 401);
+    }
+
+    const result = await emailVerificationService.resendVerification(user);
+
+    // Deliberately uniform: throttled, sent and already-verified are indistinguishable so
+    // the endpoint cannot be used to probe account state.
+    return apiResponse.success(res, {
+      requested: true,
+      emailVerified: result.status === 'already_verified',
+    });
+  } catch (err) {
+    return forwardControllerError(err, req, next, {
+      context: 'api.postResendVerification',
+      publicMessage: 'Something went wrong while sending your confirmation email.',
+    });
+  }
 });
 
 exports.postLogout = asyncHandler(async (req, res) => {

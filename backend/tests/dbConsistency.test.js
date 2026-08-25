@@ -407,9 +407,12 @@ describeIfDb('DB consistency', () => {
         ]
       );
 
+      // The invariant is that a reservation with refund history cannot be deleted. The FK
+      // is ON DELETE RESTRICT, which Postgres reports as 23001; 23503 is accepted so the
+      // assertion does not depend on whether the constraint is RESTRICT or NO ACTION.
       await expect(
         pool.query('DELETE FROM reservations WHERE id = $1', [reservationA])
-      ).rejects.toMatchObject({ code: '23503' });
+      ).rejects.toMatchObject({ code: expect.stringMatching(/^(23001|23503)$/) });
 
       await expect(
         pool.query(

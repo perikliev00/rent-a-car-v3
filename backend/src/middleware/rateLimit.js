@@ -77,10 +77,25 @@ const accountUploadLimiter = createLimiter({
   max: readPositiveInt('RATE_LIMIT_ACCOUNT_UPLOAD_MAX', 20),
 });
 
+// Guards email-verification token submission and resend against brute force and mail
+// flooding.
+const verificationLimiter = createLimiter({
+  windowMs: DEFAULT_WINDOW_MS,
+  max: readPositiveInt('RATE_LIMIT_VERIFICATION_MAX', 10),
+});
+
+// Guards booking claim token submission against enumeration.
+const claimLimiter = createLimiter({
+  windowMs: DEFAULT_WINDOW_MS,
+  max: readPositiveInt('RATE_LIMIT_CLAIM_MAX', 10),
+});
+
 module.exports = {
   authLimiter,
   loginLimiter,
   signupLimiter,
+  verificationLimiter,
+  claimLimiter,
   adminLimiter,
   accountUploadLimiter,
   adminUploadLimiter,

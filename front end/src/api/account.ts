@@ -114,6 +114,31 @@ export async function requestCancellation(
   });
 }
 
+/**
+ * Links a guest booking to the signed-in account. The raw token comes from the emailed
+ * link and is never written to storage or analytics.
+ */
+export async function claimReservation(
+  reservationId: string,
+  token: string,
+): Promise<{ reservationId: string; claimed: boolean; alreadyOwned: boolean }> {
+  return api(`/api/account/reservations/${reservationId}/claim`, {
+    method: 'POST',
+    body: JSON.stringify({ token }),
+  });
+}
+
+/** Requests a claim link for a legacy guest booking; only ever mailed to the booking email. */
+export async function requestClaimLink(
+  reservationId: string,
+  bookingEmail: string,
+): Promise<{ requested: boolean }> {
+  return api('/api/account/reservations/claim-request', {
+    method: 'POST',
+    body: JSON.stringify({ reservationId: Number(reservationId), bookingEmail }),
+  });
+}
+
 export async function listCustomerDocuments(): Promise<{ documents: CustomerDocument[] }> {
   return api('/api/account/documents');
 }

@@ -33,8 +33,12 @@ export function SignupPage() {
 
     setLoading(true);
     try {
-      await signup(email, password);
-      navigate('/', { replace: true });
+      const newUser = await signup(email, password);
+      // A new account starts unverified, so send the customer straight to the step that
+      // unblocks their portal instead of the marketing home page.
+      navigate(newUser.emailVerified === false ? '/account/verify-email' : '/', {
+        replace: true,
+      });
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);

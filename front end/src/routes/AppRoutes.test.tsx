@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppRoutes } from './AppRoutes';
 import { useAuth } from '../auth/useAuth';
+import type { AuthContextValue } from '../auth/auth-context';
 
 let initialPath = '/';
 
@@ -129,20 +130,26 @@ vi.mock('../pages/NotFoundPage', () => ({
 
 const mockedUseAuth = vi.mocked(useAuth);
 
-function mockAdminAuth() {
+function mockAuth(user: AuthContextValue['user'], emailVerified = true) {
   mockedUseAuth.mockReturnValue({
-    user: {
-      id: '2',
-      email: 'admin@example.com',
-      role: 'admin',
-      roles: ['owner'],
-      permissions: [],
-    },
+    user,
     isLoading: false,
+    emailVerified: Boolean(user) && emailVerified,
+    verificationRequired: Boolean(user) && !emailVerified,
     login: vi.fn(),
     signup: vi.fn(),
     logout: vi.fn(),
     refresh: vi.fn(),
+  });
+}
+
+function mockAdminAuth() {
+  mockAuth({
+    id: '2',
+    email: 'admin@example.com',
+    role: 'admin',
+    roles: ['owner'],
+    permissions: [],
   });
 }
 
@@ -181,14 +188,7 @@ describe('AppRoutes', () => {
   ])('renders %s', (path, label) => {
     initialPath = path;
     if (path.startsWith('/account')) {
-      mockedUseAuth.mockReturnValue({
-        user: { id: '1', email: 'user@example.com', role: 'user' },
-        isLoading: false,
-        login: vi.fn(),
-        signup: vi.fn(),
-        logout: vi.fn(),
-        refresh: vi.fn(),
-      });
+      mockAuth({ id: '1', email: 'user@example.com', role: 'user' });
     } else {
       mockAdminAuth();
     }
@@ -196,15 +196,23 @@ describe('AppRoutes', () => {
     expect(screen.getByText(label)).toBeInTheDocument();
   });
 
+  it.each([
+    ['/account', 'Account Dashboard Page'],
+    ['/account/reservations', 'Account Reservations Page'],
+    ['/account/reservations/42', 'Account Reservation Detail Page'],
+    ['/account/documents', 'Account Documents Page'],
+  ])('redirects an unverified account away from %s', (path, hiddenLabel) => {
+    mockAuth({ id: '1', email: 'user@example.com', role: 'user' }, false);
+
+    initialPath = path;
+    render(<AppRoutes />);
+
+    expect(screen.queryByText(hiddenLabel)).not.toBeInTheDocument();
+    expect(screen.getByText('Confirm your email')).toBeInTheDocument();
+  });
+
   it('blocks non-admin users from admin routes via AdminRoute', () => {
-    mockedUseAuth.mockReturnValue({
-      user: { id: '1', email: 'user@example.com', role: 'user' },
-      isLoading: false,
-      login: vi.fn(),
-      signup: vi.fn(),
-      logout: vi.fn(),
-      refresh: vi.fn(),
-    });
+    mockAuth({ id: '1', email: 'user@example.com', role: 'user' });
 
     initialPath = '/admin';
     render(<AppRoutes />);
@@ -214,14 +222,7 @@ describe('AppRoutes', () => {
   });
 
   it('redirects unauthenticated users from admin routes to login', () => {
-    mockedUseAuth.mockReturnValue({
-      user: null,
-      isLoading: false,
-      login: vi.fn(),
-      signup: vi.fn(),
-      logout: vi.fn(),
-      refresh: vi.fn(),
-    });
+    mockAuth(null);
 
     initialPath = '/admin';
     render(<AppRoutes />);

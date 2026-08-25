@@ -1,5 +1,9 @@
 import { expect, test } from '@playwright/test';
-import { applySessionCookies, createOwnedHoldViaApi, signupCustomer } from '../helpers/account';
+import {
+  applySessionCookies,
+  createOwnedHoldViaApi,
+  signupVerifiedCustomer,
+} from '../helpers/account';
 import { continueToCheckoutAndFillGuest, fillHomeSearch, openOrderAndResolveConflict } from '../helpers/booking';
 import { loginAsAdmin } from '../helpers/csrf';
 import {
@@ -196,7 +200,7 @@ test.describe("customer-booking", () => {
 
     test('authenticated order hold shows on account dashboard', async ({ page, request }) => {
       const email = uniqueEmail('cust-book');
-      const customer = await signupCustomer(request, { email, password: PASSWORD });
+      const customer = await signupVerifiedCustomer(request, { email, password: PASSWORD });
 
       await createOwnedHoldViaApi(request, customer.session, {
         carId,
@@ -256,7 +260,7 @@ test.describe("customer-pay-portal", () => {
     }) => {
       await cleanupReservationsForCar(carId);
       const email = uniqueEmail('portal-pay');
-      const customer = await signupCustomer(request, { email, password: PASSWORD });
+      const customer = await signupVerifiedCustomer(request, { email, password: PASSWORD });
       await applySessionCookies(page, customer.session);
       const pairs = customer.session.cookieHeader
         .split(';')

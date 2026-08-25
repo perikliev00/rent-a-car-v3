@@ -10,16 +10,26 @@ vi.mock('../api/auth', () => ({
   login: vi.fn(),
   signup: vi.fn(),
   logout: vi.fn(),
+  verifyEmail: vi.fn(),
+  resendVerification: vi.fn(),
 }));
 
-const mockUser = { id: '1', email: 'user@example.com', role: 'user' as const };
+const mockUser = {
+  id: '1',
+  email: 'user@example.com',
+  role: 'user' as const,
+  emailVerified: true,
+};
 
 function AuthConsumer() {
-  const { user, isLoading, login, signup, logout } = useAuth();
+  const { user, isLoading, emailVerified, verificationRequired, login, signup, logout } =
+    useAuth();
   return (
     <div>
       <span data-testid="loading">{String(isLoading)}</span>
       <span data-testid="user">{user?.email ?? 'none'}</span>
+      <span data-testid="verified">{String(emailVerified)}</span>
+      <span data-testid="verification-required">{String(verificationRequired)}</span>
       <button type="button" onClick={() => login('user@example.com', 'password1')}>
         login
       </button>
@@ -123,5 +133,31 @@ describe('AuthProvider', () => {
 
     expect(authApi.logout).toHaveBeenCalled();
     expect(clearSpy).toHaveBeenCalled();
+  });
+
+  it('exposes verification state for an unverified account', async () => {
+    vi.mocked(authApi.getMe).mockResolvedValue({
+      user: { ...mockUser, emailVerified: false },
+      verificationRequired: true,
+    });
+    renderAuthProvider();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('loading')).toHaveTextContent('false');
+    });
+
+    expect(screen.getByTestId('verified')).toHaveTextContent('false');
+    expect(screen.getByTestId('verification-required')).toHaveTextContent('true');
+  });
+
+  it('reports no verification requirement when nobody is signed in', async () => {
+    renderAuthProvider();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('loading')).toHaveTextContent('false');
+    });
+
+    expect(screen.getByTestId('verified')).toHaveTextContent('false');
+    expect(screen.getByTestId('verification-required')).toHaveTextContent('false');
   });
 });

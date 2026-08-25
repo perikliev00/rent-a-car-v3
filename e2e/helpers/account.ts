@@ -1,6 +1,7 @@
 import type { APIRequestContext, Page } from '@playwright/test';
 import { expect, request as playwrightRequest } from '@playwright/test';
 import { API_URL } from './test-env';
+import { getUserIdByEmail, markUserEmailVerified } from './db';
 import type { ApiSession } from './csrf';
 
 export type CustomerAuth = {
@@ -68,6 +69,43 @@ export async function signupCustomer(
   }
 }
 
+/**
+ * Signs up and reaches a confirmed-email state, which every `/account` route now
+ * requires. The account is verified in the database and the session is then refreshed
+ * through `/auth/me`, so the returned cookies carry `emailVerified: true`.
+ */
+export async function signupVerifiedCustomer(
+  request: APIRequestContext,
+  credentials: { email: string; password: string }
+): Promise<CustomerAuth> {
+  const customer = await signupCustomer(request, credentials);
+  await markUserEmailVerified(customer.userId);
+
+  const ctx = await playwrightRequest.newContext({
+    baseURL: API_URL,
+    extraHTTPHeaders: { Cookie: customer.session.cookieHeader },
+  });
+  try {
+    const me = await ctx.get('/api/v1/auth/me');
+    if (!me.ok()) {
+      throw new Error(`signupVerifiedCustomer: /me failed (${me.status()})`);
+    }
+    const body = await me.json();
+    if (body.data?.user?.emailVerified !== true) {
+      throw new Error('signupVerifiedCustomer: session did not pick up verified email');
+    }
+    return {
+      ...customer,
+      session: {
+        csrfToken: (body.data?.csrfToken as string) || customer.session.csrfToken,
+        cookieHeader: customer.session.cookieHeader,
+      },
+    };
+  } finally {
+    await ctx.dispose();
+  }
+}
+
 export async function loginAsCustomer(
   _request: APIRequestContext,
   credentials: { email: string; password: string }
@@ -104,6 +142,10 @@ export async function loginAsCustomer(
   }
 }
 
+/**
+ * Signs up through the UI. A new account is always unverified, so the app lands on the
+ * pending-verification page rather than the home page.
+ */
 export async function signupViaUi(
   page: Page,
   credentials: { email: string; password: string }
@@ -113,7 +155,29 @@ export async function signupViaUi(
   await page.getByLabel('Password', { exact: true }).fill(credentials.password);
   await page.getByLabel('Confirm password').fill(credentials.password);
   await page.getByRole('main').getByRole('button', { name: /sign up|create account/i }).click();
-  await page.waitForURL(/\/$/, { timeout: 15_000 });
+  await page.waitForURL(/\/account\/verify-email$/, { timeout: 15_000 });
+}
+
+/**
+ * Signs up through the UI and then confirms the email out of band (see
+ * `markUserEmailVerified`), ending on the account dashboard with a verified session.
+ */
+export async function signupVerifiedViaUi(
+  page: Page,
+  credentials: { email: string; password: string }
+): Promise<number> {
+  await signupViaUi(page, credentials);
+
+  const userId = await getUserIdByEmail(credentials.email);
+  if (!userId) {
+    throw new Error(`signupVerifiedViaUi: no user for ${credentials.email}`);
+  }
+  await markUserEmailVerified(userId);
+
+  await page.getByRole('button', { name: 'I have confirmed my email' }).click();
+  await page.waitForURL(/\/account$/, { timeout: 15_000 });
+
+  return userId;
 }
 
 export async function loginViaUi(

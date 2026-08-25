@@ -6,12 +6,29 @@ import { render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ProtectedRoute } from './ProtectedRoute';
 import { useAuth } from './useAuth';
+import type { AuthContextValue } from './auth-context';
 
 vi.mock('./useAuth', () => ({
   useAuth: vi.fn(),
 }));
 
 const mockedUseAuth = vi.mocked(useAuth);
+
+function mockAuth(
+  user: AuthContextValue['user'],
+  { isLoading = false, emailVerified = true } = {},
+) {
+  mockedUseAuth.mockReturnValue({
+    user,
+    isLoading,
+    emailVerified: Boolean(user) && emailVerified,
+    verificationRequired: Boolean(user) && !emailVerified,
+    login: vi.fn(),
+    signup: vi.fn(),
+    logout: vi.fn(),
+    refresh: vi.fn(),
+  });
+}
 
 function LoginCatcher() {
   const location = useLocation();
@@ -24,7 +41,11 @@ function LoginCatcher() {
   );
 }
 
-function renderProtectedRoute(route: string, children: ReactNode = <div>Protected content</div>) {
+function renderProtectedRoute(
+  route: string,
+  children: ReactNode = <div>Protected content</div>,
+  { requireVerifiedEmail = false } = {},
+) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -34,9 +55,14 @@ function renderProtectedRoute(route: string, children: ReactNode = <div>Protecte
       <MemoryRouter initialEntries={[route]}>
         <Routes>
           <Route path="/login" element={<LoginCatcher />} />
+          <Route path="/account/verify-email" element={<div>Verify email page</div>} />
           <Route
             path="/checkout/:carId"
-            element={<ProtectedRoute>{children}</ProtectedRoute>}
+            element={
+              <ProtectedRoute requireVerifiedEmail={requireVerifiedEmail}>
+                {children}
+              </ProtectedRoute>
+            }
           />
         </Routes>
       </MemoryRouter>
@@ -46,14 +72,7 @@ function renderProtectedRoute(route: string, children: ReactNode = <div>Protecte
 
 describe('ProtectedRoute', () => {
   it('shows loading spinner while auth is loading', () => {
-    mockedUseAuth.mockReturnValue({
-      user: null,
-      isLoading: true,
-      login: vi.fn(),
-      signup: vi.fn(),
-      logout: vi.fn(),
-      refresh: vi.fn(),
-    });
+    mockAuth(null, { isLoading: true });
 
     const { container } = renderProtectedRoute('/checkout/1');
 
@@ -62,14 +81,7 @@ describe('ProtectedRoute', () => {
   });
 
   it('redirects unauthenticated users to login', () => {
-    mockedUseAuth.mockReturnValue({
-      user: null,
-      isLoading: false,
-      login: vi.fn(),
-      signup: vi.fn(),
-      logout: vi.fn(),
-      refresh: vi.fn(),
-    });
+    mockAuth(null);
 
     renderProtectedRoute('/checkout/1');
 
@@ -78,14 +90,7 @@ describe('ProtectedRoute', () => {
   });
 
   it('redirect passes state.from with current location', () => {
-    mockedUseAuth.mockReturnValue({
-      user: null,
-      isLoading: false,
-      login: vi.fn(),
-      signup: vi.fn(),
-      logout: vi.fn(),
-      refresh: vi.fn(),
-    });
+    mockAuth(null);
 
     renderProtectedRoute('/checkout/1');
 
@@ -93,17 +98,30 @@ describe('ProtectedRoute', () => {
   });
 
   it('renders children for authenticated users', () => {
-    mockedUseAuth.mockReturnValue({
-      user: { id: '1', email: 'user@example.com', role: 'user' },
-      isLoading: false,
-      login: vi.fn(),
-      signup: vi.fn(),
-      logout: vi.fn(),
-      refresh: vi.fn(),
-    });
+    mockAuth({ id: '1', email: 'user@example.com', role: 'user' });
 
     renderProtectedRoute('/checkout/1');
 
     expect(screen.getByText('Protected content')).toBeInTheDocument();
+  });
+
+  it('does not gate on verification unless the route asks for it', () => {
+    mockAuth({ id: '1', email: 'user@example.com', role: 'user' }, { emailVerified: false });
+
+    renderProtectedRoute('/checkout/1');
+
+    // Guest checkout must keep working for an unverified account.
+    expect(screen.getByText('Protected content')).toBeInTheDocument();
+  });
+
+  it('redirects unverified users away from verification-gated routes', () => {
+    mockAuth({ id: '1', email: 'user@example.com', role: 'user' }, { emailVerified: false });
+
+    renderProtectedRoute('/checkout/1', <div>Protected content</div>, {
+      requireVerifiedEmail: true,
+    });
+
+    expect(screen.getByText('Verify email page')).toBeInTheDocument();
+    expect(screen.queryByText('Protected content')).not.toBeInTheDocument();
   });
 });

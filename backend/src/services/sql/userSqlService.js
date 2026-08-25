@@ -5,6 +5,7 @@ const USER_SELECT = `
   u.email,
   u.password,
   u.role,
+  u.email_verified_at,
   u.created_at,
   u.updated_at
 `;
@@ -31,6 +32,8 @@ function mapSqlUser(row) {
     email: row.email,
     password: row.password,
     role: row.role,
+    emailVerifiedAt: row.email_verified_at || null,
+    emailVerified: Boolean(row.email_verified_at),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -76,7 +79,10 @@ async function findUserById(userId, client = null) {
   return mapSqlUser(result.rows[0]) || null;
 }
 
-async function createUser({ email, password, role = 'user' }, client = null) {
+async function createUser(
+  { email, password, role = 'user', emailVerified = false },
+  client = null
+) {
   const normalizedEmail = normalizeEmail(email);
   if (!normalizedEmail || !password) {
     throw new Error('Email and password are required');
@@ -86,11 +92,11 @@ async function createUser({ email, password, role = 'user' }, client = null) {
     const result = await clientQuery(
       client,
       `
-      INSERT INTO users (email, password, role)
-      VALUES ($1, $2, $3)
+      INSERT INTO users (email, password, role, email_verified_at)
+      VALUES ($1, $2, $3, CASE WHEN $4::boolean THEN NOW() ELSE NULL END)
       RETURNING *
       `,
-      [normalizedEmail, password, role]
+      [normalizedEmail, password, role, Boolean(emailVerified)]
     );
 
     return mapSqlUser(result.rows[0]);
@@ -102,6 +108,30 @@ async function createUser({ email, password, role = 'user' }, client = null) {
     }
     throw err;
   }
+}
+
+/**
+ * Idempotent: an already-verified account keeps its original verification timestamp so a
+ * replayed verification cannot be distinguished from the first one by clients.
+ */
+async function markEmailVerified(userId, client = null) {
+  const normalizedId = normalizeId(userId);
+  if (!normalizedId) {
+    return null;
+  }
+
+  const result = await clientQuery(
+    client,
+    `
+    UPDATE users u
+    SET email_verified_at = COALESCE(u.email_verified_at, NOW())
+    WHERE u.id = $1
+    RETURNING ${USER_SELECT}
+    `,
+    [normalizedId]
+  );
+
+  return mapSqlUser(result.rows[0]) || null;
 }
 
 async function listUsers(client = null) {
@@ -122,5 +152,6 @@ module.exports = {
   findUserByEmail,
   findUserById,
   createUser,
+  markEmailVerified,
   listUsers,
 };
