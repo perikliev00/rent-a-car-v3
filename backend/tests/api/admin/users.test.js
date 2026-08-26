@@ -158,6 +158,28 @@ describe('Admin users APIs', () => {
     });
   });
 
+  test('PATCH /api/admin/users/:id rejects invalid email', async () => {
+    const app = createApiTestApp();
+    const agent = await loginAsAdmin(app);
+    const response = await withCsrf(agent, agent.patch('/api/admin/users/9'))
+      .send({ email: 'not-an-email' })
+      .expect(422);
+
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    expect(userAdminService.updateStaffUser).not.toHaveBeenCalled();
+  });
+
+  test('POST /api/admin/users rejects invalid email', async () => {
+    const app = createApiTestApp();
+    const agent = await loginAsAdmin(app);
+    const response = await withCsrf(agent, agent.post('/api/admin/users'))
+      .send({ email: 'bad', password: 'Secret123!', roleIds: ['3'] })
+      .expect(422);
+
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    expect(userAdminService.createStaffUser).not.toHaveBeenCalled();
+  });
+
   test('PUT /api/admin/users/:id/roles replaces roles', async () => {
     rbacService.setUserRoles.mockResolvedValue({
       userId: '9',

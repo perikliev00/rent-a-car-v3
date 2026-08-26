@@ -177,6 +177,49 @@ async function findActiveForUser(userId, client = null) {
   return mapToken(result.rows[0]);
 }
 
+async function revokeTokenById(tokenId, client = null) {
+  const id = normalizeId(tokenId);
+  if (!id) {
+    return 0;
+  }
+
+  const result = await clientQuery(
+    client,
+    `
+    UPDATE email_verification_tokens
+    SET revoked_at = NOW()
+    WHERE id = $1
+      AND used_at IS NULL
+      AND revoked_at IS NULL
+    `,
+    [id]
+  );
+
+  return result.rowCount || 0;
+}
+
+async function reactivateTokenById(tokenId, client = null) {
+  const id = normalizeId(tokenId);
+  if (!id) {
+    return 0;
+  }
+
+  const result = await clientQuery(
+    client,
+    `
+    UPDATE email_verification_tokens
+    SET revoked_at = NULL
+    WHERE id = $1
+      AND used_at IS NULL
+      AND revoked_at IS NOT NULL
+      AND expires_at > NOW()
+    `,
+    [id]
+  );
+
+  return result.rowCount || 0;
+}
+
 module.exports = {
   revokeActiveForUser,
   insertToken,
@@ -185,4 +228,6 @@ module.exports = {
   markUsed,
   findLatestForUser,
   findActiveForUser,
+  revokeTokenById,
+  reactivateTokenById,
 };

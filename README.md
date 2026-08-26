@@ -507,6 +507,8 @@ Production validation (in `backend/src/config/env.js`) enforces:
 - `EMAIL_ENABLED=true` with complete SMTP (`SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`)
 - S3 vars when `STORAGE_DRIVER=s3`
 
+For `docker-compose.prod.yml`, put SMTP / `EMAIL_ENABLED` / `MAIL_FROM` only in `backend/.env` (`env_file`). Root Compose env interpolates non-secret deploy values (`FRONTEND_BASE_URL`, `CORS_ORIGINS`, `POSTGRES_PASSWORD`, `METRICS_TOKEN`, `VITE_API_BASE_URL`) — not SMTP.
+
 ### 3. Deploy steps
 
 1. **Database** — Provision PostgreSQL, run `npm run db:setup` against production DB.

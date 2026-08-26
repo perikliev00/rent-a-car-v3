@@ -1,5 +1,6 @@
 const carRepository = require('../../../repositories/carRepository');
 const orderSql = require('../../sql/orderSqlService');
+const reservationSql = require('../../sql/reservationSqlService');
 const { parseSofiaDate } = require('../../../utils/date/timezone');
 const { updateRange, moveRange } = require('../../sql/bookingSyncSqlService');
 const {
@@ -19,6 +20,8 @@ const { applyPricingToOrder } = require('./orderMapper');
 const { runWithOptionalTransaction } = require('./orderShared');
 const { buildOrderEditErrorResult } = require('./orderFormService');
 const { syncLinkedReservationAfterOrderUpdate } = require('./orderReservationSync');
+const reservationClaimService = require('../../account/reservationClaimService');
+const logger = require('../../../utils/logger');
 
 async function updateOrder(orderId, payload) {
   const contactResult = validateOrderContact(payload);
@@ -46,7 +49,7 @@ async function updateOrder(orderId, payload) {
   }
 
   try {
-    const audit = await runWithOptionalTransaction((client) =>
+    const { audit, claimDeliver } = await runWithOptionalTransaction((client) =>
       updateOrderCore({
         orderId,
         payload,
@@ -55,6 +58,19 @@ async function updateOrder(orderId, payload) {
         client,
       })
     );
+
+    // Security email only after COMMIT — SMTP failure must not roll back the order.
+    if (claimDeliver) {
+      try {
+        await reservationClaimService.deliverPreparedClaimEmail(claimDeliver);
+      } catch (err) {
+        logger.warn(
+          { err, reservationId: claimDeliver.reservationId, kind: 'reservation_claim' },
+          'Post-commit claim email delivery failed'
+        );
+      }
+    }
+
     return { success: true, audit };
   } catch (err) {
     if (err.isOrderFormError) {
@@ -79,13 +95,40 @@ function toIso(value) {
   return String(value);
 }
 
-async function updateOrderCore({ orderId, payload, contact, range, client }) {
-  const existingOrder = await orderSql.findOrderById(orderId, client);
-  if (!existingOrder) {
+/**
+ * Lock order: for linked orders, reservation FOR UPDATE first, then order
+ * (see transaction.js). Unlinked orders lock/update the order only.
+ */
+async function lockOrderForUpdate(existingOrder, client) {
+  const reservationId = existingOrder.reservationId;
+  if (reservationId) {
+    const lockedReservation = await reservationSql.findByIdForUpdate(reservationId, client);
+    if (!lockedReservation) {
+      const err = new Error('Linked reservation not found');
+      err.status = 404;
+      throw err;
+    }
+  }
+
+  const lockedOrder = await orderSql.lockOrderByIdForUpdate(existingOrder.id, client);
+  if (!lockedOrder) {
     const err = new Error('Order not found');
     err.status = 404;
     throw err;
   }
+
+  return lockedOrder;
+}
+
+async function updateOrderCore({ orderId, payload, contact, range, client }) {
+  const peeked = await orderSql.findOrderById(orderId, client);
+  if (!peeked) {
+    const err = new Error('Order not found');
+    err.status = 404;
+    throw err;
+  }
+
+  const existingOrder = await lockOrderForUpdate(peeked, client);
 
   const prevCarId = existingOrder.carId;
   const prevStart =
@@ -170,8 +213,8 @@ async function updateOrderCore({ orderId, payload, contact, range, client }) {
     }
 
     await orderSql.updateOrderFromDoc(existingOrder, client);
-    await syncLinkedReservationAfterOrderUpdate(existingOrder, { client });
-    return audit;
+    const syncResult = await syncLinkedReservationAfterOrderUpdate(existingOrder, { client });
+    return { audit, claimDeliver: syncResult.claimDeliver || null };
   }
 
   if (String(newCarId) === String(prevCarId)) {
@@ -228,8 +271,8 @@ async function updateOrderCore({ orderId, payload, contact, range, client }) {
   }
 
   await orderSql.updateOrderFromDoc(existingOrder, client);
-  await syncLinkedReservationAfterOrderUpdate(existingOrder, { client });
-  return audit;
+  const syncResult = await syncLinkedReservationAfterOrderUpdate(existingOrder, { client });
+  return { audit, claimDeliver: syncResult.claimDeliver || null };
 }
 
 module.exports = {

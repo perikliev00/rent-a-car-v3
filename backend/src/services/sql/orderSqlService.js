@@ -234,6 +234,57 @@ async function lockByReservationIdForUpdate(reservationId, client) {
   return mapSqlOrder(result.rows[0]) || null;
 }
 
+/**
+ * Claim-only: locks the linked order regardless of soft-delete.
+ * Cancelled/refunded bookings soft-delete their order; claim must still see it
+ * so ownership cannot diverge. Do not use for admin/public list filters.
+ */
+async function lockLinkedOrderForClaimByReservationId(reservationId, client) {
+  const normalizedReservationId = normalizeId(reservationId);
+  if (!normalizedReservationId || !client) {
+    return null;
+  }
+
+  const result = await clientQuery(
+    client,
+    `
+    SELECT ${ORDER_SELECT}
+    FROM orders o
+    WHERE o.reservation_id = $1
+    ORDER BY o.id DESC
+    LIMIT 1
+    FOR UPDATE
+    `,
+    [normalizedReservationId]
+  );
+
+  return mapSqlOrder(result.rows[0]) || null;
+}
+
+/**
+ * Locks a single order row by id (including soft-deleted). Used when locking
+ * reservation first, then the known linked order (admin update lock order).
+ */
+async function lockOrderByIdForUpdate(orderId, client) {
+  const id = normalizeId(orderId);
+  if (!id || !client) {
+    return null;
+  }
+
+  const result = await clientQuery(
+    client,
+    `
+    SELECT ${ORDER_SELECT}
+    FROM orders o
+    WHERE o.id = $1
+    FOR UPDATE
+    `,
+    [id]
+  );
+
+  return mapSqlOrder(result.rows[0]) || null;
+}
+
 async function findOrderByStripeSessionId(stripeSessionId, client = null) {
   if (!stripeSessionId) {
     return null;
@@ -574,6 +625,8 @@ module.exports = {
   findOrderByIdPopulated,
   findOrderByReservationId,
   lockByReservationIdForUpdate,
+  lockLinkedOrderForClaimByReservationId,
+  lockOrderByIdForUpdate,
   findOrderByStripeSessionId,
   listOrders,
   createOrderFromReservation,

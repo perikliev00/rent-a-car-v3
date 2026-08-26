@@ -1,5 +1,6 @@
 jest.mock('../../../src/db/transaction', () => ({
   runWithTransaction: jest.fn((fn) => fn('mock-client')),
+  withClaimTokenAdvisory: jest.fn((_id, fn) => fn()),
   clientQuery: jest.fn(),
 }));
 
@@ -11,6 +12,8 @@ jest.mock('../../../src/services/sql/reservationClaimTokenSqlService', () => ({
   markUsed: jest.fn().mockResolvedValue(1),
   findLatestForReservation: jest.fn(),
   findActiveForReservation: jest.fn().mockResolvedValue(null),
+  revokeTokenById: jest.fn().mockResolvedValue(1),
+  reactivateTokenById: jest.fn().mockResolvedValue(1),
 }));
 
 jest.mock('../../../src/services/sql/reservationSqlService', () => ({
@@ -21,7 +24,7 @@ jest.mock('../../../src/services/sql/reservationSqlService', () => ({
 
 jest.mock('../../../src/services/sql/orderSqlService', () => ({
   assignOwnerByReservationIdIfUnclaimed: jest.fn().mockResolvedValue(1),
-  lockByReservationIdForUpdate: jest.fn(),
+  lockLinkedOrderForClaimByReservationId: jest.fn(),
 }));
 
 jest.mock('../../../src/services/sql/userSqlService', () => ({
@@ -88,7 +91,7 @@ function mockSuccessfulClaimLookups({
   claimTokenSql.findByTokenHashForUpdate.mockResolvedValue(token);
   userSql.lockUserByIdForUpdate.mockResolvedValue(dbUser);
   reservationSql.lockOwnershipForClaim.mockResolvedValue(reservation);
-  orderSql.lockByReservationIdForUpdate.mockResolvedValue(order);
+  orderSql.lockLinkedOrderForClaimByReservationId.mockResolvedValue(order);
 }
 
 describe('reservationClaimService.issueClaimToken', () => {
@@ -181,9 +184,9 @@ describe('reservationClaimService.claimReservation', () => {
       reservationSql.lockOwnershipForClaim.mock.invocationCallOrder[0]
     );
     expect(reservationSql.lockOwnershipForClaim.mock.invocationCallOrder[0]).toBeLessThan(
-      orderSql.lockByReservationIdForUpdate.mock.invocationCallOrder[0]
+      orderSql.lockLinkedOrderForClaimByReservationId.mock.invocationCallOrder[0]
     );
-    expect(orderSql.lockByReservationIdForUpdate.mock.invocationCallOrder[0]).toBeLessThan(
+    expect(orderSql.lockLinkedOrderForClaimByReservationId.mock.invocationCallOrder[0]).toBeLessThan(
       claimTokenSql.findByTokenHashForUpdate.mock.invocationCallOrder[0]
     );
   });
@@ -398,6 +401,24 @@ describe('reservationClaimService.claimReservation', () => {
     expect(claimTokenSql.markUsed).not.toHaveBeenCalled();
   });
 
+  test('refuses a used token when ownership matches but usedByUserId does not', async () => {
+    mockSuccessfulClaimLookups({
+      token: activeToken({ usedAt: new Date(), usedByUserId: '99' }),
+      reservation: unownedReservation({ userId: '7' }),
+      order: unownedOrder({ userId: '7' }),
+    });
+
+    const result = await service.claimReservation({
+      user: verifiedUser,
+      reservationId: '10',
+      rawToken: RAW_TOKEN,
+    });
+
+    expect(result.outcome).toBe(OUTCOMES.INVALID_TOKEN);
+    expect(claimTokenSql.markUsed).not.toHaveBeenCalled();
+    expect(reservationSql.assignOwnerIfUnclaimed).not.toHaveBeenCalled();
+  });
+
   test('throws and does not return conflict after a zero-row reservation write', async () => {
     mockSuccessfulClaimLookups();
     reservationSql.assignOwnerIfUnclaimed.mockResolvedValue(0);
@@ -541,9 +562,11 @@ describe('reservationClaimService.issueAndSendClaimToken', () => {
     claimTokenSql.findActiveForReservation.mockResolvedValue(null);
   });
 
-  test('does not rotate an existing token when delivery fails', async () => {
-    claimTokenSql.findActiveForReservation.mockResolvedValue(activeToken());
-    reservationSql.findById.mockResolvedValue(unownedReservation());
+  test('compensates rotation when delivery fails after persist', async () => {
+    claimTokenSql.findActiveForReservation
+      .mockResolvedValueOnce(activeToken({ id: '9' }))
+      .mockResolvedValueOnce(activeToken({ id: '11' }));
+    claimTokenSql.insertToken.mockResolvedValue({ id: '11' });
     securityEmail.sendReservationClaimEmail.mockResolvedValue({
       sent: false,
       reason: 'smtp_not_configured',
@@ -552,8 +575,10 @@ describe('reservationClaimService.issueAndSendClaimToken', () => {
     const result = await service.issueAndSendClaimToken({ reservationId: '10' });
 
     expect(result.sent).toBe(false);
-    expect(claimTokenSql.revokeActiveForReservation).not.toHaveBeenCalled();
-    expect(claimTokenSql.insertToken).not.toHaveBeenCalled();
+    expect(claimTokenSql.revokeActiveForReservation).toHaveBeenCalled();
+    expect(claimTokenSql.insertToken).toHaveBeenCalled();
+    expect(claimTokenSql.revokeTokenById).toHaveBeenCalledWith('11', 'mock-client');
+    expect(claimTokenSql.reactivateTokenById).toHaveBeenCalledWith('9', 'mock-client');
   });
 });
 

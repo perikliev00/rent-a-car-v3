@@ -1,4 +1,7 @@
-const { runWithTransaction } = require('../../db/transaction');
+const {
+  runWithTransaction,
+  withVerifyTokenAdvisory,
+} = require('../../db/transaction');
 const userSql = require('../sql/userSqlService');
 const tokenSql = require('../sql/emailVerificationTokenSqlService');
 const { generateRawToken, hashToken, isPlausibleRawToken } = require('./tokenUtils');
@@ -37,6 +40,10 @@ function verificationIntegrityError(message) {
   return err;
 }
 
+function isKnownDeliveryFailure(delivery) {
+  return !delivery?.sent;
+}
+
 async function persistVerificationToken(user, { tokenHash, expiresAt }, dbClient) {
   const dbUser = await userSql.lockUserByIdForUpdate(user.id, dbClient);
   if (!dbUser) {
@@ -45,10 +52,16 @@ async function persistVerificationToken(user, { tokenHash, expiresAt }, dbClient
 
   const emailHash = emailHashFor(dbUser.email);
   await tokenSql.revokeActiveForUser(dbUser.id, dbClient);
-  return tokenSql.insertToken(
+  const record = await tokenSql.insertToken(
     { userId: dbUser.id, tokenHash, emailHash, expiresAt },
     dbClient
   );
+
+  return {
+    record,
+    email: normalizeEmail(dbUser.email),
+    emailHash,
+  };
 }
 
 /**
@@ -66,9 +79,13 @@ async function issueToken(user, client = null) {
   const persist = async (dbClient) =>
     persistVerificationToken(user, { tokenHash, expiresAt }, dbClient);
 
-  const record = client ? await persist(client) : await runWithTransaction(persist);
+  const result = client ? await persist(client) : await runWithTransaction(persist);
 
-  return { rawToken, expiresAt, tokenId: record?.id || null };
+  return {
+    rawToken,
+    expiresAt,
+    tokenId: result?.record?.id || null,
+  };
 }
 
 async function deliverVerificationEmail(user, { rawToken, expiresAt, resend }) {
@@ -88,9 +105,34 @@ async function deliverVerificationEmail(user, { rawToken, expiresAt, resend }) {
   return delivery;
 }
 
+async function compensateVerificationRotation({ userId, newTokenId, prior, emailHash }) {
+  if (!prior?.id || !newTokenId) {
+    return;
+  }
+
+  await runWithTransaction(async (dbClient) => {
+    const active = await tokenSql.findActiveForUser(userId, dbClient);
+    if (!active || String(active.id) !== String(newTokenId)) {
+      return;
+    }
+    if (!prior.emailHash || prior.emailHash !== emailHash || active.emailHash !== emailHash) {
+      return;
+    }
+
+    await tokenSql.revokeTokenById(newTokenId, dbClient);
+    await tokenSql.reactivateTokenById(prior.id, dbClient);
+  });
+
+  logEvent.warn('auth.email_verification.rotation_compensated', {
+    userId: String(userId),
+    reason: 'smtp_failure',
+  });
+}
+
 /**
- * Issues a token and mails it. A known resend/rotation delivery failure does not
- * revoke the last usable link.
+ * Persist+commit under a session advisory lock, then SMTP. Never reports sent:true
+ * without a successful insert. On known SMTP failure when a prior usable token
+ * existed for the same email hash, restores that prior token.
  */
 async function issueAndSendVerification(user, { resend = false } = {}) {
   if (!user?.id || !user?.email) {
@@ -101,40 +143,65 @@ async function issueAndSendVerification(user, { resend = false } = {}) {
     return { sent: false, reason: 'already_verified' };
   }
 
-  const active = await tokenSql.findActiveForUser(user.id);
-  const rotating = resend || Boolean(active);
-
-  const rawToken = generateRawToken();
-  const tokenHash = hashToken(rawToken);
-  const expiresAt = expiryFromNow();
-
-  if (rotating) {
-    const delivery = await deliverVerificationEmail(user, {
-      rawToken,
-      expiresAt,
-      resend: true,
-    });
-    if (!delivery?.sent) {
-      return { sent: false, expiresAt };
-    }
-
-    await runWithTransaction(async (dbClient) =>
-      persistVerificationToken(user, { tokenHash, expiresAt }, dbClient)
-    );
-    return { sent: true, expiresAt };
+  const uid = Number(user.id);
+  if (!Number.isInteger(uid) || uid <= 0) {
+    return { sent: false, reason: 'missing_user' };
   }
 
-  await runWithTransaction(async (dbClient) =>
-    persistVerificationToken(user, { tokenHash, expiresAt }, dbClient)
-  );
+  return withVerifyTokenAdvisory(uid, async () => {
+    let prior = null;
+    let issued = null;
+    let mailUser = { id: user.id, email: normalizeEmail(user.email) };
 
-  const delivery = await deliverVerificationEmail(user, {
-    rawToken,
-    expiresAt,
-    resend: false,
+    await runWithTransaction(async (dbClient) => {
+      prior = await tokenSql.findActiveForUser(uid, dbClient);
+
+      const rawToken = generateRawToken();
+      const tokenHash = hashToken(rawToken);
+      const expiresAt = expiryFromNow();
+      const persisted = await persistVerificationToken(user, { tokenHash, expiresAt }, dbClient);
+
+      if (!persisted?.record?.id) {
+        return;
+      }
+
+      mailUser = { id: user.id, email: persisted.email };
+      issued = {
+        rawToken,
+        expiresAt,
+        tokenId: persisted.record.id,
+        emailHash: persisted.emailHash,
+      };
+    });
+
+    if (!issued?.tokenId || !issued.rawToken) {
+      return { sent: false, reason: 'persist_failed', expiresAt: null };
+    }
+
+    const delivery = await deliverVerificationEmail(mailUser, {
+      rawToken: issued.rawToken,
+      expiresAt: issued.expiresAt,
+      resend: resend || Boolean(prior),
+    });
+
+    if (isKnownDeliveryFailure(delivery)) {
+      if (prior?.id && prior.emailHash === issued.emailHash) {
+        await compensateVerificationRotation({
+          userId: uid,
+          newTokenId: issued.tokenId,
+          prior,
+          emailHash: issued.emailHash,
+        });
+      }
+      return {
+        sent: false,
+        reason: delivery?.reason || 'delivery_failed',
+        expiresAt: issued.expiresAt,
+      };
+    }
+
+    return { sent: true, expiresAt: issued.expiresAt };
   });
-
-  return { sent: Boolean(delivery?.sent), expiresAt };
 }
 
 function tokenEmailMatchesUser(token, user) {

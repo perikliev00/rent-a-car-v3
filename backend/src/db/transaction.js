@@ -13,6 +13,10 @@ const ACTIVE_SESSION_HOLD_UNIQUE_INDEX = 'idx_reservations_one_active_hold_per_s
 const ADVISORY_LOCK_NS = Object.freeze({
   CAR: 1,
   SESSION: 2,
+  /** Session-level (not xact): claim token issue/resend serialization by reservation_id */
+  CLAIM_TOKEN: 3,
+  /** Session-level (not xact): verification token issue/resend serialization by user_id */
+  VERIFY_TOKEN: 4,
 });
 
 /**
@@ -24,18 +28,25 @@ const ADVISORY_LOCK_NS = Object.freeze({
  * Never take a car lock after a reservation row lock on these paths.
  * Never take a session lock after car locks.
  *
- * Canonical lock order for security tokens (issue / resend / verify / claim):
+ * Canonical lock order for any path that touches reservation + linked order
+ * (claim, admin order update, calendar move, cancel/refund):
  * 1. User row (SELECT ... FOR UPDATE) when a user participates
  * 2. Reservation row (SELECT ... FOR UPDATE) when a reservation participates
- * 3. Linked order row (SELECT ... FOR UPDATE) if one exists
+ * 3. Linked order row (SELECT ... FOR UPDATE) if one exists (including soft-deleted on claim)
  * 4. Token row (SELECT ... FOR UPDATE)
  *
- * Lookup-by-hash is non-locking only to discover ids. Then lock in this order
- * and re-read the token FOR UPDATE. Token rotation serializes on the parent
- * row (user for verification, reservation for claim) before revoke+insert.
+ * Lookup-by-hash / findById is non-locking only to discover ids. Then lock in
+ * this order and re-read authoritative rows before validating or updating.
  *
- * Never invert this order. Never take a hold-path car/session advisory lock
- * after a security-token row lock on those paths.
+ * Token rotation (issue/resend) additionally takes a session-level advisory
+ * lock on the parent (CLAIM_TOKEN / VERIFY_TOKEN) outside the short row
+ * transaction so concurrent issuers serialize across processes without holding
+ * row locks during SMTP. Always release that advisory in finally.
+ *
+ * Never invert reservation↔order. Never take a hold-path car/session advisory
+ * lock after a security-token row lock on those paths.
+ * Security email delivery must run only after COMMIT — never while row locks
+ * are held.
  */
 
 function isUniqueViolation(err) {
@@ -141,6 +152,86 @@ async function acquireSessionAdvisoryLock(client, sessionId) {
   ]);
 }
 
+/**
+ * Session-level advisory lock for claim-token rotation (held across short TXs + SMTP).
+ * Must be paired with releaseClaimTokenAdvisoryLock in finally.
+ */
+async function acquireClaimTokenAdvisoryLock(client, reservationId) {
+  const id = Number(reservationId);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Error('Invalid reservation id for claim-token advisory lock');
+  }
+  await client.query('SELECT pg_advisory_lock($1, $2)', [ADVISORY_LOCK_NS.CLAIM_TOKEN, id]);
+}
+
+async function releaseClaimTokenAdvisoryLock(client, reservationId) {
+  const id = Number(reservationId);
+  if (!Number.isInteger(id) || id <= 0) {
+    return;
+  }
+  await client.query('SELECT pg_advisory_unlock($1, $2)', [ADVISORY_LOCK_NS.CLAIM_TOKEN, id]);
+}
+
+/**
+ * Session-level advisory lock for verification-token rotation.
+ * Must be paired with releaseVerifyTokenAdvisoryLock in finally.
+ */
+async function acquireVerifyTokenAdvisoryLock(client, userId) {
+  const id = Number(userId);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Error('Invalid user id for verify-token advisory lock');
+  }
+  await client.query('SELECT pg_advisory_lock($1, $2)', [ADVISORY_LOCK_NS.VERIFY_TOKEN, id]);
+}
+
+async function releaseVerifyTokenAdvisoryLock(client, userId) {
+  const id = Number(userId);
+  if (!Number.isInteger(id) || id <= 0) {
+    return;
+  }
+  await client.query('SELECT pg_advisory_unlock($1, $2)', [ADVISORY_LOCK_NS.VERIFY_TOKEN, id]);
+}
+
+/**
+ * Runs work while holding a session-level advisory lock on a dedicated connection.
+ * Row transactions inside work should use runWithTransaction (separate connections)
+ * so SMTP can run after COMMIT without holding row locks — only this advisory.
+ */
+async function withSessionAdvisoryLock(acquire, release, work) {
+  const client = await pool.connect();
+  let locked = false;
+  try {
+    await acquire(client);
+    locked = true;
+    return await work();
+  } finally {
+    if (locked) {
+      try {
+        await release(client);
+      } catch {
+        // Prefer releasing the pool client even if unlock fails.
+      }
+    }
+    client.release();
+  }
+}
+
+async function withClaimTokenAdvisory(reservationId, work) {
+  return withSessionAdvisoryLock(
+    (client) => acquireClaimTokenAdvisoryLock(client, reservationId),
+    (client) => releaseClaimTokenAdvisoryLock(client, reservationId),
+    work
+  );
+}
+
+async function withVerifyTokenAdvisory(userId, work) {
+  return withSessionAdvisoryLock(
+    (client) => acquireVerifyTokenAdvisoryLock(client, userId),
+    (client) => releaseVerifyTokenAdvisoryLock(client, userId),
+    work
+  );
+}
+
 module.exports = {
   PG_UNIQUE_VIOLATION,
   PG_EXCLUSION_VIOLATION,
@@ -159,4 +250,10 @@ module.exports = {
   acquireCarAdvisoryLock,
   acquireCarAdvisoryLocks,
   acquireSessionAdvisoryLock,
+  acquireClaimTokenAdvisoryLock,
+  releaseClaimTokenAdvisoryLock,
+  acquireVerifyTokenAdvisoryLock,
+  releaseVerifyTokenAdvisoryLock,
+  withClaimTokenAdvisory,
+  withVerifyTokenAdvisory,
 };

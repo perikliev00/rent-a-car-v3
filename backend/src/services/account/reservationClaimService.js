@@ -7,7 +7,10 @@
  * must be verified and equal to the booking email currently stored on the reservation.
  */
 
-const { runWithTransaction } = require('../../db/transaction');
+const {
+  runWithTransaction,
+  withClaimTokenAdvisory,
+} = require('../../db/transaction');
 const reservationSql = require('../sql/reservationSqlService');
 const orderSql = require('../sql/orderSqlService');
 const userSql = require('../sql/userSqlService');
@@ -29,6 +32,11 @@ const OUTCOMES = Object.freeze({
   EMAIL_MISMATCH: 'email_mismatch',
   CONFLICT: 'conflict',
 });
+
+/** Test-only hooks (NODE_ENV=test). Do not use in production paths. */
+const testHooks = {
+  afterReservationAssign: null,
+};
 
 function normalizeEmail(email) {
   return String(email || '').trim().toLowerCase();
@@ -53,6 +61,10 @@ function expiryFromNow(now = Date.now()) {
   return new Date(now + TOKEN_TTL_MS);
 }
 
+function isKnownDeliveryFailure(delivery) {
+  return !delivery?.sent;
+}
+
 async function persistClaimTokenFromLockedReservation(reservation, dbClient) {
   const bookingEmail = normalizeEmail(reservation.email);
   if (!bookingEmail) {
@@ -74,10 +86,14 @@ async function persistClaimTokenFromLockedReservation(reservation, dbClient) {
     dbClient
   );
 
+  if (!record?.id) {
+    return null;
+  }
+
   return {
     rawToken,
     expiresAt,
-    tokenId: record?.id || null,
+    tokenId: record.id,
     bookingEmail,
   };
 }
@@ -120,12 +136,38 @@ async function deliverClaimEmail({ to, reservationId, rawToken, expiresAt }) {
   return delivery;
 }
 
+async function compensateClaimRotation({ reservationId, newTokenId, prior }) {
+  if (!prior?.id || !newTokenId) {
+    return;
+  }
+
+  await runWithTransaction(async (dbClient) => {
+    const active = await claimTokenSql.findActiveForReservation(reservationId, dbClient);
+    if (!active || String(active.id) !== String(newTokenId)) {
+      return;
+    }
+    if (normalizeEmail(prior.bookingEmail) !== normalizeEmail(active.bookingEmail)) {
+      return;
+    }
+
+    await claimTokenSql.revokeTokenById(newTokenId, dbClient);
+    await claimTokenSql.reactivateTokenById(prior.id, dbClient);
+  });
+
+  logEvent.warn('account.claim_token.rotation_compensated', {
+    reservationId: String(reservationId),
+    reason: 'smtp_failure',
+  });
+}
+
 /**
  * Issues a token and mails it to the current reservation email. Used after checkout,
- * by the self-service request endpoint, and after an admin changes the booking email.
+ * by the self-service request endpoint, and after an admin changes the booking email
+ * (standalone path only — nested TX callers use prepareBookingEmailChange).
  *
- * Rotating an existing usable token only persists after a known SMTP success so a
- * delivery failure cannot invalidate the last working link.
+ * Persist+commit first under a session advisory lock, then SMTP. Never reports
+ * sent:true without a successful insert. On known SMTP failure during rotation,
+ * restores the prior usable token when email-compatible.
  */
 async function issueAndSendClaimToken({ reservationId }) {
   const rid = Number(reservationId);
@@ -133,94 +175,121 @@ async function issueAndSendClaimToken({ reservationId }) {
     return { sent: false, reason: 'missing_input' };
   }
 
-  const active = await claimTokenSql.findActiveForReservation(rid);
-  if (active) {
-    const preview = await reservationSql.findById(rid);
-    const bookingEmail = normalizeEmail(preview?.email);
-    if (!bookingEmail) {
-      return { sent: false, reason: 'missing_input' };
-    }
-
-    const rawToken = generateRawToken();
-    const tokenHash = hashToken(rawToken);
-    const expiresAt = expiryFromNow();
-    const delivery = await deliverClaimEmail({
-      to: bookingEmail,
-      reservationId: rid,
-      rawToken,
-      expiresAt,
-    });
-    if (!delivery?.sent) {
-      return { sent: false };
-    }
+  return withClaimTokenAdvisory(rid, async () => {
+    let prior = null;
+    let issued = null;
 
     await runWithTransaction(async (dbClient) => {
       const reservation = await reservationSql.lockOwnershipForClaim(rid, dbClient);
-      if (!reservation || normalizeEmail(reservation.email) !== bookingEmail) {
-        return null;
+      if (!reservation) {
+        return;
       }
-      await claimTokenSql.revokeActiveForReservation(rid, dbClient);
-      return claimTokenSql.insertToken(
-        { reservationId: rid, tokenHash, bookingEmail, expiresAt },
-        dbClient
-      );
+      const bookingEmail = normalizeEmail(reservation.email);
+      if (!bookingEmail) {
+        return;
+      }
+
+      prior = await claimTokenSql.findActiveForReservation(rid, dbClient);
+      issued = await persistClaimTokenFromLockedReservation(reservation, dbClient);
     });
 
+    if (!issued?.tokenId || !issued.rawToken) {
+      return { sent: false, reason: 'missing_input' };
+    }
+
+    const delivery = await deliverClaimEmail({
+      to: issued.bookingEmail,
+      reservationId: rid,
+      rawToken: issued.rawToken,
+      expiresAt: issued.expiresAt,
+    });
+
+    if (isKnownDeliveryFailure(delivery)) {
+      if (prior?.id) {
+        await compensateClaimRotation({
+          reservationId: rid,
+          newTokenId: issued.tokenId,
+          prior,
+        });
+      }
+      return { sent: false, reason: delivery?.reason || 'delivery_failed' };
+    }
+
     return { sent: true };
-  }
-
-  const issued = await issueClaimToken({ reservationId: rid });
-  if (!issued) {
-    return { sent: false, reason: 'missing_input' };
-  }
-
-  const delivery = await deliverClaimEmail({
-    to: issued.bookingEmail,
-    reservationId: rid,
-    rawToken: issued.rawToken,
-    expiresAt: issued.expiresAt,
   });
+}
 
-  return { sent: Boolean(delivery?.sent) };
+/**
+ * Mutates claim tokens for a booking-email change inside an outer TX.
+ * Never calls SMTP. Returns a delivery payload for the caller to send after COMMIT.
+ * Prior tokens for the old email are revoked and must never be restored.
+ */
+async function prepareBookingEmailChange(reservationId, client) {
+  const rid = Number(reservationId);
+  if (!Number.isInteger(rid) || rid <= 0 || !client) {
+    return { deliver: null };
+  }
+
+  const reservation = await reservationSql.lockOwnershipForClaim(rid, client);
+  if (!reservation) {
+    return { deliver: null };
+  }
+
+  await claimTokenSql.revokeActiveForReservation(rid, client);
+  if (reservation.userId) {
+    return { deliver: null };
+  }
+
+  const issued = await persistClaimTokenFromLockedReservation(reservation, client);
+  if (!issued?.rawToken) {
+    return { deliver: null };
+  }
+
+  return {
+    deliver: {
+      to: issued.bookingEmail,
+      reservationId: rid,
+      rawToken: issued.rawToken,
+      expiresAt: issued.expiresAt,
+    },
+  };
 }
 
 /**
  * Called after the booking contact email on a reservation changes. Outstanding claim
- * tokens are revoked; an unclaimed reservation gets a fresh token mailed to the new
- * address, derived from the locked reservation row.
+ * tokens are revoked; an unclaimed reservation gets a fresh token for the new address.
+ * When `client` is provided, only mutates — caller must deliver after COMMIT.
+ * Standalone path commits then delivers (no restore of old-email tokens).
  */
 async function onBookingEmailChanged(reservationId, client = null) {
   const rid = Number(reservationId);
   if (!Number.isInteger(rid) || rid <= 0) {
+    return { sent: false, reason: 'missing_input', deliver: null };
+  }
+
+  if (client) {
+    return prepareBookingEmailChange(rid, client);
+  }
+
+  return withClaimTokenAdvisory(rid, async () => {
+    const { deliver } = await runWithTransaction((dbClient) =>
+      prepareBookingEmailChange(rid, dbClient)
+    );
+
+    if (!deliver) {
+      return { sent: false, deliver: null };
+    }
+
+    const delivery = await deliverClaimEmail(deliver);
+    return { sent: Boolean(delivery?.sent), deliver: null };
+  });
+}
+
+async function deliverPreparedClaimEmail(deliver) {
+  if (!deliver?.rawToken || !deliver?.to || !deliver?.reservationId) {
     return { sent: false, reason: 'missing_input' };
   }
-
-  const work = async (dbClient) => {
-    const reservation = await reservationSql.lockOwnershipForClaim(rid, dbClient);
-    if (!reservation) {
-      return { reservation: null, issued: null };
-    }
-    await claimTokenSql.revokeActiveForReservation(rid, dbClient);
-    if (reservation.userId) {
-      return { reservation, issued: null };
-    }
-    const issued = await persistClaimTokenFromLockedReservation(reservation, dbClient);
-    return { reservation, issued };
-  };
-
-  const { issued } = client ? await work(client) : await runWithTransaction(work);
-  if (!issued) {
-    return { sent: false };
-  }
-
-  const delivery = await deliverClaimEmail({
-    to: issued.bookingEmail,
-    reservationId: rid,
-    rawToken: issued.rawToken,
-    expiresAt: issued.expiresAt,
-  });
-
-  return { sent: Boolean(delivery?.sent) };
+  return deliverClaimEmail(deliver);
 }
 
 async function recordAudit({ action, userId, reservationId, outcome, ipAddress }) {
@@ -254,8 +323,9 @@ function consistentlyOwnedBy(reservation, order, uid) {
  * Consumes a claim token.
  *
  * Locking order inside the transaction (see transaction.js): non-locking token
- * lookup, then user, reservation, order (if present), then token FOR UPDATE.
- * Session email / emailVerified are ignored; the locked DB user is authoritative.
+ * lookup, then user, reservation, linked order (including soft-deleted), then
+ * token FOR UPDATE. Session email / emailVerified are ignored; the locked DB
+ * user is authoritative.
  */
 async function claimReservation({
   user,
@@ -301,7 +371,7 @@ async function claimReservation({
       return { outcome: OUTCOMES.INVALID_TOKEN };
     }
 
-    const order = await orderSql.lockByReservationIdForUpdate(rid, client);
+    const order = await orderSql.lockLinkedOrderForClaimByReservationId(rid, client);
 
     const token = await claimTokenSql.findByTokenHashForUpdate(tokenHash, client);
     if (!token || String(token.reservationId) !== String(rid)) {
@@ -337,7 +407,10 @@ async function claimReservation({
     }
 
     if (token.usedAt) {
-      if (consistentlyOwnedBy(reservation, order, uid)) {
+      if (
+        consistentlyOwnedBy(reservation, order, uid) &&
+        sameUserId(token.usedByUserId, uid)
+      ) {
         return { outcome: OUTCOMES.ALREADY_OWNED, reservationId: rid };
       }
       if (
@@ -358,6 +431,13 @@ async function claimReservation({
       throw claimIntegrityError(
         'Claim refused: reservation ownership update matched unexpected row count'
       );
+    }
+
+    if (
+      process.env.NODE_ENV === 'test' &&
+      typeof testHooks.afterReservationAssign === 'function'
+    ) {
+      await testHooks.afterReservationAssign(client);
     }
 
     if (order) {
@@ -464,12 +544,30 @@ async function requestClaimToken({ user, reservationId, bookingEmail }) {
   return { status: 'sent' };
 }
 
+function __setTestHooks(hooks = {}) {
+  if (process.env.NODE_ENV !== 'test') {
+    return;
+  }
+  testHooks.afterReservationAssign =
+    typeof hooks.afterReservationAssign === 'function'
+      ? hooks.afterReservationAssign
+      : null;
+}
+
+function __clearTestHooks() {
+  testHooks.afterReservationAssign = null;
+}
+
 module.exports = {
   OUTCOMES,
   TOKEN_TTL_MS,
   issueClaimToken,
   issueAndSendClaimToken,
+  prepareBookingEmailChange,
   onBookingEmailChanged,
+  deliverPreparedClaimEmail,
   claimReservation,
   requestClaimToken,
+  __setTestHooks,
+  __clearTestHooks,
 };

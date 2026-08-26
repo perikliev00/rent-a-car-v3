@@ -3,6 +3,7 @@ jest.mock('../../src/repositories/carRepository', () => ({
 }));
 jest.mock('../../src/services/sql/orderSqlService', () => ({
   findOrderByReservationId: jest.fn(),
+  lockByReservationIdForUpdate: jest.fn(),
   updateOrderFromDoc: jest.fn(),
 }));
 jest.mock('../../src/services/admin/order/orderDomainService', () => ({
@@ -17,6 +18,7 @@ jest.mock('../../src/services/admin/order/orderMapper', () => ({
   }),
 }));
 jest.mock('../../src/services/account/reservationClaimService', () => ({
+  prepareBookingEmailChange: jest.fn().mockResolvedValue({ deliver: null }),
   onBookingEmailChanged: jest.fn().mockResolvedValue({ sent: false }),
 }));
 

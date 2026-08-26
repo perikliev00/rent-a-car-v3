@@ -219,6 +219,29 @@ async function countActiveVerificationTokens(userId) {
   return result.rows[0].count;
 }
 
+async function softDeleteOrderByReservationId(reservationId) {
+  const result = await pool.query(
+    `
+    UPDATE orders
+    SET is_deleted = TRUE,
+        deleted_at = NOW(),
+        status = 'cancelled',
+        updated_at = NOW()
+    WHERE reservation_id = $1
+    RETURNING id
+    `,
+    [reservationId]
+  );
+  return result.rowCount || 0;
+}
+
+async function setReservationStatus(reservationId, status) {
+  await pool.query(
+    `UPDATE reservations SET status = $2, updated_at = NOW() WHERE id = $1`,
+    [reservationId, status]
+  );
+}
+
 async function setOrderOwnerByReservationId(reservationId, userId) {
   await pool.query(
     `UPDATE orders SET user_id = $2, updated_at = NOW() WHERE reservation_id = $1`,
@@ -894,6 +917,8 @@ module.exports = {
   countActiveClaimTokens,
   countActiveVerificationTokens,
   setOrderOwnerByReservationId,
+  softDeleteOrderByReservationId,
+  setReservationStatus,
   setReservationEmail,
   expireClaimTokens,
   expireVerificationTokens,

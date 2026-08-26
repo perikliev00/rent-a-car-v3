@@ -69,24 +69,30 @@ async function moveOrResizeEvent(access, eventId, body, req, mode) {
     let orderSynced = false;
 
     await runWithTransaction(async (client) => {
+      // Lock order: reservation first, then linked order (see transaction.js).
+      const lockedReservation = await reservationSql.findByIdForUpdate(existing.id, client);
+      if (!lockedReservation) {
+        throw createHttpError('NOT_FOUND', 'Reservation not found.', 404);
+      }
+
       const { pricing, orderSynced: synced } = await syncLinkedOrderAfterReservationMove({
-        reservationId: existing.id,
+        reservationId: lockedReservation.id,
         carId: targetCarId,
         start,
         end,
-        pickupTime: existing.pickupTime,
-        returnTime: existing.returnTime,
-        pickupLocation: existing.pickupLocation,
-        returnLocation: existing.returnLocation,
-        selectedExtras: existing.selectedExtras,
-        hotelDelivery: existing.hotelDelivery,
+        pickupTime: lockedReservation.pickupTime,
+        returnTime: lockedReservation.returnTime,
+        pickupLocation: lockedReservation.pickupLocation,
+        returnLocation: lockedReservation.returnLocation,
+        selectedExtras: lockedReservation.selectedExtras,
+        hotelDelivery: lockedReservation.hotelDelivery,
         client,
       });
       orderSynced = synced;
 
       await reservationSql.update(
         {
-          ...existing,
+          ...lockedReservation,
           carId: targetCarId,
           pickupDate: start,
           returnDate: end,
@@ -94,13 +100,13 @@ async function moveOrResizeEvent(access, eventId, body, req, mode) {
           deliveryPrice: pricing.deliveryPrice,
           returnPrice: pricing.returnPrice,
           totalPrice: pricing.totalPrice,
-          deposit: pricing.deposit ?? existing.deposit,
-          priceSnapshot: pricing.snapshot || existing.priceSnapshot,
-          selectedExtras: pricing.snapshot?.selectedExtras || existing.selectedExtras,
+          deposit: pricing.deposit ?? lockedReservation.deposit,
+          priceSnapshot: pricing.snapshot || lockedReservation.priceSnapshot,
+          selectedExtras: pricing.snapshot?.selectedExtras || lockedReservation.selectedExtras,
           hotelDelivery:
             pricing.snapshot?.hotelDelivery != null
               ? Boolean(pricing.snapshot.hotelDelivery)
-              : existing.hotelDelivery,
+              : lockedReservation.hotelDelivery,
         },
         client
       );

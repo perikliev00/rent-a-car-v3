@@ -46,7 +46,9 @@ async function syncLinkedOrderAfterReservationMove({
     }
   );
 
-  const order = await orderSql.findOrderByReservationId(reservationId, client);
+  const order = client
+    ? await orderSql.lockByReservationIdForUpdate(reservationId, client)
+    : await orderSql.findOrderByReservationId(reservationId, client);
   let orderSynced = false;
 
   if (order) {
@@ -69,15 +71,18 @@ async function syncLinkedOrderAfterReservationMove({
 /**
  * After an admin order update, push car/dates/contact/pricing onto the linked reservation
  * so calendar/ops stay consistent with the order + date blocks.
+ *
+ * When the booking email changes, prepares claim-token mutation only (no SMTP).
+ * Caller must deliver after the outer transaction commits.
  */
 async function syncLinkedReservationAfterOrderUpdate(order, { client = null } = {}) {
   if (!order?.reservationId) {
-    return { reservationSynced: false, reservation: null };
+    return { reservationSynced: false, reservation: null, claimDeliver: null };
   }
 
   const reservation = await reservationRepository.findById(order.reservationId, client);
   if (!reservation) {
-    return { reservationSynced: false, reservation: null };
+    return { reservationSynced: false, reservation: null, claimDeliver: null };
   }
 
   const previousEmail = normalizeEmail(reservation.email);
@@ -105,11 +110,16 @@ async function syncLinkedReservationAfterOrderUpdate(order, { client = null } = 
 
   const updated = await reservationRepository.update(reservation, client);
 
+  let claimDeliver = null;
   if (normalizeEmail(order.email) !== previousEmail) {
-    await reservationClaimService.onBookingEmailChanged(updated.id || order.reservationId, client);
+    const prepared = await reservationClaimService.prepareBookingEmailChange(
+      updated.id || order.reservationId,
+      client
+    );
+    claimDeliver = prepared?.deliver || null;
   }
 
-  return { reservationSynced: true, reservation: updated };
+  return { reservationSynced: true, reservation: updated, claimDeliver };
 }
 
 /**

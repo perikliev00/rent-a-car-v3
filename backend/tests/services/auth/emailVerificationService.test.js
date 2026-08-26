@@ -1,5 +1,6 @@
 jest.mock('../../../src/db/transaction', () => ({
   runWithTransaction: jest.fn((fn) => fn('mock-client')),
+  withVerifyTokenAdvisory: jest.fn((_id, fn) => fn()),
   clientQuery: jest.fn(),
 }));
 
@@ -11,6 +12,8 @@ jest.mock('../../../src/services/sql/emailVerificationTokenSqlService', () => ({
   markUsed: jest.fn().mockResolvedValue(1),
   findLatestForUser: jest.fn().mockResolvedValue(null),
   findActiveForUser: jest.fn().mockResolvedValue(null),
+  revokeTokenById: jest.fn().mockResolvedValue(1),
+  reactivateTokenById: jest.fn().mockResolvedValue(1),
 }));
 
 jest.mock('../../../src/services/sql/userSqlService', () => ({
@@ -138,8 +141,12 @@ describe('emailVerificationService.issueAndSendVerification', () => {
     expect(tokenSql.insertToken).toHaveBeenCalled();
   });
 
-  test('does not revoke the last usable link when a resend fails to deliver', async () => {
-    tokenSql.findActiveForUser.mockResolvedValue(boundToken());
+  test('persists then compensates when a resend fails to deliver', async () => {
+    const prior = boundToken({ id: '9' });
+    tokenSql.findActiveForUser
+      .mockResolvedValueOnce(prior)
+      .mockResolvedValueOnce({ ...boundToken({ id: '1' }) });
+    tokenSql.insertToken.mockResolvedValue({ id: '1' });
     securityEmail.sendEmailVerificationEmail.mockResolvedValue({
       sent: false,
       reason: 'smtp_not_configured',
@@ -148,8 +155,10 @@ describe('emailVerificationService.issueAndSendVerification', () => {
     const result = await service.issueAndSendVerification(unverifiedUser, { resend: true });
 
     expect(result.sent).toBe(false);
-    expect(tokenSql.revokeActiveForUser).not.toHaveBeenCalled();
-    expect(tokenSql.insertToken).not.toHaveBeenCalled();
+    expect(tokenSql.revokeActiveForUser).toHaveBeenCalled();
+    expect(tokenSql.insertToken).toHaveBeenCalled();
+    expect(tokenSql.revokeTokenById).toHaveBeenCalledWith('1', 'mock-client');
+    expect(tokenSql.reactivateTokenById).toHaveBeenCalledWith('9', 'mock-client');
   });
 });
 

@@ -160,3 +160,10 @@ jobs:
           path: e2e/playwright-report/
           if-no-files-found: warn
           retention-days: 14
+
+  compose-prod-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Smoke docker compose prod config
+        run: node scripts/smoke-compose-prod-config.js
