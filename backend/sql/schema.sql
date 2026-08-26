@@ -40,6 +40,7 @@
 --   031 one active hold per session
 --   032 refund operations
 --   033 email verification + reservation claim tokens
+--   034 security token invariants (email_hash, one active token)
 
 --
 -- Legacy destructive drops (e.g. bookings) live in migrations/ only.
@@ -77,3 +78,4 @@
 \ir schema/031_reservations_one_active_hold_per_session.sql
 \ir schema/032_refund_operations.sql
 \ir schema/033_email_verification_and_claim_tokens.sql
+\ir schema/034_security_token_invariants.sql

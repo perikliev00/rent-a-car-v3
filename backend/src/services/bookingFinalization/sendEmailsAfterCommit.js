@@ -8,15 +8,15 @@ const reservationClaimService = require('../account/reservationClaimService');
  */
 function sendClaimInvite(result) {
   const reservationId = result.reservation?.id || result.order?.reservationId || null;
-  const bookingEmail = result.order?.email || result.reservation?.email || null;
 
-  // Bookings already tied to an account need no claim link.
-  if (!reservationId || !bookingEmail || result.reservation?.userId) {
+  // Bookings already tied to an account need no claim link. Email is loaded from the
+  // reservation row inside the claim service — callers must not supply it.
+  if (!reservationId || result.reservation?.userId) {
     return;
   }
 
   void Promise.resolve(
-    reservationClaimService.issueAndSendClaimToken({ reservationId, bookingEmail })
+    reservationClaimService.issueAndSendClaimToken({ reservationId })
   ).catch(() => {});
 }
 

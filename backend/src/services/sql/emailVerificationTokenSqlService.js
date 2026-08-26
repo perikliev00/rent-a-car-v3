@@ -3,6 +3,7 @@ const { clientQuery } = require('../../db/transaction');
 const TOKEN_SELECT = `
   id,
   user_id,
+  email_hash,
   expires_at,
   used_at,
   revoked_at,
@@ -17,6 +18,7 @@ function mapToken(row) {
   return {
     id: String(row.id),
     userId: String(row.user_id),
+    emailHash: row.email_hash || null,
     expiresAt: row.expires_at,
     usedAt: row.used_at,
     revokedAt: row.revoked_at,
@@ -51,20 +53,20 @@ async function revokeActiveForUser(userId, client = null) {
   return result.rowCount || 0;
 }
 
-async function insertToken({ userId, tokenHash, expiresAt }, client = null) {
+async function insertToken({ userId, tokenHash, emailHash, expiresAt }, client = null) {
   const uid = normalizeId(userId);
-  if (!uid || !tokenHash || !expiresAt) {
-    throw new Error('userId, tokenHash and expiresAt are required');
+  if (!uid || !tokenHash || !emailHash || !expiresAt) {
+    throw new Error('userId, tokenHash, emailHash and expiresAt are required');
   }
 
   const result = await clientQuery(
     client,
     `
-    INSERT INTO email_verification_tokens (user_id, token_hash, expires_at)
-    VALUES ($1, $2, $3)
+    INSERT INTO email_verification_tokens (user_id, token_hash, email_hash, expires_at)
+    VALUES ($1, $2, $3, $4)
     RETURNING ${TOKEN_SELECT}
     `,
-    [uid, tokenHash, expiresAt]
+    [uid, tokenHash, emailHash, expiresAt]
   );
 
   return mapToken(result.rows[0]);
@@ -151,6 +153,30 @@ async function findLatestForUser(userId, client = null) {
   return mapToken(result.rows[0]);
 }
 
+async function findActiveForUser(userId, client = null) {
+  const uid = normalizeId(userId);
+  if (!uid) {
+    return null;
+  }
+
+  const result = await clientQuery(
+    client,
+    `
+    SELECT ${TOKEN_SELECT}
+    FROM email_verification_tokens
+    WHERE user_id = $1
+      AND used_at IS NULL
+      AND revoked_at IS NULL
+      AND expires_at > NOW()
+    ORDER BY created_at DESC, id DESC
+    LIMIT 1
+    `,
+    [uid]
+  );
+
+  return mapToken(result.rows[0]);
+}
+
 module.exports = {
   revokeActiveForUser,
   insertToken,
@@ -158,4 +184,5 @@ module.exports = {
   findByTokenHashForUpdate,
   markUsed,
   findLatestForUser,
+  findActiveForUser,
 };

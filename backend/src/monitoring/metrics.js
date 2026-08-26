@@ -77,6 +77,10 @@ function incrementEmailConfirmationFailures() {
   prometheus.incrementEmailConfirmationFailures();
 }
 
+function incrementSecurityEmailFailures(kind) {
+  prometheus.incrementSecurityEmailFailures(kind);
+}
+
 function incrementBusinessEvent(event) {
   prometheus.incrementBusinessEvent(event);
 }
@@ -127,6 +131,7 @@ module.exports = {
   incrementReservationConflict,
   incrementAdminLoginFailures,
   incrementEmailConfirmationFailures,
+  incrementSecurityEmailFailures,
   incrementBusinessEvent,
   recordDbQuery,
   setGaugeValues,

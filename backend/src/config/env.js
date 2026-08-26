@@ -4,6 +4,7 @@ const S3_VARS = ['S3_BUCKET', 'STORAGE_PUBLIC_BASE_URL'];
 // initializes the Stripe client at import time, so these are required outside test.
 const STRIPE_VARS = ['STRIPE_SECRET', 'STRIPE_WEBHOOK_SECRET'];
 const { parseCorsOrigins } = require('./cors');
+const { URL } = require('node:url');
 
 const WEAK_SESSION_SECRETS = new Set([
   'secret',
@@ -64,9 +65,15 @@ function assertSessionSecretStrength() {
   }
 }
 
-function validateEmailConfig() {
+function validateEmailConfig({ requireEnabled = false } = {}) {
   const emailEnabled = isTruthy(process.env.EMAIL_ENABLED);
   const configuredSmtpVars = SMTP_VARS.filter((key) => !isEmpty(process.env[key]));
+
+  if (requireEnabled && !emailEnabled) {
+    throw new Error(
+      `EMAIL_ENABLED=true and a complete SMTP configuration (${SMTP_VARS.join(', ')}) are required in production`
+    );
+  }
 
   if (emailEnabled) {
     requireEnv(SMTP_VARS);
@@ -81,12 +88,27 @@ function validateEmailConfig() {
   }
 }
 
+function assertAbsoluteHttpsUrl(value, name) {
+  let parsed;
+  try {
+    parsed = new URL(String(value || '').trim());
+  } catch {
+    throw new Error(`${name} must be an absolute HTTPS URL in production`);
+  }
+
+  if (parsed.protocol !== 'https:' || !parsed.hostname) {
+    throw new Error(`${name} must be an absolute HTTPS URL in production`);
+  }
+}
+
 function validateProductionSecurity() {
   assertSessionSecretStrength();
 
   if (!process.env.CORS_ORIGINS || !String(process.env.CORS_ORIGINS).trim()) {
     throw new Error('CORS_ORIGINS must be set in production');
   }
+
+  assertAbsoluteHttpsUrl(process.env.FRONTEND_BASE_URL, 'FRONTEND_BASE_URL');
 
   const sessionCookieSameSite = (process.env.SESSION_COOKIE_SAME_SITE || 'lax').toLowerCase();
   if (sessionCookieSameSite === 'none' && !process.env.FRONTEND_BASE_URL?.startsWith('https://')) {
@@ -145,7 +167,7 @@ function validateEnv() {
 
   requireEnv(required);
   assertSessionSecretStrength();
-  validateEmailConfig();
+  validateEmailConfig({ requireEnabled: isProd });
 
   if (isProd) {
     validateProductionSecurity();

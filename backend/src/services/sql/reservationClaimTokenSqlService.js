@@ -103,8 +103,8 @@ async function findByTokenHash(tokenHash, client = null) {
 }
 
 /**
- * Locks the claim token row. This is the first lock taken by the claim transaction, so
- * two parallel claims on the same token serialize here.
+ * Locks the claim token row. Taken last on the claim path, after user / reservation /
+ * order locks (see transaction.js security-token lock order).
  */
 async function findByTokenHashForUpdate(tokenHash, client) {
   if (!tokenHash) {
@@ -168,6 +168,30 @@ async function findLatestForReservation(reservationId, client = null) {
   return mapToken(result.rows[0]);
 }
 
+async function findActiveForReservation(reservationId, client = null) {
+  const rid = normalizeId(reservationId);
+  if (!rid) {
+    return null;
+  }
+
+  const result = await clientQuery(
+    client,
+    `
+    SELECT ${TOKEN_SELECT}
+    FROM reservation_claim_tokens
+    WHERE reservation_id = $1
+      AND used_at IS NULL
+      AND revoked_at IS NULL
+      AND expires_at > NOW()
+    ORDER BY created_at DESC, id DESC
+    LIMIT 1
+    `,
+    [rid]
+  );
+
+  return mapToken(result.rows[0]);
+}
+
 module.exports = {
   revokeActiveForReservation,
   insertToken,
@@ -175,4 +199,5 @@ module.exports = {
   findByTokenHashForUpdate,
   markUsed,
   findLatestForReservation,
+  findActiveForReservation,
 };

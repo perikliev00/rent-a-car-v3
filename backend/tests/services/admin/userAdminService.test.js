@@ -1,13 +1,19 @@
 jest.mock('../../../src/services/sql/userSqlService', () => ({
   findUserById: jest.fn(),
+  lockUserByIdForUpdate: jest.fn(),
+  updateEmailKeepingVerification: jest.fn(),
   createUser: jest.fn(),
 }));
 jest.mock('../../../src/services/sql/userRoleSqlService', () => ({
   listStaffUsersWithRoles: jest.fn(),
   replaceUserRoles: jest.fn(),
+  listRolesForUser: jest.fn(),
 }));
 jest.mock('../../../src/services/sql/roleSqlService', () => ({
   findRolesByIds: jest.fn(),
+}));
+jest.mock('../../../src/services/sql/emailVerificationTokenSqlService', () => ({
+  revokeActiveForUser: jest.fn().mockResolvedValue(0),
 }));
 jest.mock('../../../src/services/rbac/rbacService', () => ({
   getUserAccess: jest.fn(),
@@ -24,6 +30,7 @@ const userAdminService = require('../../../src/services/admin/userAdminService')
 const userSql = require('../../../src/services/sql/userSqlService');
 const roleSql = require('../../../src/services/sql/roleSqlService');
 const userRoleSql = require('../../../src/services/sql/userRoleSqlService');
+const tokenSql = require('../../../src/services/sql/emailVerificationTokenSqlService');
 const rbacService = require('../../../src/services/rbac/rbacService');
 
 describe('userAdminService', () => {
@@ -95,6 +102,14 @@ describe('userAdminService', () => {
 
     expect(user.id).toBe(12);
     expect(user.roles[0].slug).toBe('driver');
+    expect(userSql.createUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: 'new@example.com',
+        role: 'staff',
+        emailVerified: true,
+      }),
+      {}
+    );
   });
 
   test('createStaffUser maps EMAIL_IN_USE', async () => {
@@ -110,5 +125,54 @@ describe('userAdminService', () => {
         roleIds: [3],
       })
     ).rejects.toMatchObject({ code: 'EMAIL_IN_USE', status: 409 });
+  });
+
+  test('updateStaffUser refuses customer accounts', async () => {
+    userSql.lockUserByIdForUpdate.mockResolvedValue({
+      id: '4',
+      email: 'customer@example.com',
+      role: 'user',
+    });
+    userRoleSql.listRolesForUser.mockResolvedValue([]);
+
+    await expect(
+      userAdminService.updateStaffUser(4, { email: 'new@example.com' })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
+    expect(userSql.updateEmailKeepingVerification).not.toHaveBeenCalled();
+  });
+
+  test('updateStaffUser keeps verification and revokes outstanding tokens', async () => {
+    userSql.lockUserByIdForUpdate.mockResolvedValue({
+      id: '9',
+      email: 'staff@example.com',
+      role: 'staff',
+    });
+    userRoleSql.listRolesForUser.mockResolvedValue([{ roleSlug: 'driver' }]);
+    userSql.updateEmailKeepingVerification.mockResolvedValue({
+      id: '9',
+      email: 'new-staff@example.com',
+      role: 'staff',
+    });
+    userSql.findUserById.mockResolvedValue({
+      id: '9',
+      email: 'new-staff@example.com',
+      role: 'staff',
+      createdAt: 'a',
+      updatedAt: 'c',
+    });
+    rbacService.getUserAccess.mockResolvedValue({
+      roleDetails: [{ id: '3', slug: 'driver', name: 'Driver' }],
+      permissions: ['can_view_calendar'],
+    });
+
+    const user = await userAdminService.updateStaffUser(9, { email: 'new-staff@example.com' });
+
+    expect(user.email).toBe('new-staff@example.com');
+    expect(userSql.updateEmailKeepingVerification).toHaveBeenCalledWith(
+      9,
+      'new-staff@example.com',
+      {}
+    );
+    expect(tokenSql.revokeActiveForUser).toHaveBeenCalledWith(9, {});
   });
 });

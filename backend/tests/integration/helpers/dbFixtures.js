@@ -191,6 +191,48 @@ async function countUsedClaimTokens(reservationId) {
   return result.rows[0].count;
 }
 
+async function countActiveClaimTokens(reservationId) {
+  const result = await pool.query(
+    `
+    SELECT COUNT(*)::int AS count
+    FROM reservation_claim_tokens
+    WHERE reservation_id = $1
+      AND used_at IS NULL
+      AND revoked_at IS NULL
+    `,
+    [reservationId]
+  );
+  return result.rows[0].count;
+}
+
+async function countActiveVerificationTokens(userId) {
+  const result = await pool.query(
+    `
+    SELECT COUNT(*)::int AS count
+    FROM email_verification_tokens
+    WHERE user_id = $1
+      AND used_at IS NULL
+      AND revoked_at IS NULL
+    `,
+    [userId]
+  );
+  return result.rows[0].count;
+}
+
+async function setOrderOwnerByReservationId(reservationId, userId) {
+  await pool.query(
+    `UPDATE orders SET user_id = $2, updated_at = NOW() WHERE reservation_id = $1`,
+    [reservationId, userId]
+  );
+}
+
+async function setReservationEmail(reservationId, email) {
+  await pool.query(
+    `UPDATE reservations SET email = $2, updated_at = NOW() WHERE id = $1`,
+    [reservationId, email]
+  );
+}
+
 async function expireClaimTokens(reservationId) {
   await pool.query(
     `UPDATE reservation_claim_tokens SET expires_at = NOW() - INTERVAL '1 hour'
@@ -849,6 +891,10 @@ module.exports = {
   getEmailVerifiedAt,
   getClaimTokenRow,
   countUsedClaimTokens,
+  countActiveClaimTokens,
+  countActiveVerificationTokens,
+  setOrderOwnerByReservationId,
+  setReservationEmail,
   expireClaimTokens,
   expireVerificationTokens,
   ageVerificationTokens,

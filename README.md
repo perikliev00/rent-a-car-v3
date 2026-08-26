@@ -205,7 +205,7 @@ Copy the example files and fill in your values:
 | `SESSION_SECRET` | Min 32 characters; used for session cookies |
 | `STRIPE_SECRET` | Stripe secret key (`sk_test_...` in dev, `sk_live_...` in prod) |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret (`whsec_...`) |
-| `FRONTEND_BASE_URL` | Required in production; defaults to `http://localhost:5173` in dev |
+| `FRONTEND_BASE_URL` | Required in production as an absolute HTTPS URL; defaults to `http://localhost:5173` in dev |
 
 ### Commonly configured
 
@@ -214,7 +214,7 @@ Copy the example files and fill in your values:
 | `NODE_ENV` | `development` | Environment |
 | `PORT` | `3000` | API port |
 | `CORS_ORIGINS` | dev defaults | Comma-separated allowed origins |
-| `EMAIL_ENABLED` | `false` | Enable SMTP email sending |
+| `EMAIL_ENABLED` | `false` | Enable SMTP. Required `true` in production together with full SMTP config |
 | `STORAGE_DRIVER` | `local` | `local` or `s3` for car images |
 
 ### Frontend
@@ -503,9 +503,9 @@ Production validation (in `backend/src/config/env.js`) enforces:
 
 - `SESSION_SECRET` strength (min 32 chars, no weak defaults)
 - Live Stripe key (`sk_live_...`)
-- `FRONTEND_BASE_URL` is set
+- `FRONTEND_BASE_URL` is an absolute HTTPS URL (security tokens are placed in email links)
+- `EMAIL_ENABLED=true` with complete SMTP (`SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`)
 - S3 vars when `STORAGE_DRIVER=s3`
-- Full SMTP config when `EMAIL_ENABLED=true`
 
 ### 3. Deploy steps
 

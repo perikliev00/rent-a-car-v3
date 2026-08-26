@@ -10,6 +10,7 @@ const REDACT_PATHS = [
   'req.body.address',
   'req.body.fullName',
   'email',
+  'to',
 ];
 
 describe('logger redaction', () => {
@@ -32,6 +33,7 @@ describe('logger redaction', () => {
 
     testLogger.info({
       email: 'user@example.com',
+      to: 'user@example.com',
       password: 'Secret123',
       req: {
         headers: {
@@ -49,6 +51,7 @@ describe('logger redaction', () => {
 
     const entry = logs[0];
     expect(entry.email).toBe('[Redacted]');
+    expect(entry.to).toBe('[Redacted]');
     expect(entry.password).toBe('[Redacted]');
     expect(entry.req.headers.cookie).toBe('[Redacted]');
     expect(entry.req.headers.authorization).toBe('[Redacted]');

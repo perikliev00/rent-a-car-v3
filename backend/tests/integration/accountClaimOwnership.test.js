@@ -431,20 +431,20 @@ describeIf('P0-01/AUTH-01: guest booking ownership requires a claim token', () =
         guest: { email: ownerAccount.email, fullName: 'Rightful Owner' },
       });
 
-      // The attacker verifies the *same* address on a second account is impossible, so the
-      // realistic attack is a stolen token plus a different verified account.
+      // Token is derived from the reservation email (owner), so a different verified
+      // account cannot satisfy the triple-email check — and ownership is never moved.
       const attackerEmail = uniqueEmail('transfer-attacker');
       const { agent } = await signupVerified(attackerEmail);
       const issued = await reservationClaimService.issueClaimToken({
         reservationId: seeded.reservationId,
-        bookingEmail: attackerEmail,
       });
 
       const res = await claim(agent, seeded.reservationId, issued.rawToken);
 
-      expect(res.status).toBe(409);
-      expect(res.body.error?.code || res.body.code).toBe('CLAIM_CONFLICT');
+      expect(res.status).toBe(400);
+      expect(res.body.error?.code || res.body.code).toBe('CLAIM_TOKEN_INVALID');
       expect(await getReservationOwner(seeded.reservationId)).toBe(ownerAccount.userId);
+      expect(await getOrderOwnerByReservationId(seeded.reservationId)).toBe(ownerAccount.userId);
     });
 
     test('a malformed token is rejected by validation', async () => {

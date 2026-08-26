@@ -51,7 +51,7 @@ async function sendMail({ to, subject, text, html }) {
 
   const transport = await createTransport();
   if (!transport) {
-    logger.info({ to, subject }, 'Email skipped (SMTP not configured)');
+    logger.info({ subject }, 'Email skipped (SMTP not configured)');
     return { sent: false, reason: 'smtp_not_configured' };
   }
 

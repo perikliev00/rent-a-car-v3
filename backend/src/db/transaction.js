@@ -23,6 +23,19 @@ const ADVISORY_LOCK_NS = Object.freeze({
  *
  * Never take a car lock after a reservation row lock on these paths.
  * Never take a session lock after car locks.
+ *
+ * Canonical lock order for security tokens (issue / resend / verify / claim):
+ * 1. User row (SELECT ... FOR UPDATE) when a user participates
+ * 2. Reservation row (SELECT ... FOR UPDATE) when a reservation participates
+ * 3. Linked order row (SELECT ... FOR UPDATE) if one exists
+ * 4. Token row (SELECT ... FOR UPDATE)
+ *
+ * Lookup-by-hash is non-locking only to discover ids. Then lock in this order
+ * and re-read the token FOR UPDATE. Token rotation serializes on the parent
+ * row (user for verification, reservation for claim) before revoke+insert.
+ *
+ * Never invert this order. Never take a hold-path car/session advisory lock
+ * after a security-token row lock on those paths.
  */
 
 function isUniqueViolation(err) {

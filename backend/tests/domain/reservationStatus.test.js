@@ -4,6 +4,8 @@ const {
   ACTIVE_HOLD_STATUSES,
   ADMIN_OPS_STATUSES,
   TRANSITIONS,
+  isOrderRequiredForClaim,
+  ORDER_OPTIONAL_FOR_CLAIM_STATUSES,
 } = require('../../src/domain/reservationStatus');
 
 describe('reservationStatus domain', () => {
@@ -39,5 +41,20 @@ describe('reservationStatus domain', () => {
 
   test('refunded is not an admin ops status', () => {
     expect(ADMIN_OPS_STATUSES).not.toContain('refunded');
+  });
+
+  test('paid and confirmed lifecycle statuses require an order during claim', () => {
+    expect(isOrderRequiredForClaim('paid')).toBe(true);
+    expect(isOrderRequiredForClaim('confirmed')).toBe(true);
+    expect(isOrderRequiredForClaim('manual_review')).toBe(true);
+    expect(isOrderRequiredForClaim('refunded')).toBe(true);
+  });
+
+  test('holds and pre-payment cancellations may have no order', () => {
+    expect(ORDER_OPTIONAL_FOR_CLAIM_STATUSES).toEqual(
+      expect.arrayContaining(['pending_payment', 'processing_payment', 'expired', 'cancelled', 'no_show'])
+    );
+    expect(isOrderRequiredForClaim('pending_payment')).toBe(false);
+    expect(isOrderRequiredForClaim('cancelled')).toBe(false);
   });
 });

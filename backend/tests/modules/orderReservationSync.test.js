@@ -16,6 +16,9 @@ jest.mock('../../src/services/admin/order/orderMapper', () => ({
     return order;
   }),
 }));
+jest.mock('../../src/services/account/reservationClaimService', () => ({
+  onBookingEmailChanged: jest.fn().mockResolvedValue({ sent: false }),
+}));
 
 const carRepository = require('../../src/repositories/carRepository');
 const orderSql = require('../../src/services/sql/orderSqlService');

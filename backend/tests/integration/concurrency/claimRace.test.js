@@ -8,12 +8,11 @@ const {
   getReservationOwner,
   getOrderOwnerByReservationId,
   countUsedClaimTokens,
+  countActiveClaimTokens,
   cleanupTestCar,
   CUSTOMER_PASSWORD,
 } = require('../helpers/dbFixtures');
 const reservationClaimService = require('../../../src/services/account/reservationClaimService');
-const claimTokenSql = require('../../../src/services/sql/reservationClaimTokenSqlService');
-const { generateRawToken, hashToken } = require('../../../src/services/auth/tokenUtils');
 const loginAttemptService = require('../../../src/services/auth/loginAttemptService');
 
 const runIntegration = process.env.RUN_INTEGRATION_TESTS === '1' && process.env.DATABASE_URL;
@@ -65,7 +64,7 @@ describeIf('Concurrency integration: claimRace', () => {
     });
   }
 
-  test('two accounts racing distinct tokens leave exactly one owner', async () => {
+  test('a wrong-email account can never win a claim race', async () => {
     const emailA = uniqueEmail('race-a');
     const emailB = uniqueEmail('race-b');
 
@@ -80,40 +79,21 @@ describeIf('Concurrency integration: claimRace', () => {
       guest: { email: emailA, fullName: 'Race Guest' },
     });
 
-    // Issuing through the service would revoke the first token, so both are inserted
-    // directly: the point of this test is the reservation-level race, with every other
-    // check already satisfied for both callers.
-    const rawA = generateRawToken();
-    const rawB = generateRawToken();
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-    await claimTokenSql.insertToken({
+    const issued = await reservationClaimService.issueClaimToken({
       reservationId: seeded.reservationId,
-      tokenHash: hashToken(rawA),
-      bookingEmail: emailA,
-      expiresAt,
-    });
-    await claimTokenSql.insertToken({
-      reservationId: seeded.reservationId,
-      tokenHash: hashToken(rawB),
-      bookingEmail: emailB,
-      expiresAt,
     });
 
     const [resA, resB] = await Promise.all([
-      postClaim(a.agent, seeded.reservationId, rawA),
-      postClaim(b.agent, seeded.reservationId, rawB),
+      postClaim(a.agent, seeded.reservationId, issued.rawToken),
+      postClaim(b.agent, seeded.reservationId, issued.rawToken),
     ]);
 
-    const statuses = [resA.status, resB.status].sort();
-    expect(statuses).toEqual([200, 409]);
+    expect(resA.status).toBe(200);
+    expect(resB.status).toBe(400);
+    expect(resB.body.error.code).toBe('CLAIM_TOKEN_INVALID');
 
-    const winnerIsA = resA.status === 200;
-    const loser = winnerIsA ? resB : resA;
-    expect(loser.body.error.code).toBe('CLAIM_CONFLICT');
-
-    const owner = await getReservationOwner(seeded.reservationId);
-    expect(owner).toBe(winnerIsA ? a.userId : b.userId);
-    expect(await getOrderOwnerByReservationId(seeded.reservationId)).toBe(owner);
+    expect(await getReservationOwner(seeded.reservationId)).toBe(a.userId);
+    expect(await getOrderOwnerByReservationId(seeded.reservationId)).toBe(a.userId);
     expect(await countUsedClaimTokens(seeded.reservationId)).toBe(1);
   });
 
@@ -131,11 +111,8 @@ describeIf('Concurrency integration: claimRace', () => {
 
     const issued = await reservationClaimService.issueClaimToken({
       reservationId: seeded.reservationId,
-      bookingEmail: email,
     });
 
-    // Two independent sessions for the same account, so both requests are legitimate and
-    // the serialization has to come from the token lock rather than from the session.
     const first = await createSessionAgent(app);
     const firstLogin = await withCsrf(first, first.post('/api/auth/login'))
       .send({ email, password: CUSTOMER_PASSWORD })
@@ -153,10 +130,28 @@ describeIf('Concurrency integration: claimRace', () => {
       postClaim(second, seeded.reservationId, issued.rawToken),
     ]);
 
-    // Both are the rightful owner, so both succeed; the token is still burned only once.
     expect(results.map((r) => r.status)).toEqual([200, 200]);
     expect(await getReservationOwner(seeded.reservationId)).toBe(userId);
     expect(await getOrderOwnerByReservationId(seeded.reservationId)).toBe(userId);
     expect(await countUsedClaimTokens(seeded.reservationId)).toBe(1);
+  });
+
+  test('parallel claim-token issuance leaves exactly one active token', async () => {
+    const email = uniqueEmail('race-issue');
+    const seeded = await insertLinkedBooking({
+      carId,
+      status: 'confirmed',
+      pickupDate: '2033-03-01',
+      returnDate: '2033-03-04',
+      guest: { email, fullName: 'Race Issue' },
+    });
+
+    await Promise.all([
+      reservationClaimService.issueClaimToken({ reservationId: seeded.reservationId }),
+      reservationClaimService.issueClaimToken({ reservationId: seeded.reservationId }),
+      reservationClaimService.issueClaimToken({ reservationId: seeded.reservationId }),
+    ]);
+
+    expect(await countActiveClaimTokens(seeded.reservationId)).toBe(1);
   });
 });

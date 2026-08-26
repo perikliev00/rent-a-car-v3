@@ -91,6 +91,27 @@ function isOpsLifecycleStatus(status) {
   ].includes(status);
 }
 
+/**
+ * Statuses that may legitimately have no order (holds, abandoned holds, or
+ * cancelled before payment). A claim for these skips the order write when
+ * no order row exists.
+ */
+const ORDER_OPTIONAL_FOR_CLAIM_STATUSES = Object.freeze([
+  'pending_payment',
+  'processing_payment',
+  'expired',
+  'cancelled',
+  'no_show',
+]);
+
+/**
+ * Paid / confirmed lifecycle records are expected to have an order. Missing
+ * that row during a claim is an integrity error, not a successful no-op.
+ */
+function isOrderRequiredForClaim(status) {
+  return !ORDER_OPTIONAL_FOR_CLAIM_STATUSES.includes(status);
+}
+
 function canTransition(fromStatus, toStatus) {
   if (fromStatus == null) {
     return toStatus === 'pending_payment' || toStatus === 'confirmed';
@@ -128,10 +149,12 @@ module.exports = {
   TERMINAL_STATUSES,
   TRANSITIONS,
   ADMIN_OPS_STATUSES,
+  ORDER_OPTIONAL_FOR_CLAIM_STATUSES,
   isValidStatus,
   isHoldStatus,
   isTerminal,
   isOpsLifecycleStatus,
+  isOrderRequiredForClaim,
   canTransition,
   assertTransition,
 };

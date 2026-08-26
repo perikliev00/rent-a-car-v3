@@ -18,48 +18,60 @@ const OUTCOMES = Object.freeze({
   REVOKED: 'revoked',
 });
 
+function normalizeEmail(email) {
+  return String(email || '').trim().toLowerCase();
+}
+
+function emailHashFor(email) {
+  return hashToken(normalizeEmail(email));
+}
+
 function expiryFromNow(now = Date.now()) {
   return new Date(now + TOKEN_TTL_MS);
 }
 
+function verificationIntegrityError(message) {
+  const err = new Error(message);
+  err.code = 'VERIFICATION_INTEGRITY_ERROR';
+  err.status = 500;
+  return err;
+}
+
+async function persistVerificationToken(user, { tokenHash, expiresAt }, dbClient) {
+  const dbUser = await userSql.lockUserByIdForUpdate(user.id, dbClient);
+  if (!dbUser) {
+    throw verificationIntegrityError('Verification token issue: user row missing');
+  }
+
+  const emailHash = emailHashFor(dbUser.email);
+  await tokenSql.revokeActiveForUser(dbUser.id, dbClient);
+  return tokenSql.insertToken(
+    { userId: dbUser.id, tokenHash, emailHash, expiresAt },
+    dbClient
+  );
+}
+
 /**
- * Issues a fresh verification token, revoking any outstanding one first so a resend
- * invalidates the previous link. Returns the raw token for mailing only — it is never
- * stored, logged, or returned to an API client.
+ * Issues a fresh verification token bound to the current DB email hash, revoking any
+ * outstanding one first. Returns the raw token for mailing only — it is never stored,
+ * logged, or returned to an API client.
+ *
+ * Caller must already hold the user row lock when passing a client, or this takes it.
  */
 async function issueToken(user, client = null) {
   const rawToken = generateRawToken();
   const tokenHash = hashToken(rawToken);
   const expiresAt = expiryFromNow();
 
-  const persist = async (dbClient) => {
-    await tokenSql.revokeActiveForUser(user.id, dbClient);
-    return tokenSql.insertToken(
-      { userId: user.id, tokenHash, expiresAt },
-      dbClient
-    );
-  };
+  const persist = async (dbClient) =>
+    persistVerificationToken(user, { tokenHash, expiresAt }, dbClient);
 
   const record = client ? await persist(client) : await runWithTransaction(persist);
 
   return { rawToken, expiresAt, tokenId: record?.id || null };
 }
 
-/**
- * Issues a token and mails it. Mail failures are swallowed by securityEmailService so a
- * transport problem never blocks or falsifies verification state.
- */
-async function issueAndSendVerification(user, { resend = false } = {}) {
-  if (!user?.id || !user?.email) {
-    return { sent: false, reason: 'missing_user' };
-  }
-
-  if (user.emailVerified) {
-    return { sent: false, reason: 'already_verified' };
-  }
-
-  const { rawToken, expiresAt } = await issueToken(user);
-
+async function deliverVerificationEmail(user, { rawToken, expiresAt, resend }) {
   const delivery = await securityEmail.sendEmailVerificationEmail({
     to: user.email,
     rawToken,
@@ -73,12 +85,67 @@ async function issueAndSendVerification(user, { resend = false } = {}) {
     delivered: Boolean(delivery?.sent),
   });
 
+  return delivery;
+}
+
+/**
+ * Issues a token and mails it. A known resend/rotation delivery failure does not
+ * revoke the last usable link.
+ */
+async function issueAndSendVerification(user, { resend = false } = {}) {
+  if (!user?.id || !user?.email) {
+    return { sent: false, reason: 'missing_user' };
+  }
+
+  if (user.emailVerified) {
+    return { sent: false, reason: 'already_verified' };
+  }
+
+  const active = await tokenSql.findActiveForUser(user.id);
+  const rotating = resend || Boolean(active);
+
+  const rawToken = generateRawToken();
+  const tokenHash = hashToken(rawToken);
+  const expiresAt = expiryFromNow();
+
+  if (rotating) {
+    const delivery = await deliverVerificationEmail(user, {
+      rawToken,
+      expiresAt,
+      resend: true,
+    });
+    if (!delivery?.sent) {
+      return { sent: false, expiresAt };
+    }
+
+    await runWithTransaction(async (dbClient) =>
+      persistVerificationToken(user, { tokenHash, expiresAt }, dbClient)
+    );
+    return { sent: true, expiresAt };
+  }
+
+  await runWithTransaction(async (dbClient) =>
+    persistVerificationToken(user, { tokenHash, expiresAt }, dbClient)
+  );
+
+  const delivery = await deliverVerificationEmail(user, {
+    rawToken,
+    expiresAt,
+    resend: false,
+  });
+
   return { sent: Boolean(delivery?.sent), expiresAt };
+}
+
+function tokenEmailMatchesUser(token, user) {
+  const expected = emailHashFor(user.email);
+  return Boolean(token.emailHash) && token.emailHash === expected;
 }
 
 /**
  * Consumes a verification token. Idempotent for the legitimate owner: replaying a link
- * for an account that is already verified reports success rather than an error.
+ * for an account that is already verified reports success rather than an error — but
+ * only when the token is still bound to the current email.
  */
 async function verifyToken(rawToken) {
   if (!isPlausibleRawToken(rawToken)) {
@@ -88,18 +155,26 @@ async function verifyToken(rawToken) {
   const tokenHash = hashToken(rawToken);
 
   return runWithTransaction(async (client) => {
+    const tokenPeek = await tokenSql.findByTokenHash(tokenHash, client);
+    if (!tokenPeek) {
+      return { outcome: OUTCOMES.INVALID };
+    }
+
+    const user = await userSql.lockUserByIdForUpdate(tokenPeek.userId, client);
+    if (!user) {
+      return { outcome: OUTCOMES.INVALID };
+    }
+
     const token = await tokenSql.findByTokenHashForUpdate(tokenHash, client);
     if (!token) {
       return { outcome: OUTCOMES.INVALID };
     }
 
-    const user = await userSql.findUserById(token.userId, client);
-    if (!user) {
+    if (!tokenEmailMatchesUser(token, user)) {
       return { outcome: OUTCOMES.INVALID };
     }
 
     if (token.usedAt) {
-      // A replayed link on an already-verified account is a no-op success, not a leak.
       return user.emailVerified
         ? { outcome: OUTCOMES.ALREADY_VERIFIED, user }
         : { outcome: OUTCOMES.USED };
@@ -117,7 +192,13 @@ async function verifyToken(rawToken) {
         : { outcome: OUTCOMES.EXPIRED };
     }
 
-    await tokenSql.markUsed(token.id, client);
+    const usedRows = await tokenSql.markUsed(token.id, client);
+    if (usedRows !== 1) {
+      throw verificationIntegrityError(
+        'Verification refused: token consumption matched unexpected row count'
+      );
+    }
+
     const verifiedUser = await userSql.markEmailVerified(token.userId, client);
 
     logEvent.info('auth.email_verification.completed', { userId: token.userId });
@@ -149,7 +230,10 @@ async function resendVerification(user) {
   }
 
   try {
-    await issueAndSendVerification(user, { resend: true });
+    const delivery = await issueAndSendVerification(user, { resend: true });
+    if (!delivery?.sent) {
+      return { status: 'error' };
+    }
   } catch (err) {
     logger.warn({ err, userId: user.id }, 'Failed to resend verification email');
     return { status: 'error' };

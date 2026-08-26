@@ -26,6 +26,11 @@ function productionEnv(overrides = {}) {
     STRIPE_WEBHOOK_SECRET: 'whsec_live_secret',
     FRONTEND_BASE_URL: 'https://app.example.com',
     CORS_ORIGINS: 'https://app.example.com',
+    EMAIL_ENABLED: 'true',
+    SMTP_HOST: 'smtp.example.com',
+    SMTP_USER: 'smtp-user',
+    SMTP_PASS: 'smtp-pass',
+    MAIL_FROM: 'noreply@example.com',
     ...overrides,
   });
 }
@@ -146,5 +151,38 @@ describe('validateEnv', () => {
     const { validateEnv } = loadEnvModule();
 
     expect(() => validateEnv()).not.toThrow();
+  });
+
+  test('requires EMAIL_ENABLED=true and SMTP in production', () => {
+    process.env = productionEnv();
+    delete process.env.EMAIL_ENABLED;
+    delete process.env.SMTP_HOST;
+    delete process.env.SMTP_USER;
+    delete process.env.SMTP_PASS;
+    delete process.env.MAIL_FROM;
+    const { validateEnv } = loadEnvModule();
+
+    expect(() => validateEnv()).toThrow(/EMAIL_ENABLED=true/);
+  });
+
+  test('rejects EMAIL_ENABLED=false in production', () => {
+    process.env = productionEnv({ EMAIL_ENABLED: 'false' });
+    const { validateEnv } = loadEnvModule();
+
+    expect(() => validateEnv()).toThrow(/EMAIL_ENABLED=true/);
+  });
+
+  test('rejects a non-HTTPS FRONTEND_BASE_URL in production', () => {
+    process.env = productionEnv({ FRONTEND_BASE_URL: 'http://app.example.com' });
+    const { validateEnv } = loadEnvModule();
+
+    expect(() => validateEnv()).toThrow('FRONTEND_BASE_URL must be an absolute HTTPS URL');
+  });
+
+  test('rejects a relative FRONTEND_BASE_URL in production', () => {
+    process.env = productionEnv({ FRONTEND_BASE_URL: '/app' });
+    const { validateEnv } = loadEnvModule();
+
+    expect(() => validateEnv()).toThrow('FRONTEND_BASE_URL must be an absolute HTTPS URL');
   });
 });

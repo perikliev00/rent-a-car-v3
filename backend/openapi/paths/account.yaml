@@ -5,14 +5,16 @@
     description: >
       The only path by which a reservation and its order change owner after booking.
 
-      Requires an authenticated session whose account email is confirmed and equal to the
-      normalized booking email, plus the single-use claim token that was mailed to that
-      address. The token is bound to this one reservation and cannot be replayed against
-      another. Only the SHA-256 hash of the token is stored server-side.
+      Requires an authenticated session whose account email is confirmed. Authorization
+      uses the current database user (not stale session email/verification flags). The
+      claim token, the current reservation email, and the account email must all match
+      after normalization. The token is bound to this one reservation; a token issued
+      before an admin changed the booking email cannot claim the new address.
 
-      The reservation and its linked order are assigned atomically in one transaction.
-      Repeating the request as the rightful owner succeeds with `alreadyOwned: true`;
-      a booking owned by a different account is refused and never transferred.
+      Only the SHA-256 hash of the token is stored server-side. The reservation and its
+      linked order are assigned atomically in one transaction. Repeating the request as
+      the rightful owner succeeds with `alreadyOwned: true`; a booking or order owned by
+      a different account is refused and never transferred.
     security:
       - cookieAuth: []
         csrfHeader: []
@@ -101,8 +103,9 @@
     summary: Request a claim link for a legacy guest booking
     description: >
       Recovery path for guest bookings made before claim tokens existed. Requires a
-      confirmed account email. A claim token is only ever mailed to the email stored on the
-      booking itself, never to the requester.
+      confirmed account email. `bookingEmail` is a match check against the caller's
+      verified address only — the claim service always loads the authoritative address
+      from the reservation row and mails the token there.
 
       The response is intentionally uniform whether or not anything was sent, so this
       endpoint cannot be used to discover which reservation ids or email addresses exist.

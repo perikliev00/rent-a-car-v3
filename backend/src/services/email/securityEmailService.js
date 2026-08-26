@@ -11,6 +11,7 @@ const { sendMail } = require('./emailService');
 const { config } = require('../../config/env');
 const logger = require('../../utils/logger');
 const logEvent = require('../../monitoring/logEvent');
+const metrics = require('../../monitoring/metrics');
 const testOutbox = require('./testOutbox');
 
 function frontendBase() {
@@ -32,17 +33,22 @@ function buildClaimUrl(reservationId, rawToken) {
 async function deliver({ to, subject, text, html, kind, context }) {
   testOutbox.record({ to, subject, text, html, kind });
 
+  if (process.env.NODE_ENV === 'test') {
+    return { sent: true, reason: 'test_outbox' };
+  }
+
   try {
     const result = await sendMail({ to, subject, text, html });
     if (!result.sent) {
       logEvent.warn('security.email.not_sent', { kind, reason: result.reason, ...context });
+      metrics.incrementSecurityEmailFailures(kind);
     }
     return result;
   } catch (err) {
-    // Never rethrow: the security state change has already been committed and must not
-    // be rolled back by a mail transport problem.
+    // Never rethrow: a mail transport problem must not roll back committed security state.
     logger.warn({ err, kind, ...context }, 'Security email delivery failed');
     logEvent.warn('security.email.failed', { kind, ...context });
+    metrics.incrementSecurityEmailFailures(kind);
     return { sent: false, reason: 'delivery_error' };
   }
 }

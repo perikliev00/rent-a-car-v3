@@ -209,6 +209,31 @@ async function findOrderByReservationId(reservationId, client = null) {
   return mapSqlOrder(result.rows[0]) || null;
 }
 
+/**
+ * Locks the non-deleted order for a reservation, if one exists.
+ * Taken after the reservation row on claim (see transaction.js lock order).
+ */
+async function lockByReservationIdForUpdate(reservationId, client) {
+  const normalizedReservationId = normalizeId(reservationId);
+  if (!normalizedReservationId || !client) {
+    return null;
+  }
+
+  const result = await clientQuery(
+    client,
+    `
+    SELECT ${ORDER_SELECT}
+    FROM orders o
+    WHERE o.reservation_id = $1
+      AND o.is_deleted = FALSE
+    FOR UPDATE
+    `,
+    [normalizedReservationId]
+  );
+
+  return mapSqlOrder(result.rows[0]) || null;
+}
+
 async function findOrderByStripeSessionId(stripeSessionId, client = null) {
   if (!stripeSessionId) {
     return null;
@@ -548,6 +573,7 @@ module.exports = {
   findOrderById,
   findOrderByIdPopulated,
   findOrderByReservationId,
+  lockByReservationIdForUpdate,
   findOrderByStripeSessionId,
   listOrders,
   createOrderFromReservation,

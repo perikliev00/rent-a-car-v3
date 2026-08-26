@@ -129,10 +129,12 @@
     summary: Confirm an email address with a verification token
     description: >
       Consumes a single-use verification token that was mailed to the account address.
-      Only the SHA-256 hash of the token is stored server-side. Idempotent: replaying a
-      link for an already-confirmed account succeeds. Invalid, used and revoked tokens all
-      return the same `VERIFICATION_TOKEN_INVALID` response so token existence cannot be
-      probed. Subject to rate limiting.
+      The token is bound to a hash of the normalized email present at issuance; it cannot
+      confirm a different address after an email change. Only the SHA-256 hash of the
+      token is stored server-side. Idempotent: replaying a link for an already-confirmed
+      account succeeds when the token still matches the current email. Invalid, used,
+      revoked and email-mismatch tokens all return the same `VERIFICATION_TOKEN_INVALID`
+      response so token existence cannot be probed. Subject to rate limiting.
     security: []
     requestBody:
       required: true

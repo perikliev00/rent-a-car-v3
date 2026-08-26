@@ -10,6 +10,7 @@ jest.mock('../../../src/services/sql/reservationClaimTokenSqlService', () => ({
   findByTokenHashForUpdate: jest.fn(),
   markUsed: jest.fn().mockResolvedValue(1),
   findLatestForReservation: jest.fn(),
+  findActiveForReservation: jest.fn().mockResolvedValue(null),
 }));
 
 jest.mock('../../../src/services/sql/reservationSqlService', () => ({
@@ -20,6 +21,12 @@ jest.mock('../../../src/services/sql/reservationSqlService', () => ({
 
 jest.mock('../../../src/services/sql/orderSqlService', () => ({
   assignOwnerByReservationIdIfUnclaimed: jest.fn().mockResolvedValue(1),
+  lockByReservationIdForUpdate: jest.fn(),
+}));
+
+jest.mock('../../../src/services/sql/userSqlService', () => ({
+  findUserById: jest.fn(),
+  lockUserByIdForUpdate: jest.fn(),
 }));
 
 jest.mock('../../../src/services/sql/adminAuditSqlService', () => ({
@@ -34,6 +41,7 @@ jest.mock('../../../src/services/email/securityEmailService', () => ({
 const claimTokenSql = require('../../../src/services/sql/reservationClaimTokenSqlService');
 const reservationSql = require('../../../src/services/sql/reservationSqlService');
 const orderSql = require('../../../src/services/sql/orderSqlService');
+const userSql = require('../../../src/services/sql/userSqlService');
 const auditSql = require('../../../src/services/sql/adminAuditSqlService');
 const securityEmail = require('../../../src/services/email/securityEmailService');
 const { hashToken } = require('../../../src/services/auth/tokenUtils');
@@ -66,17 +74,36 @@ function unownedReservation(overrides = {}) {
   return { id: '10', userId: null, email: 'guest@example.com', status: 'confirmed', ...overrides };
 }
 
+function unownedOrder(overrides = {}) {
+  return { id: '20', userId: null, reservationId: '10', ...overrides };
+}
+
+function mockSuccessfulClaimLookups({
+  token = activeToken(),
+  reservation = unownedReservation(),
+  order = unownedOrder(),
+  dbUser = verifiedUser,
+} = {}) {
+  claimTokenSql.findByTokenHash.mockResolvedValue(token);
+  claimTokenSql.findByTokenHashForUpdate.mockResolvedValue(token);
+  userSql.lockUserByIdForUpdate.mockResolvedValue(dbUser);
+  reservationSql.lockOwnershipForClaim.mockResolvedValue(reservation);
+  orderSql.lockByReservationIdForUpdate.mockResolvedValue(order);
+}
+
 describe('reservationClaimService.issueClaimToken', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     claimTokenSql.insertToken.mockResolvedValue({ id: '1' });
+    reservationSql.lockOwnershipForClaim.mockResolvedValue(unownedReservation());
   });
 
-  test('stores only the hash and binds the token to one reservation and email', async () => {
-    const issued = await service.issueClaimToken({
-      reservationId: '10',
-      bookingEmail: 'Guest@Example.com',
-    });
+  test('stores only the hash and binds the token to the reservation email from the database', async () => {
+    reservationSql.lockOwnershipForClaim.mockResolvedValue(
+      unownedReservation({ email: 'Guest@Example.com' })
+    );
+
+    const issued = await service.issueClaimToken({ reservationId: '10' });
 
     const [payload] = claimTokenSql.insertToken.mock.calls[0];
     expect(payload.tokenHash).toBe(hashToken(issued.rawToken));
@@ -84,14 +111,29 @@ describe('reservationClaimService.issueClaimToken', () => {
     expect(payload.reservationId).toBe('10');
     expect(payload.bookingEmail).toBe('guest@example.com');
     expect(JSON.stringify(payload)).not.toContain(issued.rawToken);
+    expect(issued.bookingEmail).toBe('guest@example.com');
   });
 
-  test('revokes any outstanding token for that reservation first', async () => {
-    await service.issueClaimToken({ reservationId: '10', bookingEmail: 'guest@example.com' });
+  test('ignores a caller-supplied bookingEmail', async () => {
+    await service.issueClaimToken({
+      reservationId: '10',
+      bookingEmail: 'attacker@example.com',
+    });
 
+    const [payload] = claimTokenSql.insertToken.mock.calls[0];
+    expect(payload.bookingEmail).toBe('guest@example.com');
+  });
+
+  test('locks the reservation then revokes any outstanding token before insert', async () => {
+    await service.issueClaimToken({ reservationId: '10' });
+
+    expect(reservationSql.lockOwnershipForClaim).toHaveBeenCalledWith(10, 'mock-client');
     expect(claimTokenSql.revokeActiveForReservation).toHaveBeenCalledWith('10', 'mock-client');
     expect(
-      claimTokenSql.revokeActiveForReservation.mock.invocationCallOrder[0],
+      reservationSql.lockOwnershipForClaim.mock.invocationCallOrder[0]
+    ).toBeLessThan(claimTokenSql.revokeActiveForReservation.mock.invocationCallOrder[0]);
+    expect(
+      claimTokenSql.revokeActiveForReservation.mock.invocationCallOrder[0]
     ).toBeLessThan(claimTokenSql.insertToken.mock.invocationCallOrder[0]);
   });
 });
@@ -105,8 +147,7 @@ describe('reservationClaimService.claimReservation', () => {
   });
 
   test('links the reservation and its order in one transaction', async () => {
-    claimTokenSql.findByTokenHashForUpdate.mockResolvedValue(activeToken());
-    reservationSql.lockOwnershipForClaim.mockResolvedValue(unownedReservation());
+    mockSuccessfulClaimLookups();
 
     const result = await service.claimReservation({
       user: verifiedUser,
@@ -119,14 +160,13 @@ describe('reservationClaimService.claimReservation', () => {
     expect(orderSql.assignOwnerByReservationIdIfUnclaimed).toHaveBeenCalledWith(
       10,
       7,
-      'mock-client',
+      'mock-client'
     );
     expect(claimTokenSql.markUsed).toHaveBeenCalledWith('1', 7, 'mock-client');
   });
 
-  test('locks the token before the reservation', async () => {
-    claimTokenSql.findByTokenHashForUpdate.mockResolvedValue(activeToken());
-    reservationSql.lockOwnershipForClaim.mockResolvedValue(unownedReservation());
+  test('locks user, reservation, order, then token', async () => {
+    mockSuccessfulClaimLookups();
 
     await service.claimReservation({
       user: verifiedUser,
@@ -134,13 +174,22 @@ describe('reservationClaimService.claimReservation', () => {
       rawToken: RAW_TOKEN,
     });
 
-    expect(claimTokenSql.findByTokenHashForUpdate.mock.invocationCallOrder[0]).toBeLessThan(
-      reservationSql.lockOwnershipForClaim.mock.invocationCallOrder[0],
+    expect(claimTokenSql.findByTokenHash.mock.invocationCallOrder[0]).toBeLessThan(
+      userSql.lockUserByIdForUpdate.mock.invocationCallOrder[0]
+    );
+    expect(userSql.lockUserByIdForUpdate.mock.invocationCallOrder[0]).toBeLessThan(
+      reservationSql.lockOwnershipForClaim.mock.invocationCallOrder[0]
+    );
+    expect(reservationSql.lockOwnershipForClaim.mock.invocationCallOrder[0]).toBeLessThan(
+      orderSql.lockByReservationIdForUpdate.mock.invocationCallOrder[0]
+    );
+    expect(orderSql.lockByReservationIdForUpdate.mock.invocationCallOrder[0]).toBeLessThan(
+      claimTokenSql.findByTokenHashForUpdate.mock.invocationCallOrder[0]
     );
   });
 
   test('looks the token up by hash, never by raw value', async () => {
-    claimTokenSql.findByTokenHashForUpdate.mockResolvedValue(null);
+    claimTokenSql.findByTokenHash.mockResolvedValue(null);
 
     await service.claimReservation({
       user: verifiedUser,
@@ -148,21 +197,38 @@ describe('reservationClaimService.claimReservation', () => {
       rawToken: RAW_TOKEN,
     });
 
-    expect(claimTokenSql.findByTokenHashForUpdate).toHaveBeenCalledWith(
+    expect(claimTokenSql.findByTokenHash).toHaveBeenCalledWith(
       hashToken(RAW_TOKEN),
-      'mock-client',
+      'mock-client'
     );
+    expect(claimTokenSql.findByTokenHash).not.toHaveBeenCalledWith(RAW_TOKEN, expect.anything());
   });
 
-  test('refuses an unverified account without touching ownership', async () => {
+  test('authorizes from the locked DB user, not session emailVerified', async () => {
+    mockSuccessfulClaimLookups();
+
     const result = await service.claimReservation({
-      user: { ...verifiedUser, emailVerified: false },
+      user: { ...verifiedUser, emailVerified: false, email: 'stale@example.com' },
+      reservationId: '10',
+      rawToken: RAW_TOKEN,
+    });
+
+    expect(result.outcome).toBe(OUTCOMES.CLAIMED);
+    expect(userSql.lockUserByIdForUpdate).toHaveBeenCalledWith(7, 'mock-client');
+  });
+
+  test('refuses an unverified DB account without touching ownership', async () => {
+    mockSuccessfulClaimLookups({
+      dbUser: { ...verifiedUser, emailVerified: false },
+    });
+
+    const result = await service.claimReservation({
+      user: verifiedUser,
       reservationId: '10',
       rawToken: RAW_TOKEN,
     });
 
     expect(result.outcome).toBe(OUTCOMES.EMAIL_MISMATCH);
-    expect(claimTokenSql.findByTokenHashForUpdate).not.toHaveBeenCalled();
     expect(reservationSql.assignOwnerIfUnclaimed).not.toHaveBeenCalled();
   });
 
@@ -174,14 +240,28 @@ describe('reservationClaimService.claimReservation', () => {
     });
 
     expect(result.outcome).toBe(OUTCOMES.INVALID_TOKEN);
-    expect(claimTokenSql.findByTokenHashForUpdate).not.toHaveBeenCalled();
+    expect(claimTokenSql.findByTokenHash).not.toHaveBeenCalled();
   });
 
   test('refuses a token issued for a different email', async () => {
-    claimTokenSql.findByTokenHashForUpdate.mockResolvedValue(
-      activeToken({ bookingEmail: 'someone.else@example.com' }),
-    );
-    reservationSql.lockOwnershipForClaim.mockResolvedValue(unownedReservation());
+    mockSuccessfulClaimLookups({
+      token: activeToken({ bookingEmail: 'someone.else@example.com' }),
+    });
+
+    const result = await service.claimReservation({
+      user: verifiedUser,
+      reservationId: '10',
+      rawToken: RAW_TOKEN,
+    });
+
+    expect(result.outcome).toBe(OUTCOMES.EMAIL_MISMATCH);
+    expect(reservationSql.assignOwnerIfUnclaimed).not.toHaveBeenCalled();
+  });
+
+  test('refuses when the reservation email no longer matches the token', async () => {
+    mockSuccessfulClaimLookups({
+      reservation: unownedReservation({ email: 'new-owner@example.com' }),
+    });
 
     const result = await service.claimReservation({
       user: verifiedUser,
@@ -194,13 +274,14 @@ describe('reservationClaimService.claimReservation', () => {
   });
 
   test('normalizes email comparison case-insensitively', async () => {
-    claimTokenSql.findByTokenHashForUpdate.mockResolvedValue(
-      activeToken({ bookingEmail: 'Guest@Example.COM' }),
-    );
-    reservationSql.lockOwnershipForClaim.mockResolvedValue(unownedReservation());
+    mockSuccessfulClaimLookups({
+      token: activeToken({ bookingEmail: 'Guest@Example.COM' }),
+      dbUser: { ...verifiedUser, email: 'GUEST@example.com' },
+      reservation: unownedReservation({ email: ' guest@EXAMPLE.com ' }),
+    });
 
     const result = await service.claimReservation({
-      user: { ...verifiedUser, email: 'GUEST@example.com' },
+      user: { ...verifiedUser, email: 'stale-session@example.com' },
       reservationId: '10',
       rawToken: RAW_TOKEN,
     });
@@ -209,9 +290,7 @@ describe('reservationClaimService.claimReservation', () => {
   });
 
   test('refuses a token issued for a different reservation', async () => {
-    claimTokenSql.findByTokenHashForUpdate.mockResolvedValue(
-      activeToken({ reservationId: '99' }),
-    );
+    claimTokenSql.findByTokenHash.mockResolvedValue(activeToken({ reservationId: '99' }));
 
     const result = await service.claimReservation({
       user: verifiedUser,
@@ -220,14 +299,15 @@ describe('reservationClaimService.claimReservation', () => {
     });
 
     expect(result.outcome).toBe(OUTCOMES.INVALID_TOKEN);
+    expect(userSql.lockUserByIdForUpdate).not.toHaveBeenCalled();
     expect(reservationSql.lockOwnershipForClaim).not.toHaveBeenCalled();
     expect(reservationSql.assignOwnerIfUnclaimed).not.toHaveBeenCalled();
   });
 
   test('refuses an expired token', async () => {
-    claimTokenSql.findByTokenHashForUpdate.mockResolvedValue(
-      activeToken({ expiresAt: new Date(Date.now() - 1000) }),
-    );
+    mockSuccessfulClaimLookups({
+      token: activeToken({ expiresAt: new Date(Date.now() - 1000) }),
+    });
 
     const result = await service.claimReservation({
       user: verifiedUser,
@@ -240,9 +320,9 @@ describe('reservationClaimService.claimReservation', () => {
   });
 
   test('refuses a revoked token', async () => {
-    claimTokenSql.findByTokenHashForUpdate.mockResolvedValue(
-      activeToken({ revokedAt: new Date() }),
-    );
+    mockSuccessfulClaimLookups({
+      token: activeToken({ revokedAt: new Date() }),
+    });
 
     const result = await service.claimReservation({
       user: verifiedUser,
@@ -254,11 +334,10 @@ describe('reservationClaimService.claimReservation', () => {
     expect(reservationSql.assignOwnerIfUnclaimed).not.toHaveBeenCalled();
   });
 
-  test('refuses a used token in a second account\u2019s hands', async () => {
-    claimTokenSql.findByTokenHashForUpdate.mockResolvedValue(
-      activeToken({ usedAt: new Date(), usedByUserId: '99' }),
-    );
-    reservationSql.lockOwnershipForClaim.mockResolvedValue(unownedReservation());
+  test('refuses a used token in a second account’s hands', async () => {
+    mockSuccessfulClaimLookups({
+      token: activeToken({ usedAt: new Date(), usedByUserId: '99' }),
+    });
 
     const result = await service.claimReservation({
       user: verifiedUser,
@@ -271,10 +350,25 @@ describe('reservationClaimService.claimReservation', () => {
   });
 
   test('never transfers a reservation already owned by someone else', async () => {
-    claimTokenSql.findByTokenHashForUpdate.mockResolvedValue(activeToken());
-    reservationSql.lockOwnershipForClaim.mockResolvedValue(
-      unownedReservation({ userId: '99' }),
-    );
+    mockSuccessfulClaimLookups({
+      reservation: unownedReservation({ userId: '99' }),
+    });
+
+    const result = await service.claimReservation({
+      user: verifiedUser,
+      reservationId: '10',
+      rawToken: RAW_TOKEN,
+    });
+
+    expect(result.outcome).toBe(OUTCOMES.CONFLICT);
+    expect(reservationSql.assignOwnerIfUnclaimed).not.toHaveBeenCalled();
+    expect(orderSql.assignOwnerByReservationIdIfUnclaimed).not.toHaveBeenCalled();
+  });
+
+  test('never transfers an order already owned by someone else', async () => {
+    mockSuccessfulClaimLookups({
+      order: unownedOrder({ userId: '99' }),
+    });
 
     const result = await service.claimReservation({
       user: verifiedUser,
@@ -288,12 +382,11 @@ describe('reservationClaimService.claimReservation', () => {
   });
 
   test('is idempotent when the rightful owner replays a used token', async () => {
-    claimTokenSql.findByTokenHashForUpdate.mockResolvedValue(
-      activeToken({ usedAt: new Date(), usedByUserId: '7' }),
-    );
-    reservationSql.lockOwnershipForClaim.mockResolvedValue(
-      unownedReservation({ userId: '7' }),
-    );
+    mockSuccessfulClaimLookups({
+      token: activeToken({ usedAt: new Date(), usedByUserId: '7' }),
+      reservation: unownedReservation({ userId: '7' }),
+      order: unownedOrder({ userId: '7' }),
+    });
 
     const result = await service.claimReservation({
       user: verifiedUser,
@@ -305,11 +398,56 @@ describe('reservationClaimService.claimReservation', () => {
     expect(claimTokenSql.markUsed).not.toHaveBeenCalled();
   });
 
-  test('reports a conflict when a parallel claim wins the ownership update', async () => {
-    claimTokenSql.findByTokenHashForUpdate.mockResolvedValue(activeToken());
-    reservationSql.lockOwnershipForClaim.mockResolvedValue(unownedReservation());
-    // The conditional UPDATE matched nothing, meaning another transaction took ownership.
+  test('throws and does not return conflict after a zero-row reservation write', async () => {
+    mockSuccessfulClaimLookups();
     reservationSql.assignOwnerIfUnclaimed.mockResolvedValue(0);
+
+    await expect(
+      service.claimReservation({
+        user: verifiedUser,
+        reservationId: '10',
+        rawToken: RAW_TOKEN,
+      })
+    ).rejects.toMatchObject({ code: 'CLAIM_INTEGRITY_ERROR', status: 500 });
+
+    expect(orderSql.assignOwnerByReservationIdIfUnclaimed).not.toHaveBeenCalled();
+    expect(claimTokenSql.markUsed).not.toHaveBeenCalled();
+  });
+
+  test('throws and rolls back when the order update matches zero rows', async () => {
+    mockSuccessfulClaimLookups();
+    orderSql.assignOwnerByReservationIdIfUnclaimed.mockResolvedValue(0);
+
+    await expect(
+      service.claimReservation({
+        user: verifiedUser,
+        reservationId: '10',
+        rawToken: RAW_TOKEN,
+      })
+    ).rejects.toMatchObject({ code: 'CLAIM_INTEGRITY_ERROR' });
+
+    expect(reservationSql.assignOwnerIfUnclaimed).toHaveBeenCalled();
+    expect(claimTokenSql.markUsed).not.toHaveBeenCalled();
+  });
+
+  test('throws and rolls back when token consumption matches zero rows', async () => {
+    mockSuccessfulClaimLookups();
+    claimTokenSql.markUsed.mockResolvedValue(0);
+
+    await expect(
+      service.claimReservation({
+        user: verifiedUser,
+        reservationId: '10',
+        rawToken: RAW_TOKEN,
+      })
+    ).rejects.toMatchObject({ code: 'CLAIM_INTEGRITY_ERROR' });
+  });
+
+  test('allows a hold with no order', async () => {
+    mockSuccessfulClaimLookups({
+      reservation: unownedReservation({ status: 'pending_payment' }),
+      order: null,
+    });
 
     const result = await service.claimReservation({
       user: verifiedUser,
@@ -317,14 +455,27 @@ describe('reservationClaimService.claimReservation', () => {
       rawToken: RAW_TOKEN,
     });
 
-    expect(result.outcome).toBe(OUTCOMES.CONFLICT);
+    expect(result.outcome).toBe(OUTCOMES.CLAIMED);
     expect(orderSql.assignOwnerByReservationIdIfUnclaimed).not.toHaveBeenCalled();
-    expect(claimTokenSql.markUsed).not.toHaveBeenCalled();
+    expect(claimTokenSql.markUsed).toHaveBeenCalled();
+  });
+
+  test('fails closed when a confirmed reservation is missing its order', async () => {
+    mockSuccessfulClaimLookups({ order: null });
+
+    await expect(
+      service.claimReservation({
+        user: verifiedUser,
+        reservationId: '10',
+        rawToken: RAW_TOKEN,
+      })
+    ).rejects.toMatchObject({ code: 'CLAIM_INTEGRITY_ERROR' });
+
+    expect(reservationSql.assignOwnerIfUnclaimed).not.toHaveBeenCalled();
   });
 
   test('refuses a token for a reservation that no longer exists', async () => {
-    claimTokenSql.findByTokenHashForUpdate.mockResolvedValue(activeToken());
-    reservationSql.lockOwnershipForClaim.mockResolvedValue(null);
+    mockSuccessfulClaimLookups({ reservation: null });
 
     const result = await service.claimReservation({
       user: verifiedUser,
@@ -336,8 +487,7 @@ describe('reservationClaimService.claimReservation', () => {
   });
 
   test('audits the claim without the raw token or booking PII', async () => {
-    claimTokenSql.findByTokenHashForUpdate.mockResolvedValue(activeToken());
-    reservationSql.lockOwnershipForClaim.mockResolvedValue(unownedReservation());
+    mockSuccessfulClaimLookups();
 
     await service.claimReservation({
       user: verifiedUser,
@@ -355,7 +505,7 @@ describe('reservationClaimService.claimReservation', () => {
   });
 
   test('audits rejected attempts too', async () => {
-    claimTokenSql.findByTokenHashForUpdate.mockResolvedValue(null);
+    claimTokenSql.findByTokenHash.mockResolvedValue(null);
 
     await service.claimReservation({
       user: verifiedUser,
@@ -370,8 +520,7 @@ describe('reservationClaimService.claimReservation', () => {
   });
 
   test('a failed security notice does not undo a committed claim', async () => {
-    claimTokenSql.findByTokenHashForUpdate.mockResolvedValue(activeToken());
-    reservationSql.lockOwnershipForClaim.mockResolvedValue(unownedReservation());
+    mockSuccessfulClaimLookups();
     securityEmail.sendReservationClaimedNotice.mockRejectedValue(new Error('smtp down'));
 
     const result = await service.claimReservation({
@@ -384,10 +533,37 @@ describe('reservationClaimService.claimReservation', () => {
   });
 });
 
+describe('reservationClaimService.issueAndSendClaimToken', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    claimTokenSql.insertToken.mockResolvedValue({ id: '1' });
+    reservationSql.lockOwnershipForClaim.mockResolvedValue(unownedReservation());
+    claimTokenSql.findActiveForReservation.mockResolvedValue(null);
+  });
+
+  test('does not rotate an existing token when delivery fails', async () => {
+    claimTokenSql.findActiveForReservation.mockResolvedValue(activeToken());
+    reservationSql.findById.mockResolvedValue(unownedReservation());
+    securityEmail.sendReservationClaimEmail.mockResolvedValue({
+      sent: false,
+      reason: 'smtp_not_configured',
+    });
+
+    const result = await service.issueAndSendClaimToken({ reservationId: '10' });
+
+    expect(result.sent).toBe(false);
+    expect(claimTokenSql.revokeActiveForReservation).not.toHaveBeenCalled();
+    expect(claimTokenSql.insertToken).not.toHaveBeenCalled();
+  });
+});
+
 describe('reservationClaimService.requestClaimToken', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     claimTokenSql.insertToken.mockResolvedValue({ id: '1' });
+    userSql.findUserById.mockResolvedValue(verifiedUser);
+    reservationSql.lockOwnershipForClaim.mockResolvedValue(unownedReservation());
+    claimTokenSql.findActiveForReservation.mockResolvedValue(null);
   });
 
   test('mails a link only to the email stored on the booking', async () => {
@@ -405,7 +581,7 @@ describe('reservationClaimService.requestClaimToken', () => {
 
     expect(result.status).toBe('sent');
     expect(securityEmail.sendReservationClaimEmail.mock.calls[0][0].to).toBe(
-      'guest@example.com',
+      'guest@example.com'
     );
   });
 
@@ -426,7 +602,7 @@ describe('reservationClaimService.requestClaimToken', () => {
     expect(securityEmail.sendReservationClaimEmail).not.toHaveBeenCalled();
   });
 
-  test('ignores a request for an email other than the caller\u2019s own', async () => {
+  test('ignores a request for an email other than the caller’s own', async () => {
     const result = await service.requestClaimToken({
       user: verifiedUser,
       reservationId: '10',
@@ -439,8 +615,10 @@ describe('reservationClaimService.requestClaimToken', () => {
   });
 
   test('ignores a request from an unverified account', async () => {
+    userSql.findUserById.mockResolvedValue({ ...verifiedUser, emailVerified: false });
+
     const result = await service.requestClaimToken({
-      user: { ...verifiedUser, emailVerified: false },
+      user: verifiedUser,
       reservationId: '10',
       bookingEmail: 'guest@example.com',
     });

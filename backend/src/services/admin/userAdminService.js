@@ -2,14 +2,22 @@ const bcrypt = require('bcrypt');
 const userSql = require('../sql/userSqlService');
 const userRoleSql = require('../sql/userRoleSqlService');
 const roleSql = require('../sql/roleSqlService');
+const tokenSql = require('../sql/emailVerificationTokenSqlService');
 const rbacService = require('../rbac/rbacService');
-const { runWithTransaction, clientQuery } = require('../../db/transaction');
+const { runWithTransaction } = require('../../db/transaction');
 
 function createHttpError(code, message, status = 400) {
   const err = new Error(message);
   err.code = code;
   err.status = status;
   return err;
+}
+
+function isStaffManagedUser(user, assignedRoles) {
+  if (user.role === 'staff' || user.role === 'admin') {
+    return true;
+  }
+  return Array.isArray(assignedRoles) && assignedRoles.length > 0;
 }
 
 async function listUsers() {
@@ -58,6 +66,7 @@ async function createStaffUser({ email, password, roleIds = [] }) {
           email,
           password: hashedPassword,
           role: 'staff',
+          emailVerified: true,
         },
         client
       );
@@ -85,35 +94,45 @@ async function createStaffUser({ email, password, roleIds = [] }) {
 }
 
 async function updateStaffUser(userId, { email } = {}) {
-  const user = await userSql.findUserById(userId);
-  if (!user) {
-    throw createHttpError('NOT_FOUND', 'User not found.', 404);
-  }
-
-  if (email != null) {
-    const normalized = String(email).trim().toLowerCase();
-    if (!normalized) {
-      throw createHttpError('VALIDATION_ERROR', 'Email is required.', 422);
+  return runWithTransaction(async (client) => {
+    const user = await userSql.lockUserByIdForUpdate(userId, client);
+    if (!user) {
+      throw createHttpError('NOT_FOUND', 'User not found.', 404);
     }
-    try {
-      await clientQuery(
-        null,
-        `
-        UPDATE users
-        SET email = $2, updated_at = NOW()
-        WHERE id = $1
-        `,
-        [Number(userId), normalized]
-      );
-    } catch (err) {
-      if (err.code === '23505') {
-        throw createHttpError('EMAIL_IN_USE', 'Email is already in use.', 409);
+
+    const assignedRoles = await userRoleSql.listRolesForUser(userId, client);
+    if (!isStaffManagedUser(user, assignedRoles)) {
+      throw createHttpError('NOT_FOUND', 'User not found.', 404);
+    }
+
+    if (email != null) {
+      const normalized = String(email).trim().toLowerCase();
+      if (!normalized) {
+        throw createHttpError('VALIDATION_ERROR', 'Email is required.', 422);
       }
-      throw err;
+      try {
+        await userSql.updateEmailKeepingVerification(userId, normalized, client);
+      } catch (err) {
+        if (err.code === 'EMAIL_IN_USE') {
+          throw createHttpError('EMAIL_IN_USE', 'Email is already in use.', 409);
+        }
+        throw err;
+      }
+      await tokenSql.revokeActiveForUser(userId, client);
     }
-  }
 
-  return getUser(userId);
+    const updated = await userSql.findUserById(userId, client);
+    const access = await rbacService.getUserAccess(userId);
+    return {
+      id: updated.id,
+      email: updated.email,
+      role: updated.role,
+      createdAt: updated.createdAt,
+      updatedAt: updated.updatedAt,
+      roles: access.roleDetails,
+      permissions: access.permissions,
+    };
+  });
 }
 
 module.exports = {

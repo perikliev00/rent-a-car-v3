@@ -62,6 +62,12 @@ const emailConfirmationFailuresTotal = new client.Counter({
   help: 'Failed booking confirmation emails',
 });
 
+const securityEmailFailuresTotal = new client.Counter({
+  name: 'security_email_failures_total',
+  help: 'Failed verification or reservation-claim security emails',
+  labelNames: ['kind'],
+});
+
 const businessEventsTotal = new client.Counter({
   name: 'business_events_total',
   help: 'Business event occurrences',
@@ -169,6 +175,10 @@ function incrementEmailConfirmationFailures() {
   emailConfirmationFailuresTotal.inc();
 }
 
+function incrementSecurityEmailFailures(kind = 'unknown') {
+  securityEmailFailuresTotal.inc({ kind: kind || 'unknown' });
+}
+
 function incrementBusinessEvent(event) {
   if (!event) return;
   businessEventsTotal.inc({ event });
@@ -214,6 +224,7 @@ module.exports = {
   incrementReservationConflict,
   incrementAdminLoginFailures,
   incrementEmailConfirmationFailures,
+  incrementSecurityEmailFailures,
   incrementBusinessEvent,
   setGaugeValues,
   getMetrics,

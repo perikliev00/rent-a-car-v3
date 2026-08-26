@@ -79,6 +79,63 @@ async function findUserById(userId, client = null) {
   return mapSqlUser(result.rows[0]) || null;
 }
 
+/**
+ * Locks the user row. Must be the first lock taken on verification issue/verify
+ * and claim paths (see transaction.js security-token lock order).
+ */
+async function lockUserByIdForUpdate(userId, client) {
+  const normalizedId = normalizeId(userId);
+  if (!normalizedId || !client) {
+    return null;
+  }
+
+  const result = await clientQuery(
+    client,
+    `
+    SELECT ${USER_SELECT}
+    FROM users u
+    WHERE u.id = $1
+    FOR UPDATE
+    `,
+    [normalizedId]
+  );
+
+  return mapSqlUser(result.rows[0]) || null;
+}
+
+/**
+ * Trusted staff email rewrite: keep email_verified_at, bump updated_at.
+ * Callers must revoke verification tokens in the same transaction.
+ */
+async function updateEmailKeepingVerification(userId, email, client = null) {
+  const normalizedId = normalizeId(userId);
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedId || !normalizedEmail) {
+    return null;
+  }
+
+  try {
+    const result = await clientQuery(
+      client,
+      `
+      UPDATE users u
+      SET email = $2, updated_at = NOW()
+      WHERE u.id = $1
+      RETURNING ${USER_SELECT}
+      `,
+      [normalizedId, normalizedEmail]
+    );
+    return mapSqlUser(result.rows[0]) || null;
+  } catch (err) {
+    if (isUniqueViolation(err)) {
+      const duplicateErr = new Error('Email is already in use');
+      duplicateErr.code = 'EMAIL_IN_USE';
+      throw duplicateErr;
+    }
+    throw err;
+  }
+}
+
 async function createUser(
   { email, password, role = 'user', emailVerified = false },
   client = null
@@ -151,6 +208,8 @@ module.exports = {
   mapSqlUser,
   findUserByEmail,
   findUserById,
+  lockUserByIdForUpdate,
+  updateEmailKeepingVerification,
   createUser,
   markEmailVerified,
   listUsers,

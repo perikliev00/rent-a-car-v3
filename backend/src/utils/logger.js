@@ -21,6 +21,7 @@ const logger = pino({
       'req.body.address',
       'req.body.fullName',
       'email',
+      'to',
       'token',
       'rawToken',
       'req.body.token',

@@ -3,6 +3,11 @@ const carRepository = require('../../../repositories/carRepository');
 const reservationRepository = require('../../../repositories/reservationRepository');
 const { computeOrderPricing, applyOrderExpiryStatus } = require('./orderDomainService');
 const { applyPricingToOrder } = require('./orderMapper');
+const reservationClaimService = require('../../account/reservationClaimService');
+
+function normalizeEmail(email) {
+  return String(email || '').trim().toLowerCase();
+}
 
 /**
  * After a calendar move/resize updated reservation dates/car, sync the linked order
@@ -75,6 +80,8 @@ async function syncLinkedReservationAfterOrderUpdate(order, { client = null } = 
     return { reservationSynced: false, reservation: null };
   }
 
+  const previousEmail = normalizeEmail(reservation.email);
+
   reservation.carId = order.carId?.id || order.carId;
   reservation.pickupDate = order.pickupDate;
   reservation.returnDate = order.returnDate;
@@ -97,6 +104,11 @@ async function syncLinkedReservationAfterOrderUpdate(order, { client = null } = 
   reservation.hotelDelivery = order.hotelDelivery;
 
   const updated = await reservationRepository.update(reservation, client);
+
+  if (normalizeEmail(order.email) !== previousEmail) {
+    await reservationClaimService.onBookingEmailChanged(updated.id || order.reservationId, client);
+  }
+
   return { reservationSynced: true, reservation: updated };
 }
 
