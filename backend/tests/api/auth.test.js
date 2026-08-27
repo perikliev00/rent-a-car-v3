@@ -26,9 +26,6 @@ jest.mock('../../src/services/rbac/rbacService', () => {
     }),
   };
 });
-jest.mock('../../src/services/account/accountClaimService', () => ({
-  claimReservationsForUser: jest.fn().mockResolvedValue({ reservations: 0, orders: 0 }),
-}));
 jest.mock('bcrypt', () => ({
   compare: jest.fn(),
   hash: jest.fn(),
@@ -36,7 +33,6 @@ jest.mock('bcrypt', () => ({
 
 const userSql = require('../../src/services/sql/userSqlService');
 const loginAttemptService = require('../../src/services/auth/loginAttemptService');
-const { claimReservationsForUser } = require('../../src/services/account/accountClaimService');
 
 const mockUser = {
   id: 42,
@@ -56,7 +52,6 @@ const emptyAccessUser = {
 describe('POST /api/auth/login', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    claimReservationsForUser.mockResolvedValue({ reservations: 0, orders: 0 });
     loginAttemptService.resetForTests();
     userSql.findUserByEmail.mockResolvedValue(mockUser);
     userSql.findUserById.mockResolvedValue(mockUser);

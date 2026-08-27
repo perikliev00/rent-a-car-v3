@@ -3,7 +3,6 @@ const bcrypt = require('bcrypt');
 const userSql = require('../../services/sql/userSqlService');
 const rbacService = require('../../services/rbac/rbacService');
 const loginAttemptService = require('../../services/auth/loginAttemptService');
-const { claimReservationsForUser } = require('../../services/account/accountClaimService');
 const { getCsrfToken, generateCsrfToken } = require('../../middleware/csrf');
 const apiResponse = require('../../utils/apiResponse');
 const asyncHandler = require('../../utils/asyncHandler');
@@ -99,11 +98,7 @@ exports.postLogin = asyncHandler(async (req, res, next) => {
     const access = await loadAccessForUser(user);
     await establishUserSession(req, user, access);
 
-    try {
-      await claimReservationsForUser(user.id, user.email);
-    } catch (claimErr) {
-      logger.warn({ err: claimErr, userId: user.id }, 'Failed to claim reservations on login');
-    }
+    // Login must never assign guest booking ownership from an email match alone.
 
     if (rbacService.isStaffAccess(access, user.role)) {
       logEvent.info('admin.login.success', {
@@ -165,11 +160,7 @@ exports.postSignup = asyncHandler(async (req, res, next) => {
     const access = await loadAccessForUser(user);
     await establishUserSession(req, user, access);
 
-    try {
-      await claimReservationsForUser(user.id, user.email);
-    } catch (claimErr) {
-      logger.warn({ err: claimErr, userId: user.id }, 'Failed to claim reservations on signup');
-    }
+    // Signup must never assign guest booking ownership from an email match alone.
 
     return apiResponse.success(
       res,

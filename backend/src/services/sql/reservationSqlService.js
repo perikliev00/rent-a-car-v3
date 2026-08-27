@@ -30,7 +30,6 @@ const {
   listByUserId,
   findByIdForUser,
   updateTravelDetails,
-  claimByEmail,
 } = require('./reservation/reservationAccountRepository');
 
 module.exports = {
@@ -57,5 +56,4 @@ module.exports = {
   listByUserId,
   findByIdForUser,
   updateTravelDetails,
-  claimByEmail,
 };

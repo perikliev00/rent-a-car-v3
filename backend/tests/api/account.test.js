@@ -103,9 +103,9 @@ describe('Customer account API', () => {
     expect(response.body.error.code).toBe('UNAUTHORIZED');
   });
 
-  test('login claims reservations by email', async () => {
+  test('login never claims reservations by email', async () => {
     await loginAgent();
-    expect(claimReservationsForUser).toHaveBeenCalledWith(7, 'demo@luxride.local');
+    expect(claimReservationsForUser).not.toHaveBeenCalled();
   });
 
   test('GET /api/account/dashboard returns summary for logged-in user', async () => {

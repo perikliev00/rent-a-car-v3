@@ -86,46 +86,8 @@ async function updateTravelDetails(reservationId, userId, travel, client = null)
   return findByIdForUser(rid, uid, client);
 }
 
-async function claimByEmail(userId, email, client = null) {
-  const uid = Number(userId);
-  const normalizedEmail = String(email || '').trim().toLowerCase();
-  if (!Number.isInteger(uid) || uid <= 0 || !normalizedEmail) {
-    return { reservations: 0, orders: 0 };
-  }
-
-  const reservationResult = await clientQuery(
-    client,
-    `
-    UPDATE reservations
-    SET user_id = $1, updated_at = NOW()
-    WHERE user_id IS NULL
-      AND email IS NOT NULL
-      AND LOWER(email) = $2
-    `,
-    [uid, normalizedEmail]
-  );
-
-  const orderResult = await clientQuery(
-    client,
-    `
-    UPDATE orders
-    SET user_id = $1, updated_at = NOW()
-    WHERE user_id IS NULL
-      AND email IS NOT NULL
-      AND LOWER(email) = $2
-    `,
-    [uid, normalizedEmail]
-  );
-
-  return {
-    reservations: reservationResult.rowCount || 0,
-    orders: orderResult.rowCount || 0,
-  };
-}
-
 module.exports = {
   listByUserId,
   findByIdForUser,
   updateTravelDetails,
-  claimByEmail,
 };
