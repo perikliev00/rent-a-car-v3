@@ -18,7 +18,7 @@ describe('stripeRefundService (stub)', () => {
   });
 
   test('creates and retrieves a succeeded refund', async () => {
-    const session = stripeTestStub.createSession({
+    const session = await stripeTestStub.createSession({
       reservationId: 1,
       pricing: { totalPrice: 120 },
     });

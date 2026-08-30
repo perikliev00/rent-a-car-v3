@@ -7,7 +7,7 @@ const { trackPaymentFailure } = require('../../../monitoring/track');
 const logEvent = require('../../../monitoring/logEvent');
 const metrics = require('../../../monitoring/metrics');
 const logger = require('../../../utils/logger');
-const { withReservationCheckoutLock } = require('../../../db/transaction');
+const { withReservationCheckoutLock, isCheckoutLockBusyError } = require('../../../db/transaction');
 const {
   buildCheckoutIdempotencyKey,
   createStripeCheckoutSession,
@@ -410,21 +410,28 @@ async function createCheckoutSessionFlow(req) {
     return checkoutErrorResponse(car, formData, pricing);
   }
 
-  return withReservationCheckoutLock(reservationDoc.id, async () => {
-    const locked = await reservationRepository.findById(reservationDoc.id);
-    if (!locked) {
+  try {
+    return await withReservationCheckoutLock(reservationDoc.id, async () => {
+      const locked = await reservationRepository.findById(reservationDoc.id);
+      if (!locked) {
+        return checkoutErrorResponse(car, formData, pricing);
+      }
+
+      return createOrReuseLockedCheckoutSession({
+        req,
+        car,
+        formData,
+        pricing,
+        reservationDoc: locked,
+        createdReservationThisStep,
+      });
+    });
+  } catch (err) {
+    if (isCheckoutLockBusyError(err)) {
       return checkoutErrorResponse(car, formData, pricing);
     }
-
-    return createOrReuseLockedCheckoutSession({
-      req,
-      car,
-      formData,
-      pricing,
-      reservationDoc: locked,
-      createdReservationThisStep,
-    });
-  });
+    throw err;
+  }
 }
 
 module.exports = {

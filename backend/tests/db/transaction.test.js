@@ -1,3 +1,9 @@
+jest.mock('../../src/db/pool', () => ({
+  connect: jest.fn(),
+  query: jest.fn(),
+}));
+
+const pool = require('../../src/db/pool');
 const {
   isUniqueViolation,
   isCarDateBlockOverlapViolation,
@@ -6,8 +12,11 @@ const {
   acquireCarAdvisoryLock,
   acquireCarAdvisoryLocks,
   acquireSessionAdvisoryLock,
+  tryAcquireReservationCheckoutLock,
   acquireReservationCheckoutLock,
   releaseReservationCheckoutLock,
+  withReservationCheckoutLock,
+  isCheckoutLockBusyError,
   ADVISORY_LOCK_NS,
   ACTIVE_SESSION_HOLD_UNIQUE_INDEX,
 } = require('../../src/db/transaction');
@@ -16,6 +25,12 @@ describe('transaction error helpers', () => {
   test('isUniqueViolation detects postgres unique violations', () => {
     expect(isUniqueViolation({ code: '23505' })).toBe(true);
     expect(isUniqueViolation({ code: '23503' })).toBe(false);
+  });
+
+  test('isCheckoutLockBusyError detects checkout lock busy', () => {
+    expect(isCheckoutLockBusyError({ code: 'CHECKOUT_LOCK_BUSY' })).toBe(true);
+    expect(isCheckoutLockBusyError({ code: 'OTHER' })).toBe(false);
+    expect(isCheckoutLockBusyError(null)).toBe(false);
   });
 
   test('isCarDateBlockOverlapViolation detects car block overlap', () => {
@@ -104,15 +119,29 @@ describe('transaction error helpers', () => {
     expect(client.query).not.toHaveBeenCalled();
   });
 
-  test('acquireReservationCheckoutLock queries namespaced pg_advisory_lock', async () => {
-    const client = { query: jest.fn().mockResolvedValue({ rows: [] }) };
+  test('acquireReservationCheckoutLock queries namespaced pg_try_advisory_lock', async () => {
+    const client = { query: jest.fn().mockResolvedValue({ rows: [{ acquired: true }] }) };
 
     await acquireReservationCheckoutLock(client, 42);
 
-    expect(client.query).toHaveBeenCalledWith('SELECT pg_advisory_lock($1, $2)', [
+    expect(client.query).toHaveBeenCalledWith('SELECT pg_try_advisory_lock($1, $2) AS acquired', [
       ADVISORY_LOCK_NS.CHECKOUT,
       42,
     ]);
+  });
+
+  test('tryAcquireReservationCheckoutLock returns false when the lock is held', async () => {
+    const client = { query: jest.fn().mockResolvedValue({ rows: [{ acquired: false }] }) };
+
+    await expect(tryAcquireReservationCheckoutLock(client, 42)).resolves.toBe(false);
+  });
+
+  test('acquireReservationCheckoutLock throws when the lock is not acquired', async () => {
+    const client = { query: jest.fn().mockResolvedValue({ rows: [{ acquired: false }] }) };
+
+    await expect(acquireReservationCheckoutLock(client, 42)).rejects.toMatchObject({
+      code: 'CHECKOUT_LOCK_BUSY',
+    });
   });
 
   test('releaseReservationCheckoutLock queries namespaced pg_advisory_unlock', async () => {
@@ -139,5 +168,133 @@ describe('transaction error helpers', () => {
     expect(ADVISORY_LOCK_NS.CHECKOUT).toBe(3);
     expect(ADVISORY_LOCK_NS.CHECKOUT).not.toBe(ADVISORY_LOCK_NS.CAR);
     expect(ADVISORY_LOCK_NS.CHECKOUT).not.toBe(ADVISORY_LOCK_NS.SESSION);
+  });
+});
+
+describe('withReservationCheckoutLock', () => {
+  beforeEach(() => {
+    pool.connect.mockReset();
+    pool.query.mockReset();
+  });
+
+  test('releases the pool client before sleeping when the lock is busy', async () => {
+    const events = [];
+    const sleep = jest.fn(async () => {
+      events.push('sleep');
+    });
+
+    const busyClient = {
+      query: jest.fn(async (sql) => {
+        if (String(sql).includes('pg_try_advisory_lock')) {
+          events.push('try-busy');
+          return { rows: [{ acquired: false }] };
+        }
+        return { rows: [] };
+      }),
+      release: jest.fn(() => {
+        events.push('release-busy');
+      }),
+    };
+    const heldClient = {
+      query: jest.fn(async (sql) => {
+        if (String(sql).includes('pg_try_advisory_lock')) {
+          events.push('try-held');
+          return { rows: [{ acquired: true }] };
+        }
+        if (String(sql).includes('pg_advisory_unlock')) {
+          events.push('unlock');
+          return { rows: [] };
+        }
+        return { rows: [] };
+      }),
+      release: jest.fn(() => {
+        events.push('release-held');
+      }),
+    };
+
+    pool.connect.mockResolvedValueOnce(busyClient).mockResolvedValueOnce(heldClient);
+
+    const work = jest.fn(async () => {
+      events.push('work');
+      return 'ok';
+    });
+
+    await expect(
+      withReservationCheckoutLock(42, work, { sleep, delayMsForAttempt: () => 1 })
+    ).resolves.toBe('ok');
+
+    expect(events).toEqual([
+      'try-busy',
+      'release-busy',
+      'sleep',
+      'try-held',
+      'work',
+      'unlock',
+      'release-held',
+    ]);
+    expect(work).toHaveBeenCalledTimes(1);
+    expect(busyClient.query).not.toHaveBeenCalledWith(
+      expect.stringContaining('pg_advisory_lock($1, $2)'),
+      expect.anything()
+    );
+  });
+
+  test('unlocks and releases the client when work throws', async () => {
+    const events = [];
+    const heldClient = {
+      query: jest.fn(async (sql) => {
+        if (String(sql).includes('pg_try_advisory_lock')) {
+          return { rows: [{ acquired: true }] };
+        }
+        if (String(sql).includes('pg_advisory_unlock')) {
+          events.push('unlock');
+          return { rows: [] };
+        }
+        return { rows: [] };
+      }),
+      release: jest.fn(() => {
+        events.push('release');
+      }),
+    };
+
+    pool.connect.mockResolvedValue(heldClient);
+
+    await expect(
+      withReservationCheckoutLock(42, async () => {
+        events.push('work');
+        throw new Error('stripe down');
+      })
+    ).rejects.toThrow('stripe down');
+
+    expect(events).toEqual(['work', 'unlock', 'release']);
+  });
+
+  test('throws CHECKOUT_LOCK_BUSY after bounded retries without holding a client', async () => {
+    const sleep = jest.fn().mockResolvedValue(undefined);
+    const client = {
+      query: jest.fn().mockResolvedValue({ rows: [{ acquired: false }] }),
+      release: jest.fn(),
+    };
+    pool.connect.mockResolvedValue(client);
+
+    await expect(
+      withReservationCheckoutLock(42, jest.fn(), {
+        maxAttempts: 3,
+        sleep,
+        delayMsForAttempt: () => 5,
+      })
+    ).rejects.toMatchObject({ code: 'CHECKOUT_LOCK_BUSY' });
+
+    expect(pool.connect).toHaveBeenCalledTimes(3);
+    expect(client.release).toHaveBeenCalledTimes(3);
+    expect(sleep).toHaveBeenCalledTimes(2);
+    expect(client.query).toHaveBeenCalledWith('SELECT pg_try_advisory_lock($1, $2) AS acquired', [
+      ADVISORY_LOCK_NS.CHECKOUT,
+      42,
+    ]);
+    expect(client.query).not.toHaveBeenCalledWith(
+      expect.stringContaining('pg_advisory_unlock'),
+      expect.anything()
+    );
   });
 });

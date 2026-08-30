@@ -14,15 +14,75 @@ let failNextRefund = false;
 let throwNextRefundAfterRecording = false;
 let nextRefundStatus = null;
 let createOverrides = null;
+let createGate = null;
+let createGateConsumed = false;
+
+function createDeferred() {
+  let resolve;
+  const promise = new Promise((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
+}
+
+function clearCreateSessionGate() {
+  if (createGate) {
+    createGate.continue.resolve();
+    createGate = null;
+  }
+  createGateConsumed = false;
+}
+
+function armCreateSessionGate() {
+  clearCreateSessionGate();
+  createGate = {
+    started: createDeferred(),
+    continue: createDeferred(),
+  };
+  createGateConsumed = false;
+}
+
+async function waitForCreateSession({ timeoutMs = 8000 } = {}) {
+  if (!createGate) {
+    throw new Error('Create session gate is not armed');
+  }
+
+  let timeoutId;
+  try {
+    await Promise.race([
+      createGate.started.promise,
+      new Promise((_, reject) => {
+        timeoutId = setTimeout(
+          () => reject(new Error('Timed out waiting for Stripe createSession')),
+          timeoutMs
+        );
+      }),
+    ]);
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function releaseCreateSessionGate() {
+  if (createGate) {
+    createGate.continue.resolve();
+  }
+}
 
 function buildSuccessUrl(sessionId) {
   const base = (process.env.FRONTEND_BASE_URL || 'http://localhost:5173').replace(/\/+$/, '');
   return `${base}/checkout/success?session_id=${sessionId}`;
 }
 
-function createSession({ reservationId, carId, sessionId, pricing, car, idempotencyKey } = {}) {
+async function createSession({ reservationId, carId, sessionId, pricing, car, idempotencyKey } = {}) {
   if (idempotencyKey && sessionsByIdempotency.has(idempotencyKey)) {
     return { ...sessionsByIdempotency.get(idempotencyKey) };
+  }
+
+  if (createGate && !createGateConsumed) {
+    createGateConsumed = true;
+    createGate.started.resolve();
+    await createGate.continue.promise;
   }
 
   if (failNextCreate) {
@@ -257,6 +317,7 @@ function clearSessions() {
   throwNextRefundAfterRecording = false;
   nextRefundStatus = null;
   createOverrides = null;
+  clearCreateSessionGate();
 }
 
 function isStubEnabled() {
@@ -271,6 +332,9 @@ module.exports = {
   markUnpaidOpen,
   expireSession,
   failNextCreateSession,
+  armCreateSessionGate,
+  waitForCreateSession,
+  releaseCreateSessionGate,
   setNextCreateOverrides,
   createOrphanPaidSession,
   createRefund,

@@ -12,6 +12,7 @@ jest.mock('../src/services/sql/reservationSqlService', () => ({
 
 jest.mock('../src/db/transaction', () => ({
   withReservationCheckoutLock: jest.fn(async (_id, work) => work({})),
+  isCheckoutLockBusyError: (err) => Boolean(err && err.code === 'CHECKOUT_LOCK_BUSY'),
 }));
 
 jest.mock('../src/services/reservation/reservationStatusService', () => ({
@@ -78,6 +79,7 @@ const {
   retrieveStripeCheckoutSession,
   safeExpireSupersededCheckoutSession,
 } = require('../src/services/payment/stripeCheckoutService');
+const { withReservationCheckoutLock } = require('../src/db/transaction');
 const { validateCheckoutRequest } = require('../src/services/payment/checkout/checkoutValidationService');
 const { resolveCheckoutPricing } = require('../src/services/payment/checkout/checkoutPricingService');
 const { resolveCheckoutReservation } = require('../src/services/payment/checkout/checkoutReservationService');
@@ -412,6 +414,23 @@ describe('createCheckoutSessionFlow', () => {
     const result = await createCheckoutSessionFlow(req);
 
     expect(createStripeCheckoutSession).not.toHaveBeenCalled();
+    expect(result).toEqual(
+      expect.objectContaining({
+        type: 'renderOrderPage',
+        message: 'Unable to start payment. Please try again in a minute.',
+      })
+    );
+  });
+
+  test('returns clean error when checkout lock stays busy', async () => {
+    const err = new Error('Checkout lock busy');
+    err.code = 'CHECKOUT_LOCK_BUSY';
+    withReservationCheckoutLock.mockRejectedValueOnce(err);
+
+    const result = await createCheckoutSessionFlow(req);
+
+    expect(createStripeCheckoutSession).not.toHaveBeenCalled();
+    expect(reservationRepository.findById).not.toHaveBeenCalled();
     expect(result).toEqual(
       expect.objectContaining({
         type: 'renderOrderPage',
