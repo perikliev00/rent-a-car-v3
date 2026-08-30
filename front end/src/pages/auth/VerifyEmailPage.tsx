@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../auth/useAuth';
 import { resendVerification, verifyEmail } from '../../api/auth';
@@ -18,21 +18,36 @@ export function VerifyEmailPage() {
     token ? 'verifying' : 'idle'
   );
 
+  // Share one in-flight verify per token so React Strict Mode remounts do not
+  // consume the one-time token twice and cancel navigation.
+  const verifyRequestRef = useRef<{ token: string; promise: Promise<void> } | null>(null);
+
   useEffect(() => {
     if (!token) return;
 
-    let cancelled = false;
+    let ignore = false;
     setStatus('verifying');
     setError('');
 
-    verifyEmail(token)
-      .then(async () => {
-        if (cancelled) return;
-        await refresh();
+    if (!verifyRequestRef.current || verifyRequestRef.current.token !== token) {
+      verifyRequestRef.current = {
+        token,
+        promise: verifyEmail(token).then(async () => {
+          await refresh();
+        }),
+      };
+    }
+
+    verifyRequestRef.current.promise
+      .then(() => {
+        if (ignore) return;
         navigate('/account', { replace: true });
       })
       .catch((err) => {
-        if (cancelled) return;
+        if (ignore) return;
+        if (verifyRequestRef.current?.token === token) {
+          verifyRequestRef.current = null;
+        }
         setStatus('idle');
         if (err instanceof ApiError) {
           setError(err.message);
@@ -42,7 +57,7 @@ export function VerifyEmailPage() {
       });
 
     return () => {
-      cancelled = true;
+      ignore = true;
     };
   }, [token, refresh, navigate]);
 

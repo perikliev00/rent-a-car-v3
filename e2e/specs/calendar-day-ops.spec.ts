@@ -236,7 +236,6 @@ test.describe("calendar-day-ops-details", () => {
 
       await expect(adminPage.getByRole('button', { name: /Pickups/ })).toBeVisible();
       await expect(adminPage.getByText(guestName)).toBeVisible({ timeout: 10_000 });
-      await expect(adminPage.getByText(String(seeded.reservationId)).or(adminPage.getByText(guestName))).toBeVisible();
 
       await adminPage.getByRole('button', { name: 'Open' }).first().click();
       await adminPage.waitForURL(new RegExp(`/admin/reservations\\?id=${seeded.reservationId}`), {
