@@ -13,6 +13,7 @@ describe('rateLimit middleware behavior', () => {
     ['authLimiter'],
     ['loginLimiter'],
     ['signupLimiter'],
+    ['emailVerificationLimiter'],
     ['adminLimiter'],
     ['adminUploadLimiter'],
     ['accountUploadLimiter'],

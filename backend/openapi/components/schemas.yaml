@@ -64,6 +64,9 @@ User:
     createdAt:
       type: string
       format: date-time
+    emailVerified:
+      type: boolean
+      description: True after the account email has been confirmed via verification link.
 
 Car:
   type: object

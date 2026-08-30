@@ -210,6 +210,7 @@ export interface User {
   role: UserRole;
   roles?: string[];
   permissions?: string[];
+  emailVerified?: boolean;
 }
 
 export interface AdminStaffUser {

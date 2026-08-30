@@ -17,4 +17,13 @@ const authSignupValidationRules = [
   signupPasswordRules,
 ];
 
-module.exports = { authSignupValidationRules };
+const authVerifyEmailValidationRules = [
+  body('token')
+    .trim()
+    .isLength({ min: 16, max: 128 })
+    .withMessage('A valid verification token is required')
+    .matches(/^[a-fA-F0-9]+$/)
+    .withMessage('A valid verification token is required'),
+];
+
+module.exports = { authSignupValidationRules, authVerifyEmailValidationRules };

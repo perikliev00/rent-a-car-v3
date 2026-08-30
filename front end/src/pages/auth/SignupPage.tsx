@@ -34,7 +34,7 @@ export function SignupPage() {
     setLoading(true);
     try {
       await signup(email, password);
-      navigate('/', { replace: true });
+      navigate('/verify-email', { replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);

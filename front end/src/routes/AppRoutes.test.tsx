@@ -55,6 +55,9 @@ vi.mock('../pages/auth/LoginPage', () => ({
 vi.mock('../pages/auth/SignupPage', () => ({
   SignupPage: () => <div>Signup Page</div>,
 }));
+vi.mock('../pages/auth/VerifyEmailPage', () => ({
+  VerifyEmailPage: () => <div>Verify Email Page</div>,
+}));
 vi.mock('../pages/account/AccountDashboardPage', () => ({
   AccountDashboardPage: () => <div>Account Dashboard Page</div>,
 }));
@@ -162,6 +165,7 @@ describe('AppRoutes', () => {
     ['/checkout/cancel', 'Checkout Cancel Page'],
     ['/login', 'Login Page'],
     ['/signup', 'Signup Page'],
+    ['/verify-email', 'Verify Email Page'],
     ['/account', 'Account Dashboard Page'],
     ['/account/reservations', 'Account Reservations Page'],
     ['/account/documents', 'Account Documents Page'],

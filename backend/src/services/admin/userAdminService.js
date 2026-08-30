@@ -58,6 +58,7 @@ async function createStaffUser({ email, password, roleIds = [] }) {
           email,
           password: hashedPassword,
           role: 'staff',
+          emailVerifiedAt: new Date(),
         },
         client
       );

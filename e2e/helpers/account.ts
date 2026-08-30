@@ -113,7 +113,7 @@ export async function signupViaUi(
   await page.getByLabel('Password', { exact: true }).fill(credentials.password);
   await page.getByLabel('Confirm password').fill(credentials.password);
   await page.getByRole('main').getByRole('button', { name: /sign up|create account/i }).click();
-  await page.waitForURL(/\/$/, { timeout: 15_000 });
+  await page.waitForURL(/\/verify-email/, { timeout: 15_000 });
 }
 
 export async function loginViaUi(

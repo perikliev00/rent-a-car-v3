@@ -3,6 +3,7 @@ const bcrypt = require('bcrypt');
 const userSql = require('../../services/sql/userSqlService');
 const rbacService = require('../../services/rbac/rbacService');
 const loginAttemptService = require('../../services/auth/loginAttemptService');
+const emailVerificationService = require('../../services/auth/emailVerificationService');
 const { claimReservationsForUser } = require('../../services/account/accountClaimService');
 const { getCsrfToken, generateCsrfToken } = require('../../middleware/csrf');
 const apiResponse = require('../../utils/apiResponse');
@@ -10,7 +11,10 @@ const asyncHandler = require('../../utils/asyncHandler');
 const { forwardControllerError } = require('../../utils/controllerError');
 const logger = require('../../utils/logger');
 const logEvent = require('../../monitoring/logEvent');
-const metrics = require('../../monitoring/metrics');
+
+function isEmailVerified(user) {
+  return Boolean(user?.emailVerifiedAt);
+}
 
 function toUserPayload(user, access = null) {
   return {
@@ -19,7 +23,15 @@ function toUserPayload(user, access = null) {
     role: user.role,
     roles: access?.roles || user.roles || [],
     permissions: access?.permissions || user.permissions || [],
+    emailVerified: isEmailVerified(user),
   };
+}
+
+function respondServiceError(res, err) {
+  if (err?.status && err?.code) {
+    return apiResponse.error(res, err.code, err.message, err.status);
+  }
+  return null;
 }
 
 async function loadAccessForUser(user) {
@@ -46,6 +58,7 @@ function establishUserSession(req, user, access) {
         role: user.role,
         roles: access?.roles || [],
         permissions: access?.permissions || [],
+        emailVerified: isEmailVerified(user),
       };
       req.session.csrfToken = generateCsrfToken();
 
@@ -54,6 +67,12 @@ function establishUserSession(req, user, access) {
         resolve();
       });
     });
+  });
+}
+
+function saveSession(req) {
+  return new Promise((resolve, reject) => {
+    req.session.save((err) => (err ? reject(err) : resolve()));
   });
 }
 
@@ -166,9 +185,9 @@ exports.postSignup = asyncHandler(async (req, res, next) => {
     await establishUserSession(req, user, access);
 
     try {
-      await claimReservationsForUser(user.id, user.email);
-    } catch (claimErr) {
-      logger.warn({ err: claimErr, userId: user.id }, 'Failed to claim reservations on signup');
+      await emailVerificationService.sendVerificationEmail(user);
+    } catch (verifyErr) {
+      logger.warn({ err: verifyErr, userId: user.id }, 'Failed to send verification email on signup');
     }
 
     return apiResponse.success(
@@ -183,6 +202,60 @@ exports.postSignup = asyncHandler(async (req, res, next) => {
     return forwardControllerError(err, req, next, {
       context: 'api.postSignup',
       publicMessage: 'Something went wrong while signing you up. Please try again.',
+    });
+  }
+});
+
+exports.postVerifyEmail = asyncHandler(async (req, res, next) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return apiResponse.error(
+        res,
+        'VALIDATION_ERROR',
+        errors.array()[0].msg,
+        422
+      );
+    }
+
+    const user = await emailVerificationService.verifyEmailToken(req.body.token);
+    const access = await loadAccessForUser(user);
+
+    if (req.session?.isLoggedIn && String(req.session.user?.id) === String(user.id)) {
+      req.session.user = {
+        ...req.session.user,
+        emailVerified: true,
+        roles: access.roles,
+        permissions: access.permissions,
+      };
+      await saveSession(req);
+    }
+
+    return apiResponse.success(res, {
+      user: toUserPayload(user, access),
+      csrfToken: getCsrfToken(req),
+    });
+  } catch (err) {
+    const handled = respondServiceError(res, err);
+    if (handled) return handled;
+    return forwardControllerError(err, req, next, {
+      context: 'api.postVerifyEmail',
+      publicMessage: 'Something went wrong while verifying your email. Please try again.',
+    });
+  }
+});
+
+exports.postResendVerification = asyncHandler(async (req, res, next) => {
+  try {
+    const userId = req.session?.user?.id;
+    await emailVerificationService.resendVerificationEmail(userId);
+    return apiResponse.success(res, { sent: true });
+  } catch (err) {
+    const handled = respondServiceError(res, err);
+    if (handled) return handled;
+    return forwardControllerError(err, req, next, {
+      context: 'api.postResendVerification',
+      publicMessage: 'Something went wrong while sending the verification email. Please try again.',
     });
   }
 });
@@ -209,11 +282,10 @@ exports.getMe = asyncHandler(async (req, res) => {
     role: dbUser.role,
     roles: access.roles,
     permissions: access.permissions,
+    emailVerified: isEmailVerified(dbUser),
   };
 
-  await new Promise((resolve, reject) => {
-    req.session.save((err) => (err ? reject(err) : resolve()));
-  });
+  await saveSession(req);
 
   return apiResponse.success(res, {
     user: toUserPayload(dbUser, access),

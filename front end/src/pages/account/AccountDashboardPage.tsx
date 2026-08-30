@@ -4,6 +4,7 @@ import { getAccountDashboard } from '../../api/account';
 import { Button } from '../../components/ui/Button';
 import { Card, CardBody } from '../../components/ui/Card';
 import { PageLoader } from '../../components/ui/Loading';
+import { EmailUnverifiedBanner } from './EmailUnverifiedBanner';
 
 function formatWhen(value?: string | null, time?: string | null) {
   if (!value) return '—';
@@ -51,6 +52,8 @@ export function AccountDashboardPage() {
           </Link>
         </div>
       </div>
+
+      <EmailUnverifiedBanner />
 
       <div className="mt-8 grid gap-4 sm:grid-cols-3">
         {[

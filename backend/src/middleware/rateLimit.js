@@ -42,6 +42,11 @@ const signupLimiter = createLimiter({
   max: readPositiveInt('RATE_LIMIT_SIGNUP_MAX', 10),
 });
 
+const emailVerificationLimiter = createLimiter({
+  windowMs: DEFAULT_WINDOW_MS,
+  max: readPositiveInt('RATE_LIMIT_EMAIL_VERIFICATION_MAX', 10),
+});
+
 const adminLimiter = createLimiter({
   windowMs: DEFAULT_WINDOW_MS,
   max: readPositiveInt('RATE_LIMIT_ADMIN_MAX', 100),
@@ -81,6 +86,7 @@ module.exports = {
   authLimiter,
   loginLimiter,
   signupLimiter,
+  emailVerificationLimiter,
   adminLimiter,
   accountUploadLimiter,
   adminUploadLimiter,

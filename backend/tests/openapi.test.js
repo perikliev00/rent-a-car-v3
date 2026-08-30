@@ -10,6 +10,8 @@ describe('OpenAPI document', () => {
     expect(doc.openapi).toBe('3.0.3');
     expect(doc.info.title).toBe('LuxRide API');
     expect(doc.paths['/api/v1/auth/login']).toBeDefined();
+    expect(doc.paths['/api/v1/auth/verify-email']).toBeDefined();
+    expect(doc.paths['/api/v1/auth/resend-verification']).toBeDefined();
     expect(doc.paths['/api/v1/cars']).toBeDefined();
     expect(doc.paths['/api/v1/admin/calendar/events']).toBeDefined();
     expect(doc.paths['/api/v1/admin/cars']).toBeDefined();

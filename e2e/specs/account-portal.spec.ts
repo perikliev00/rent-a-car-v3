@@ -9,6 +9,7 @@ import {
   cleanupTestCar,
   getReservationById,
   getReservationUserId,
+  issueEmailVerificationToken,
 } from '../helpers/db';
 import { seedE2eFixtures, seedLinkedBooking } from '../helpers/seed';
 import { E2E_GUEST, allocateFutureRange, uniqueEmail } from '../helpers/test-env';
@@ -32,7 +33,7 @@ test.describe("account-portal", () => {
       await page.getByLabel('Confirm password').fill(password);
       await page.getByRole('main').getByRole('button', { name: /sign up|create account/i }).click();
 
-      await expect(page).toHaveURL(/\/$/, { timeout: 15_000 });
+      await expect(page).toHaveURL(/\/verify-email/, { timeout: 15_000 });
 
       await page.goto('/account');
       await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({
@@ -50,7 +51,7 @@ test.describe("account-portal", () => {
       await page.getByLabel('Confirm password').fill(password);
       await page.getByRole('main').getByRole('button', { name: /sign up|create account/i }).click();
 
-      await expect(page).toHaveURL(/\/$/, { timeout: 15_000 });
+      await expect(page).toHaveURL(/\/verify-email/, { timeout: 15_000 });
 
       await page.goto('/admin/pricing');
       await expect(page.getByRole('heading', { name: 'Access Denied' })).toBeVisible({
@@ -109,12 +110,13 @@ test.describe("account-documents", () => {
       await page.getByLabel('Document type').selectOption('driver_license');
       await page.locator('input[type="file"]').setInputFiles(DOC_A);
       await page.getByRole('button', { name: 'Upload' }).click();
-      await expect(page.getByText('Document uploaded')).toBeVisible({ timeout: 15_000 });
+      // Toast stack can keep prior success toasts visible — use .last() for strict mode.
+      await expect(page.getByText('Document uploaded').last()).toBeVisible({ timeout: 15_000 });
       await expect(page.getByText(/Driver license/i).first()).toBeVisible();
 
       await page.locator('input[type="file"]').setInputFiles(DOC_B);
       await page.getByRole('button', { name: 'Upload' }).click();
-      await expect(page.getByText('Document uploaded')).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText('Document uploaded').last()).toBeVisible({ timeout: 15_000 });
 
       const downloadPromise = page.waitForEvent('download', { timeout: 15_000 });
       await page.getByRole('button', { name: 'Download' }).first().click();
@@ -122,7 +124,7 @@ test.describe("account-documents", () => {
       expect(download.suggestedFilename()).toBeTruthy();
 
       await page.getByRole('button', { name: 'Delete' }).first().click();
-      await expect(page.getByText('Document deleted')).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText('Document deleted').last()).toBeVisible({ timeout: 15_000 });
     });
   });
 });
@@ -213,6 +215,11 @@ test.describe("account-claim-booking", () => {
       expect(await getReservationUserId(reservationId)).toBeNull();
 
       await signupViaUi(page, { email, password: PASSWORD });
+      expect(await getReservationUserId(reservationId)).toBeNull();
+
+      const token = await issueEmailVerificationToken(email);
+      await page.goto(`/verify-email?token=${token}`);
+      await expect(page).toHaveURL(/\/account/, { timeout: 15_000 });
 
       await page.goto('/account/reservations');
       await expect(page.getByRole('heading', { name: 'My reservations' })).toBeVisible({

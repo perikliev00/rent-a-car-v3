@@ -36,7 +36,7 @@ test.describe("admin-authz", () => {
       await page.getByLabel('Confirm password').fill(password);
       await page.getByRole('main').getByRole('button', { name: /sign up|create account/i }).click();
 
-      await expect(page).toHaveURL(/\/$/, { timeout: 15_000 });
+      await expect(page).toHaveURL(/\/verify-email/, { timeout: 15_000 });
 
       await page.goto('/admin');
       await expect(page.getByRole('heading', { name: 'Access Denied' })).toBeVisible({

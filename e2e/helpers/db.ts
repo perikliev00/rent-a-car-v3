@@ -1,5 +1,6 @@
 import { Client } from 'pg';
 import bcrypt from 'bcrypt';
+import { createHash, randomBytes } from 'crypto';
 import { DATABASE_URL, ADMIN_EMAIL, ADMIN_PASSWORD, E2E_GUEST } from './test-env';
 import { allocateFutureRange, getSofiaIsoDateString, parseSofiaDate } from './dates';
 
@@ -1144,4 +1145,26 @@ export async function countNotificationsByType(
     );
     return result.rows[0].count;
   });
+}
+
+export async function issueEmailVerificationToken(email: string): Promise<string> {
+  const token = randomBytes(32).toString('hex');
+  const tokenHash = createHash('sha256').update(token, 'utf8').digest('hex');
+  await withDb(async (client) => {
+    const result = await client.query(
+      `
+      UPDATE users
+      SET
+        email_verification_token_hash = $2,
+        email_verification_expires_at = NOW() + INTERVAL '1 day',
+        updated_at = NOW()
+      WHERE LOWER(email) = LOWER($1)
+      `,
+      [email, tokenHash]
+    );
+    if (!result.rowCount) {
+      throw new Error(`issueEmailVerificationToken: no user for ${email}`);
+    }
+  });
+  return token;
 }

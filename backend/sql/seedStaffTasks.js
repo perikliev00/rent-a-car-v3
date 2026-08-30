@@ -32,6 +32,7 @@ async function ensureStaffUser(email) {
       email,
       password: hashed,
       role: 'staff',
+      emailVerifiedAt: new Date(),
     });
     console.log(`→ created staff user ${email}`);
   } else {

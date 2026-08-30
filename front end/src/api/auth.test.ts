@@ -19,7 +19,7 @@ vi.mock('./client', () => ({
 }));
 
 import { ApiError } from './client';
-import { getMe, login, logout, signup } from './auth';
+import { getMe, login, logout, signup, verifyEmail, resendVerification } from './auth';
 
 describe('auth API', () => {
   beforeEach(() => {
@@ -49,6 +49,28 @@ describe('auth API', () => {
     expect(mockApi).toHaveBeenCalledWith('/api/auth/signup', {
       method: 'POST',
       body: JSON.stringify({ email: 'new@b.com', password: 'pass123' }),
+    });
+  });
+
+  it('verifyEmail posts the token', async () => {
+    const user = { id: '2', email: 'new@b.com', role: 'user' as const, emailVerified: true };
+    mockApi.mockResolvedValue({ user });
+
+    await verifyEmail('abc123');
+
+    expect(mockApi).toHaveBeenCalledWith('/api/auth/verify-email', {
+      method: 'POST',
+      body: JSON.stringify({ token: 'abc123' }),
+    });
+  });
+
+  it('resendVerification posts without a body', async () => {
+    mockApi.mockResolvedValue({ sent: true });
+
+    await resendVerification();
+
+    expect(mockApi).toHaveBeenCalledWith('/api/auth/resend-verification', {
+      method: 'POST',
     });
   });
 

@@ -56,7 +56,9 @@
   post:
     tags: [Auth]
     summary: Register a new customer account
-    description: Creates a user and session. Subject to rate limiting.
+    description: |
+      Creates a user and session. Does not claim guest bookings until the email
+      is verified. Subject to rate limiting.
     security: []
     requestBody:
       required: true
@@ -176,3 +178,89 @@
           application/json:
             schema:
               $ref: '#/components/schemas/ApiError'
+
+/api/v1/auth/verify-email:
+  post:
+    tags: [Auth]
+    summary: Verify account email
+    description: |
+      Confirms mailbox ownership with a one-time token from the verification email.
+      Guest reservations and orders matching the email are claimed only after this succeeds.
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [token]
+            properties:
+              token:
+                type: string
+    responses:
+      '200':
+        description: Email verified
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+                      properties:
+                        user:
+                          $ref: '#/components/schemas/User'
+      '400':
+        description: Invalid or expired token
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '429':
+        description: Rate limited
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RateLimitedError'
+
+/api/v1/auth/resend-verification:
+  post:
+    tags: [Auth]
+    summary: Resend email verification
+    description: Sends a new verification link to the authenticated unverified user.
+    security:
+      - cookieAuth: []
+        csrfHeader: []
+    responses:
+      '200':
+        description: Verification email queued or sent
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiSuccessEnvelope'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '409':
+        description: Email already verified
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiError'
+      '429':
+        description: Rate limited
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RateLimitedError'

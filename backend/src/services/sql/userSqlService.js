@@ -5,6 +5,9 @@ const USER_SELECT = `
   u.email,
   u.password,
   u.role,
+  u.email_verified_at,
+  u.email_verification_token_hash,
+  u.email_verification_expires_at,
   u.created_at,
   u.updated_at
 `;
@@ -31,6 +34,9 @@ function mapSqlUser(row) {
     email: row.email,
     password: row.password,
     role: row.role,
+    emailVerifiedAt: row.email_verified_at || null,
+    emailVerificationTokenHash: row.email_verification_token_hash || null,
+    emailVerificationExpiresAt: row.email_verification_expires_at || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -76,7 +82,30 @@ async function findUserById(userId, client = null) {
   return mapSqlUser(result.rows[0]) || null;
 }
 
-async function createUser({ email, password, role = 'user' }, client = null) {
+async function findUserByVerificationTokenHash(tokenHash, client = null) {
+  const hash = String(tokenHash || '').trim();
+  if (!hash) {
+    return null;
+  }
+
+  const result = await clientQuery(
+    client,
+    `
+    SELECT ${USER_SELECT}
+    FROM users u
+    WHERE u.email_verification_token_hash = $1
+    LIMIT 1
+    `,
+    [hash]
+  );
+
+  return mapSqlUser(result.rows[0]) || null;
+}
+
+async function createUser(
+  { email, password, role = 'user', emailVerifiedAt = null },
+  client = null
+) {
   const normalizedEmail = normalizeEmail(email);
   if (!normalizedEmail || !password) {
     throw new Error('Email and password are required');
@@ -86,11 +115,11 @@ async function createUser({ email, password, role = 'user' }, client = null) {
     const result = await clientQuery(
       client,
       `
-      INSERT INTO users (email, password, role)
-      VALUES ($1, $2, $3)
+      INSERT INTO users (email, password, role, email_verified_at)
+      VALUES ($1, $2, $3, $4)
       RETURNING *
       `,
-      [normalizedEmail, password, role]
+      [normalizedEmail, password, role, emailVerifiedAt || null]
     );
 
     return mapSqlUser(result.rows[0]);
@@ -102,6 +131,76 @@ async function createUser({ email, password, role = 'user' }, client = null) {
     }
     throw err;
   }
+}
+
+async function setVerificationToken(userId, tokenHash, expiresAt, client = null) {
+  const normalizedId = normalizeId(userId);
+  if (!normalizedId || !tokenHash || !expiresAt) {
+    return null;
+  }
+
+  const result = await clientQuery(
+    client,
+    `
+    UPDATE users
+    SET
+      email_verification_token_hash = $2,
+      email_verification_expires_at = $3,
+      updated_at = NOW()
+    WHERE id = $1
+    RETURNING *
+    `,
+    [normalizedId, tokenHash, expiresAt]
+  );
+
+  return mapSqlUser(result.rows[0]) || null;
+}
+
+async function markEmailVerified(userId, client = null) {
+  const normalizedId = normalizeId(userId);
+  if (!normalizedId) {
+    return null;
+  }
+
+  const result = await clientQuery(
+    client,
+    `
+    UPDATE users
+    SET
+      email_verified_at = COALESCE(email_verified_at, NOW()),
+      email_verification_token_hash = NULL,
+      email_verification_expires_at = NULL,
+      updated_at = NOW()
+    WHERE id = $1
+    RETURNING *
+    `,
+    [normalizedId]
+  );
+
+  return mapSqlUser(result.rows[0]) || null;
+}
+
+async function clearVerificationToken(userId, client = null) {
+  const normalizedId = normalizeId(userId);
+  if (!normalizedId) {
+    return null;
+  }
+
+  const result = await clientQuery(
+    client,
+    `
+    UPDATE users
+    SET
+      email_verification_token_hash = NULL,
+      email_verification_expires_at = NULL,
+      updated_at = NOW()
+    WHERE id = $1
+    RETURNING *
+    `,
+    [normalizedId]
+  );
+
+  return mapSqlUser(result.rows[0]) || null;
 }
 
 async function listUsers(client = null) {
@@ -121,6 +220,10 @@ module.exports = {
   mapSqlUser,
   findUserByEmail,
   findUserById,
+  findUserByVerificationTokenHash,
   createUser,
+  setVerificationToken,
+  markEmailVerified,
+  clearVerificationToken,
   listUsers,
 };

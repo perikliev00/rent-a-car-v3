@@ -1,14 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { formatISO } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/useAuth';
-import { hasPermission } from '../../auth/permissions';
 import { PageLoader } from '../../components/ui/Loading';
 import { Button } from '../../components/ui/Button';
-import { toast } from '../../components/ui/toastStore';
-import { ApiError } from '../../api/client';
-import { moveCalendarEvent, resizeCalendarEvent } from '../../api/admin/calendar';
-import { useQueryClient } from '@tanstack/react-query';
 import { CalendarToolbar } from './calendar/CalendarToolbar';
 import { CalendarFilters, type CalendarPreset } from './calendar/CalendarFilters';
 import { EventLegend } from './calendar/EventLegend';
@@ -22,17 +17,19 @@ import { ConflictWarningModal } from './calendar/ConflictWarningModal';
 import { QuickCreateMenu } from './calendar/QuickCreateMenu';
 import { useCalendarFilters } from './calendar/useCalendarFilters';
 import { useCalendarEvents } from './calendar/useCalendarEvents';
+import { useCalendarPermissions } from './calendar/useCalendarPermissions';
+import { useCalendarModals } from './calendar/useCalendarModals';
+import { useCalendarSchedule } from './calendar/useCalendarSchedule';
 import {
   buildRolePresetParams,
   shouldApplyRolePreset,
 } from './calendar/calendarRolePreset';
 import { opsReservationUrl } from './calendar/reservationDeepLink';
-import type { CalendarConflict, CalendarEvent } from './calendar/calendar.types';
+import type { CalendarEvent } from './calendar/calendar.types';
 
 export function AdminCalendarPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const {
     view,
     anchor,
@@ -47,19 +44,16 @@ export function AdminCalendarPage() {
     params,
   } = useCalendarFilters();
 
-  const canView =
-    hasPermission(user, 'can_view_calendar') ||
-    hasPermission(user, 'can_view_own_calendar_tasks');
-  const canMove = hasPermission(user, 'can_move_calendar_reservations');
-  const canResize = hasPermission(user, 'can_resize_calendar_reservations');
-  const canCreateTasks = hasPermission(user, 'can_create_calendar_tasks');
-  const canCreateBlocks = hasPermission(user, 'can_create_calendar_blocks');
-  const canAssign = hasPermission(user, 'can_assign_calendar_staff');
-  const canOverride = hasPermission(user, 'can_override_calendar_conflicts');
-
-  const ownOnly =
-    !hasPermission(user, 'can_view_calendar') &&
-    hasPermission(user, 'can_view_own_calendar_tasks');
+  const {
+    canView,
+    canMove,
+    canResize,
+    canCreateTasks,
+    canCreateBlocks,
+    canAssign,
+    canOverride,
+    ownOnly,
+  } = useCalendarPermissions(user);
 
   useEffect(() => {
     if (!user || !canView) return;
@@ -76,52 +70,8 @@ export function AdminCalendarPage() {
   });
 
   const cars = data?.cars || [];
-
-  const [dayDate, setDayDate] = useState<string | null>(null);
-  const [eventId, setEventId] = useState<string | null>(null);
-  const [taskOpen, setTaskOpen] = useState(false);
-  const [taskMode, setTaskMode] = useState<'create' | 'edit'>('create');
-  const [taskId, setTaskId] = useState<string | null>(null);
-  const [taskDefaults, setTaskDefaults] = useState<{
-    title?: string;
-    taskType?: string;
-    carId?: string | null;
-    startsAt?: string | null;
-    dueAt?: string | null;
-    locationText?: string | null;
-    notes?: string | null;
-    assignedToUserId?: string | null;
-    reservationId?: string | null;
-  }>({});
-  const [blockOpen, setBlockOpen] = useState(false);
-  const [blockMode, setBlockMode] = useState<'create' | 'edit'>('create');
-  const [blockId, setBlockId] = useState<string | null>(null);
-  const [blockDefaults, setBlockDefaults] = useState<{
-    carId?: string | null;
-    start?: string;
-    end?: string;
-    blockType?: string;
-    reason?: string;
-    notes?: string;
-  }>({});
-  const [menu, setMenu] = useState<{
-    x: number;
-    y: number;
-    carId: string;
-    at: Date;
-  } | null>(null);
-  const [conflicts, setConflicts] = useState<CalendarConflict[]>([]);
-  const [isMoving, setIsMoving] = useState(false);
-  const [pendingMove, setPendingMove] = useState<{
-    id: string;
-    start: string;
-    end: string;
-    carId: string;
-    mode: 'move' | 'resize';
-  } | null>(null);
-  const [pendingBlockForce, setPendingBlockForce] = useState<((force: boolean) => void) | null>(
-    null
-  );
+  const modals = useCalendarModals();
+  const schedule = useCalendarSchedule();
 
   function applyPreset(preset: CalendarPreset) {
     const next = new URLSearchParams();
@@ -131,61 +81,6 @@ export function AdminCalendarPage() {
     if (preset.reservationStatus) next.set('reservationStatus', preset.reservationStatus);
     if (preset.eventType) next.set('eventType', preset.eventType);
     setParams(next);
-  }
-
-  async function applyScheduleChange(payload: {
-    id: string;
-    start: string;
-    end: string;
-    carId: string;
-    force?: boolean;
-    mode: 'move' | 'resize';
-  }) {
-    setIsMoving(true);
-    try {
-      const fn = payload.mode === 'resize' ? resizeCalendarEvent : moveCalendarEvent;
-      await fn(payload.id, {
-        start: payload.start,
-        end: payload.end,
-        carId: payload.carId,
-        force: payload.force,
-      });
-      queryClient.invalidateQueries({ queryKey: ['admin', 'calendar'] });
-      toast(payload.mode === 'resize' ? 'Reservation resized' : 'Event moved', 'success');
-      setPendingMove(null);
-      setConflicts([]);
-    } catch (err) {
-      if (err instanceof ApiError && err.code === 'CALENDAR_CONFLICT') {
-        setPendingMove(payload);
-        setConflicts((err.conflicts as CalendarConflict[]) || []);
-        return;
-      }
-      toast((err as Error).message, 'error');
-    } finally {
-      setIsMoving(false);
-    }
-  }
-
-  function openCreateTask(carId: string | null, at?: Date) {
-    setTaskMode('create');
-    setTaskId(null);
-    setTaskDefaults({
-      carId,
-      startsAt: at?.toISOString(),
-      dueAt: at ? new Date(at.getTime() + 3600_000).toISOString() : undefined,
-    });
-    setTaskOpen(true);
-  }
-
-  function openCreateBlock(carId: string | null, at?: Date) {
-    setBlockMode('create');
-    setBlockId(null);
-    setBlockDefaults({
-      carId,
-      start: at?.toISOString(),
-      end: at ? new Date(at.getTime() + 2 * 3600_000).toISOString() : undefined,
-    });
-    setBlockOpen(true);
   }
 
   if (!canView) {
@@ -212,16 +107,12 @@ export function AdminCalendarPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           {canCreateBlocks ? (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => openCreateBlock(null)}
-            >
+            <Button size="sm" variant="outline" onClick={() => modals.openCreateBlock(null)}>
               Block car
             </Button>
           ) : null}
           {canCreateTasks ? (
-            <Button size="sm" onClick={() => openCreateTask(null)}>
+            <Button size="sm" onClick={() => modals.openCreateTask(null)}>
               Create task
             </Button>
           ) : null}
@@ -260,8 +151,8 @@ export function AdminCalendarPage() {
           events={data.events}
           from={range.from}
           to={range.to}
-          onDayClick={(date) => setDayDate(date)}
-          onEventClick={(ev: CalendarEvent) => setEventId(ev.id)}
+          onDayClick={(date) => modals.setDayDate(date)}
+          onEventClick={(ev: CalendarEvent) => modals.setEventId(ev.id)}
         />
       ) : null}
 
@@ -274,20 +165,20 @@ export function AdminCalendarPage() {
           canDragReservations={canMove}
           canDragTasks={canCreateTasks}
           canResize={canResize}
-          moving={isMoving}
+          moving={schedule.isMoving}
           showSkeleton={isFetching && Boolean(data)}
-          selectedEventId={eventId}
-          onEventClick={(ev) => setEventId(ev.id)}
+          selectedEventId={modals.eventId}
+          onEventClick={(ev) => modals.setEventId(ev.id)}
           onReservationOpen={(id) => navigate(opsReservationUrl(id))}
           onCarLabelClick={(carId) => {
-            setDayDate(formatISO(range.from, { representation: 'date' }));
-            if (canCreateTasks) setTaskDefaults({ carId });
+            modals.setDayDate(formatISO(range.from, { representation: 'date' }));
+            if (canCreateTasks) modals.setTaskDefaults({ carId });
           }}
           onEmptySlot={({ carId, at, clientX, clientY }) => {
-            setMenu({ x: clientX, y: clientY, carId, at });
+            modals.setMenu({ x: clientX, y: clientY, carId, at });
           }}
           onMoveRequest={(ev, start, end, carId) => {
-            void applyScheduleChange({
+            void schedule.applyScheduleChange({
               id: ev.id,
               start: start.toISOString(),
               end: end.toISOString(),
@@ -296,7 +187,7 @@ export function AdminCalendarPage() {
             });
           }}
           onResizeRequest={(ev, start, end) => {
-            void applyScheduleChange({
+            void schedule.applyScheduleChange({
               id: ev.id,
               start: start.toISOString(),
               end: end.toISOString(),
@@ -308,144 +199,61 @@ export function AdminCalendarPage() {
       ) : null}
 
       <QuickCreateMenu
-        open={Boolean(menu)}
-        x={menu?.x || 0}
-        y={menu?.y || 0}
+        open={Boolean(modals.menu)}
+        x={modals.menu?.x || 0}
+        y={modals.menu?.y || 0}
         canCreateBlock={canCreateBlocks}
         canCreateTask={canCreateTasks}
-        onCreateTask={() => {
-          if (!menu) return;
-          openCreateTask(menu.carId, menu.at);
-          setMenu(null);
-        }}
-        onCreateBlock={() => {
-          if (!menu) return;
-          openCreateBlock(menu.carId, menu.at);
-          setMenu(null);
-        }}
-        onOpenDay={() => {
-          if (!menu) return;
-          setDayDate(formatISO(menu.at, { representation: 'date' }));
-          setMenu(null);
-        }}
-        onClose={() => setMenu(null)}
+        onCreateTask={modals.createTaskFromMenu}
+        onCreateBlock={modals.createBlockFromMenu}
+        onOpenDay={modals.openDayFromMenu}
+        onClose={() => modals.setMenu(null)}
       />
 
       <DayOperationsModal
-        open={Boolean(dayDate)}
-        date={dayDate}
-        onClose={() => setDayDate(null)}
-        onOpenEvent={(id) => {
-          setEventId(id);
-          setDayDate(null);
-        }}
+        open={Boolean(modals.dayDate)}
+        date={modals.dayDate}
+        onClose={() => modals.setDayDate(null)}
+        onOpenEvent={modals.openEventFromDay}
         onOpenReservation={(id) => navigate(opsReservationUrl(id))}
-        onFreeCarAction={(carId) => {
-          if (!dayDate) return;
-          const at = new Date(`${dayDate}T12:00:00`);
-          setMenu({
-            x: window.innerWidth / 2,
-            y: window.innerHeight / 2,
-            carId,
-            at,
-          });
-        }}
+        onFreeCarAction={modals.openMenuFromDay}
       />
 
       <EventDetailsDrawer
-        open={Boolean(eventId)}
-        eventId={eventId}
-        onClose={() => setEventId(null)}
-        onCreateTask={
-          canCreateTasks
-            ? (carId) => openCreateTask(carId)
-            : undefined
-        }
-        onEditTask={
-          canCreateTasks
-            ? (task) => {
-                setTaskMode('edit');
-                setTaskId(String(task.id));
-                setTaskDefaults({
-                  title: String(task.title || ''),
-                  taskType: String(task.taskType || 'pickup'),
-                  carId: task.carId ? String(task.carId) : null,
-                  startsAt: task.startsAt ? String(task.startsAt) : null,
-                  dueAt: task.dueAt ? String(task.dueAt) : null,
-                  locationText: task.locationText ? String(task.locationText) : null,
-                  notes: task.notes ? String(task.notes) : null,
-                  assignedToUserId: task.assignedToUserId
-                    ? String(task.assignedToUserId)
-                    : null,
-                  reservationId: task.reservationId ? String(task.reservationId) : null,
-                });
-                setTaskOpen(true);
-              }
-            : undefined
-        }
-        onEditBlock={
-          canCreateBlocks
-            ? (block, eid) => {
-                const rawId = eid.startsWith('blocked:') ? eid.slice('blocked:'.length) : eid;
-                setBlockMode('edit');
-                setBlockId(rawId);
-                const meta = (block.meta || {}) as { blockType?: string; notes?: string };
-                setBlockDefaults({
-                  carId: block.carId ? String(block.carId) : null,
-                  start: block.start ? String(block.start) : undefined,
-                  end: block.end ? String(block.end) : undefined,
-                  blockType: meta.blockType || String(block.status || 'manual'),
-                  reason: block.title ? String(block.title) : '',
-                  notes: meta.notes || '',
-                });
-                setBlockOpen(true);
-              }
-            : undefined
-        }
+        open={Boolean(modals.eventId)}
+        eventId={modals.eventId}
+        onClose={() => modals.setEventId(null)}
+        onCreateTask={canCreateTasks ? (carId) => modals.openCreateTask(carId) : undefined}
+        onEditTask={canCreateTasks ? modals.editTask : undefined}
+        onEditBlock={canCreateBlocks ? modals.editBlock : undefined}
       />
 
       <TaskFormModal
-        open={taskOpen}
-        mode={taskMode}
-        taskId={taskId}
+        open={modals.taskOpen}
+        mode={modals.taskMode}
+        taskId={modals.taskId}
         cars={cars}
-        defaults={taskDefaults}
+        defaults={modals.taskDefaults}
         canAssign={canAssign}
-        onClose={() => setTaskOpen(false)}
+        onClose={() => modals.setTaskOpen(false)}
       />
 
       <BlockFormModal
-        open={blockOpen}
-        mode={blockMode}
-        blockId={blockId}
+        open={modals.blockOpen}
+        mode={modals.blockMode}
+        blockId={modals.blockId}
         cars={cars}
-        defaults={blockDefaults}
-        onClose={() => setBlockOpen(false)}
-        onConflict={(c, retry) => {
-          setConflicts(c);
-          setPendingBlockForce(() => retry);
-        }}
+        defaults={modals.blockDefaults}
+        onClose={() => modals.setBlockOpen(false)}
+        onConflict={schedule.onBlockConflict}
       />
 
       <ConflictWarningModal
-        open={conflicts.length > 0}
-        conflicts={conflicts}
+        open={schedule.conflicts.length > 0}
+        conflicts={schedule.conflicts}
         canOverride={canOverride}
-        onClose={() => {
-          setConflicts([]);
-          setPendingMove(null);
-          setPendingBlockForce(null);
-        }}
-        onForce={() => {
-          if (pendingBlockForce) {
-            pendingBlockForce(true);
-            setPendingBlockForce(null);
-            setConflicts([]);
-            return;
-          }
-          if (!pendingMove) return;
-          void applyScheduleChange({ ...pendingMove, force: true });
-        }}
+        onClose={schedule.clearConflicts}
+        onForce={schedule.forceOverride}
       />
     </div>
   );

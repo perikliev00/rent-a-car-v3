@@ -12,6 +12,7 @@ import { CheckoutSuccessPage } from '../pages/public/CheckoutSuccessPage';
 import { CheckoutCancelPage } from '../pages/public/CheckoutCancelPage';
 import { LoginPage } from '../pages/auth/LoginPage';
 import { SignupPage } from '../pages/auth/SignupPage';
+import { VerifyEmailPage } from '../pages/auth/VerifyEmailPage';
 import { AccountDashboardPage } from '../pages/account/AccountDashboardPage';
 import { AccountReservationsPage } from '../pages/account/AccountReservationsPage';
 import { AccountReservationDetailPage } from '../pages/account/AccountReservationDetailPage';
@@ -65,6 +66,7 @@ export function AppRoutes() {
           <Route path="checkout/cancel" element={<CheckoutCancelPage />} />
           <Route path="login" element={<LoginPage />} />
           <Route path="signup" element={<SignupPage />} />
+          <Route path="verify-email" element={<VerifyEmailPage />} />
           <Route
             path="account"
             element={

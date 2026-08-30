@@ -1,0 +1,15 @@
+export const LOCATION_LABELS: Record<string, string> = {
+  office: 'Office',
+  'sunny-beach': 'Sunny Beach',
+  'sveti-vlas': 'Sveti Vlas',
+  nesebar: 'Nesebar',
+  burgas: 'Burgas',
+  'burgas-airport': 'Burgas Airport',
+  sofia: 'Sofia',
+  'sofia-airport': 'Sofia Airport',
+  varna: 'Varna',
+  'varna-airport': 'Varna Airport',
+  plovdiv: 'Plovdiv',
+  eleni: 'Eleni',
+  ravda: 'Ravda',
+};

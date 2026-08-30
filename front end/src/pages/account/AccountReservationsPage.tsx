@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { listAccountReservations } from '../../api/account';
 import { Button } from '../../components/ui/Button';
 import { PageLoader } from '../../components/ui/Loading';
+import { EmailUnverifiedBanner } from './EmailUnverifiedBanner';
 
 function formatWhen(value?: string | null, time?: string | null) {
   if (!value) return '—';
@@ -39,6 +40,8 @@ export function AccountReservationsPage() {
           </Button>
         </Link>
       </div>
+
+      <EmailUnverifiedBanner />
 
       {query.isError ? (
         <p className="mt-6 text-[var(--color-danger)]">Unable to load reservations.</p>

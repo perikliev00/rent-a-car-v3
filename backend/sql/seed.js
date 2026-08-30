@@ -42,6 +42,7 @@ async function seedUser({ email, password, role }) {
     email,
     password: hashedPassword,
     role,
+    emailVerifiedAt: new Date(),
   });
 
   console.log(`→ created ${role} user ${email}`);

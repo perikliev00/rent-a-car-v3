@@ -7,6 +7,7 @@ jest.mock('../../src/middleware/rateLimit', () => ({
   authLimiter: (_req, _res, next) => next(),
   loginLimiter: (_req, _res, next) => next(),
   signupLimiter: (_req, _res, next) => next(),
+  emailVerificationLimiter: (_req, _res, next) => next(),
   adminUploadLimiter: (_req, _res, next) => next(),
   accountUploadLimiter: (_req, _res, next) => next(),
 }));
@@ -29,6 +30,12 @@ jest.mock('../../src/services/rbac/rbacService', () => {
 jest.mock('../../src/services/account/accountClaimService', () => ({
   claimReservationsForUser: jest.fn().mockResolvedValue({ reservations: 0, orders: 0 }),
 }));
+jest.mock('../../src/services/auth/emailVerificationService', () => ({
+  sendVerificationEmail: jest.fn().mockResolvedValue({ sent: false }),
+  verifyEmailToken: jest.fn(),
+  resendVerificationEmail: jest.fn().mockResolvedValue({ sent: true }),
+  hashEmailVerificationToken: jest.fn((token) => token),
+}));
 jest.mock('bcrypt', () => ({
   compare: jest.fn(),
   hash: jest.fn(),
@@ -37,6 +44,7 @@ jest.mock('bcrypt', () => ({
 const userSql = require('../../src/services/sql/userSqlService');
 const loginAttemptService = require('../../src/services/auth/loginAttemptService');
 const { claimReservationsForUser } = require('../../src/services/account/accountClaimService');
+const emailVerificationService = require('../../src/services/auth/emailVerificationService');
 
 const mockUser = {
   id: 42,
@@ -51,6 +59,7 @@ const emptyAccessUser = {
   role: 'customer',
   roles: [],
   permissions: [],
+  emailVerified: false,
 };
 
 describe('POST /api/auth/login', () => {
@@ -185,6 +194,7 @@ describe('POST /api/auth/signup', () => {
           role: 'customer',
           roles: [],
           permissions: [],
+          emailVerified: false,
         },
         csrfToken: expect.any(String),
       },
@@ -194,6 +204,8 @@ describe('POST /api/auth/signup', () => {
       email: 'new@example.com',
       password: 'hashed-new-password',
     });
+    expect(claimReservationsForUser).not.toHaveBeenCalled();
+    expect(emailVerificationService.sendVerificationEmail).toHaveBeenCalledWith(newUser);
   });
 
   test('returns validation error for weak password', async () => {
@@ -318,5 +330,94 @@ describe('GET /api/auth/me', () => {
     const response = await request(app).get('/api/auth/me').expect(401);
 
     expect(response.body.error.code).toBe('UNAUTHORIZED');
+  });
+});
+
+describe('POST /api/auth/verify-email', () => {
+  const verifiedUser = {
+    id: 99,
+    email: 'new@example.com',
+    role: 'customer',
+    emailVerifiedAt: new Date('2026-01-01T00:00:00.000Z'),
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    emailVerificationService.verifyEmailToken.mockResolvedValue(verifiedUser);
+  });
+
+  test('verifies email with a valid token', async () => {
+    const app = createApiTestApp();
+    const agent = await initTestAgent(app);
+    const token = 'a'.repeat(64);
+
+    const response = await withCsrf(agent, agent.post('/api/auth/verify-email'))
+      .send({ token })
+      .expect(200);
+
+    expect(emailVerificationService.verifyEmailToken).toHaveBeenCalledWith(token);
+    expect(response.body.data.user).toEqual({
+      id: 99,
+      email: 'new@example.com',
+      role: 'customer',
+      roles: [],
+      permissions: [],
+      emailVerified: true,
+    });
+  });
+
+  test('returns 400 when the token is invalid', async () => {
+    const err = new Error('This verification link is invalid or has expired.');
+    err.code = 'INVALID_TOKEN';
+    err.status = 400;
+    emailVerificationService.verifyEmailToken.mockRejectedValue(err);
+
+    const app = createApiTestApp();
+    const agent = await initTestAgent(app);
+
+    const response = await withCsrf(agent, agent.post('/api/auth/verify-email'))
+      .send({ token: 'b'.repeat(64) })
+      .expect(400);
+
+    expect(response.body.error.code).toBe('INVALID_TOKEN');
+  });
+});
+
+describe('POST /api/auth/resend-verification', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    loginAttemptService.resetForTests();
+    userSql.findUserByEmail.mockResolvedValue(mockUser);
+    userSql.findUserById.mockResolvedValue(mockUser);
+    bcrypt.compare.mockResolvedValue(true);
+    emailVerificationService.resendVerificationEmail.mockResolvedValue({ sent: true });
+  });
+
+  test('returns unauthorized when not logged in', async () => {
+    const app = createApiTestApp();
+    const agent = await initTestAgent(app);
+
+    const response = await withCsrf(agent, agent.post('/api/auth/resend-verification')).expect(
+      401
+    );
+    expect(response.body.error.code).toBe('UNAUTHORIZED');
+    expect(emailVerificationService.resendVerificationEmail).not.toHaveBeenCalled();
+  });
+
+  test('resends verification for the authenticated user', async () => {
+    const app = createApiTestApp();
+    const agent = await initTestAgent(app);
+
+    const loginRes = await withCsrf(agent, agent.post('/api/auth/login'))
+      .send({ email: 'user@example.com', password: 'Secret123' })
+      .expect(200);
+    agent.csrfToken = loginRes.body.data.csrfToken;
+
+    const response = await withCsrf(agent, agent.post('/api/auth/resend-verification')).expect(
+      200
+    );
+
+    expect(response.body.data.sent).toBe(true);
+    expect(emailVerificationService.resendVerificationEmail).toHaveBeenCalledWith(42);
   });
 });
