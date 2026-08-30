@@ -13,13 +13,22 @@ function buildStripeCheckoutRedirectUrls() {
   };
 }
 
+function buildCheckoutIdempotencyKey(reservationId, attempt) {
+  return `checkout:reservation:${reservationId}:attempt${attempt}`;
+}
+
 async function createStripeCheckoutSession({
   car,
   pricing,
   reservationId,
   carId,
   sessionId,
+  idempotencyKey,
 }) {
+  if (!idempotencyKey) {
+    throw new Error('idempotencyKey is required');
+  }
+
   if (stripeTestStub.isStubEnabled()) {
     return stripeTestStub.createSession({
       car,
@@ -27,33 +36,37 @@ async function createStripeCheckoutSession({
       reservationId,
       carId,
       sessionId,
+      idempotencyKey,
     });
   }
 
   const expiresAt = getStripeCheckoutExpiresAt();
 
-  return stripe.checkout.sessions.create({
-    payment_method_types: ['card'],
-    line_items: [
-      {
-        price_data: {
-          currency: 'eur',
-          product_data: { name: `Car Rental – ${car.name}` },
-          unit_amount: Math.round(Number(pricing.totalPrice) * 100),
+  return stripe.checkout.sessions.create(
+    {
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: 'eur',
+            product_data: { name: `Car Rental – ${car.name}` },
+            unit_amount: Math.round(Number(pricing.totalPrice) * 100),
+          },
+          quantity: 1,
         },
-        quantity: 1,
+      ],
+      mode: 'payment',
+      expires_at: expiresAt,
+      ...buildStripeCheckoutRedirectUrls(),
+      client_reference_id: String(reservationId),
+      metadata: {
+        reservationId: String(reservationId),
+        carId: String(carId),
+        sessionId: String(sessionId),
       },
-    ],
-    mode: 'payment',
-    expires_at: expiresAt,
-    ...buildStripeCheckoutRedirectUrls(),
-    client_reference_id: String(reservationId),
-    metadata: {
-      reservationId: String(reservationId),
-      carId: String(carId),
-      sessionId: String(sessionId),
     },
-  });
+    { idempotencyKey }
+  );
 }
 
 async function expireStripeCheckoutSession(sessionId) {
@@ -117,6 +130,7 @@ async function safeExpireSupersededCheckoutSession(sessionId, context = {}) {
 }
 
 module.exports = {
+  buildCheckoutIdempotencyKey,
   createStripeCheckoutSession,
   expireStripeCheckoutSession,
   retrieveStripeCheckoutSession,

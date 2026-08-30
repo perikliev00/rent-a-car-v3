@@ -24,6 +24,7 @@ describe('createStripeCheckoutSession', () => {
     reservationId: '42',
     carId: '7',
     sessionId: 'sess_abc',
+    idempotencyKey: 'checkout:reservation:42:attempt1',
   };
 
   beforeEach(() => {
@@ -39,7 +40,8 @@ describe('createStripeCheckoutSession', () => {
     expect(stripe.checkout.sessions.create).toHaveBeenCalledWith(
       expect.objectContaining({
         expires_at: getStripeCheckoutExpiresAt(nowMs),
-      })
+      }),
+      { idempotencyKey: 'checkout:reservation:42:attempt1' }
     );
 
     dateNowSpy.mockRestore();
@@ -54,7 +56,18 @@ describe('createStripeCheckoutSession', () => {
           'http://localhost:5173/checkout/success?session_id={CHECKOUT_SESSION_ID}',
         cancel_url:
           'http://localhost:5173/checkout/cancel?session_id={CHECKOUT_SESSION_ID}',
-      })
+      }),
+      { idempotencyKey: 'checkout:reservation:42:attempt1' }
     );
+  });
+
+  test('requires an idempotency key', async () => {
+    await expect(
+      createStripeCheckoutSession({
+        ...baseArgs,
+        idempotencyKey: undefined,
+      })
+    ).rejects.toThrow('idempotencyKey is required');
+    expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
   });
 });

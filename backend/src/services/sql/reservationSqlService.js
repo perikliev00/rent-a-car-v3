@@ -24,6 +24,7 @@ const {
 const {
   update,
   applyStatusChange,
+  reserveCheckoutAttempt,
   createConfirmedReservation,
 } = require('./reservation/reservationLifecycleRepository');
 const {
@@ -53,6 +54,7 @@ module.exports = {
   createConfirmedReservation,
   update,
   applyStatusChange,
+  reserveCheckoutAttempt,
   markAbandonedReservations,
   listByUserId,
   findByIdForUser,

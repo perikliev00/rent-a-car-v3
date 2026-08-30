@@ -4,6 +4,7 @@
  */
 
 const sessions = new Map();
+const sessionsByIdempotency = new Map();
 const refunds = new Map();
 const refundsByIdempotency = new Map();
 let counter = 0;
@@ -19,7 +20,11 @@ function buildSuccessUrl(sessionId) {
   return `${base}/checkout/success?session_id=${sessionId}`;
 }
 
-function createSession({ reservationId, carId, sessionId, pricing, car } = {}) {
+function createSession({ reservationId, carId, sessionId, pricing, car, idempotencyKey } = {}) {
+  if (idempotencyKey && sessionsByIdempotency.has(idempotencyKey)) {
+    return { ...sessionsByIdempotency.get(idempotencyKey) };
+  }
+
   if (failNextCreate) {
     failNextCreate = false;
     const err = new Error('Stripe stub forced create failure');
@@ -75,6 +80,9 @@ function createSession({ reservationId, carId, sessionId, pricing, car } = {}) {
   }
 
   sessions.set(id, session);
+  if (idempotencyKey) {
+    sessionsByIdempotency.set(idempotencyKey, session);
+  }
   return { ...session };
 }
 
@@ -239,6 +247,7 @@ function setRefundState(refundId, patch = {}) {
 
 function clearSessions() {
   sessions.clear();
+  sessionsByIdempotency.clear();
   refunds.clear();
   refundsByIdempotency.clear();
   counter = 0;

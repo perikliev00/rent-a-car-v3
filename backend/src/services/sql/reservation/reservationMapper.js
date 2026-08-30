@@ -55,6 +55,7 @@ function mapSqlReservation(row) {
     holdExpiresAt: row.hold_expires_at,
     stripeSessionId: row.stripe_session_id || undefined,
     stripePaymentIntentId: row.stripe_payment_intent_id || undefined,
+    stripeCheckoutAttempt: Number(row.stripe_checkout_attempt) || 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -90,6 +91,7 @@ const RESERVATION_SELECT = `
   r.hold_expires_at,
   r.stripe_session_id,
   r.stripe_payment_intent_id,
+  r.stripe_checkout_attempt,
   r.created_at,
   r.updated_at
 `;

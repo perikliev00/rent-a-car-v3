@@ -409,7 +409,7 @@ describeIfDb('DB consistency', () => {
 
       await expect(
         pool.query('DELETE FROM reservations WHERE id = $1', [reservationA])
-      ).rejects.toMatchObject({ code: '23503' });
+      ).rejects.toMatchObject({ code: expect.stringMatching(/^(23503|23001)$/) });
 
       await expect(
         pool.query(

@@ -67,6 +67,23 @@ describe('H-06: controllable Stripe stub', () => {
     expect(orphan.client_reference_id).toBeNull();
   });
 
+  test('replays createSession for the same idempotency key', () => {
+    const first = stripeTestStub.createSession({
+      pricing: { totalPrice: 40 },
+      reservationId: 8,
+      idempotencyKey: 'checkout:reservation:8:attempt1',
+    });
+    const replay = stripeTestStub.createSession({
+      pricing: { totalPrice: 99 },
+      reservationId: 8,
+      idempotencyKey: 'checkout:reservation:8:attempt1',
+    });
+
+    expect(replay.id).toBe(first.id);
+    expect(replay.amount_total).toBe(4000);
+    expect(stripeTestStub.sessions.size).toBe(1);
+  });
+
   test('supports refund create / retrieve / fail / pending', () => {
     const session = stripeTestStub.createSession({
       pricing: { totalPrice: 80 },

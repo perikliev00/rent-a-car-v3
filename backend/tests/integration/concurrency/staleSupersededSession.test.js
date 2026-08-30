@@ -45,14 +45,37 @@ describeIf('MONEY-003: staleSupersededStripeSession', () => {
     stripeTestStub.clearSessions();
   });
 
-  test('paid webhook for superseded Stripe session marks manual_review', async () => {
+  test('same-payload second checkout reuses the active Stripe session', async () => {
     const agent = await createSessionAgent(app);
     const checkoutBody = buildCheckoutBody(carId, { email: 'stale-session@example.com' });
 
     expect((await postOrder(agent, checkoutBody)).status).toBe(200);
     const firstCheckout = await postCheckout(agent, checkoutBody);
     expect(firstCheckout.status).toBe(200);
+    const firstSessionId = extractStripeSessionId(firstCheckout);
+
+    const secondCheckout = await postCheckout(agent, checkoutBody);
+    expect(secondCheckout.status).toBe(200);
+    const reusedSessionId = extractStripeSessionId(secondCheckout);
+
+    expect(reusedSessionId).toBe(firstSessionId);
+    expect(stripeTestStub.sessions.size).toBe(1);
+
+    const reservation = await getReservationByStripeSessionId(reusedSessionId);
+    expect(reservation.status).toBe('processing_payment');
+    expect(reservation.stripe_session_id).toBe(reusedSessionId);
+  });
+
+  test('paid webhook for a non-linked Stripe session marks manual_review', async () => {
+    const agent = await createSessionAgent(app);
+    const checkoutBody = buildCheckoutBody(carId, { email: 'stale-leftover@example.com' });
+
+    expect((await postOrder(agent, checkoutBody)).status).toBe(200);
+    const firstCheckout = await postCheckout(agent, checkoutBody);
+    expect(firstCheckout.status).toBe(200);
     const staleSessionId = extractStripeSessionId(firstCheckout);
+
+    stripeTestStub.expireSession(staleSessionId);
 
     const secondCheckout = await postCheckout(agent, checkoutBody);
     expect(secondCheckout.status).toBe(200);

@@ -152,6 +152,49 @@ async function applyStatusChange({ reservationId, newStatus, patch = null }, cli
 }
 
 /**
+ * Reserve a Stripe Checkout attempt number under the checkout lock.
+ * Reuses the current attempt when a prior create crashed before linking
+ * (session id already cleared, attempt already bumped). forceIncrement
+ * is for link-failure after the orphan session was expired.
+ */
+async function reserveCheckoutAttempt(
+  reservationId,
+  { forceIncrement = false, client = null } = {}
+) {
+  const id = Number(reservationId);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Error('Invalid reservation id');
+  }
+
+  const result = await clientQuery(
+    client,
+    `
+    UPDATE reservations
+    SET
+      stripe_checkout_attempt = CASE
+        WHEN $2::boolean THEN stripe_checkout_attempt + 1
+        WHEN stripe_session_id IS NULL AND stripe_checkout_attempt > 0 THEN stripe_checkout_attempt
+        ELSE stripe_checkout_attempt + 1
+      END,
+      stripe_session_id = NULL,
+      updated_at = NOW()
+    WHERE id = $1
+    RETURNING stripe_checkout_attempt
+    `,
+    [id, Boolean(forceIncrement)]
+  );
+
+  if (!result.rowCount) {
+    const err = new Error('Reservation not found');
+    err.code = 'NOT_FOUND';
+    err.status = 404;
+    throw err;
+  }
+
+  return Number(result.rows[0].stripe_checkout_attempt);
+}
+
+/**
  * Create a confirmed reservation for admin-created/restored orders (ops coverage).
  */
 async function createConfirmedReservation(payload, client = null) {
@@ -244,5 +287,6 @@ async function createConfirmedReservation(payload, client = null) {
 module.exports = {
   update,
   applyStatusChange,
+  reserveCheckoutAttempt,
   createConfirmedReservation,
 };

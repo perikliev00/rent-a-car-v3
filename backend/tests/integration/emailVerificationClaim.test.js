@@ -27,6 +27,41 @@ async function getReservationUserId(reservationId) {
   return value == null ? null : Number(value);
 }
 
+async function getOrderUserId(reservationId) {
+  const result = await pool.query(
+    `
+    SELECT user_id FROM orders
+    WHERE reservation_id = $1
+    ORDER BY id DESC
+    LIMIT 1
+    `,
+    [reservationId]
+  );
+  const value = result.rows[0]?.user_id;
+  return value == null ? null : Number(value);
+}
+
+async function assertGuestUnclaimed(reservationId) {
+  expect(await getReservationUserId(reservationId)).toBeNull();
+  expect(await getOrderUserId(reservationId)).toBeNull();
+}
+
+async function plantVerificationToken(userId) {
+  const token = crypto.randomBytes(32).toString('hex');
+  const tokenHash = hashEmailVerificationToken(token);
+  await pool.query(
+    `
+    UPDATE users
+    SET
+      email_verification_token_hash = $2,
+      email_verification_expires_at = NOW() + INTERVAL '1 day'
+    WHERE id = $1
+    `,
+    [userId, tokenHash]
+  );
+  return token;
+}
+
 describeIf('email verification booking claim', () => {
   jest.setTimeout(60_000);
 
@@ -67,18 +102,7 @@ describeIf('email verification booking claim', () => {
 
     expect(await getReservationUserId(seeded.reservationId)).toBeNull();
 
-    const token = crypto.randomBytes(32).toString('hex');
-    const tokenHash = hashEmailVerificationToken(token);
-    await pool.query(
-      `
-      UPDATE users
-      SET
-        email_verification_token_hash = $2,
-        email_verification_expires_at = NOW() + INTERVAL '1 day'
-      WHERE id = $1
-      `,
-      [userId, tokenHash]
-    );
+    const token = await plantVerificationToken(userId);
 
     const verifyRes = await withCsrf(agent, agent.post('/api/auth/verify-email')).send({
       token,
@@ -92,5 +116,85 @@ describeIf('email verification booking claim', () => {
     });
     expect(reuse.status).toBe(400);
     expect(reuse.body.error.code).toBe('INVALID_TOKEN');
+  });
+
+  test('unverified login does not claim; account endpoints stay denied until verify', async () => {
+    const email = uniqueEmail('claim-full');
+    const password = 'Customer123!';
+    const seeded = await insertLinkedBooking({
+      carId,
+      status: 'confirmed',
+      pickupDate: '2031-04-10',
+      returnDate: '2031-04-14',
+      guest: { email, fullName: 'Full Claim Guest' },
+    });
+    const reservationId = seeded.reservationId;
+    expect(seeded.orderId).toBeTruthy();
+    await assertGuestUnclaimed(reservationId);
+
+    const signupAgent = await createSessionAgent(app);
+    const signupRes = await withCsrf(signupAgent, signupAgent.post('/api/auth/signup')).send({
+      email,
+      password,
+    });
+    expect(signupRes.status).toBe(201);
+    signupAgent.csrfToken = signupRes.body.data?.csrfToken || signupAgent.csrfToken;
+    const userId = Number(signupRes.body.data.user.id);
+    expect(signupRes.body.data.user.emailVerified).toBe(false);
+    await assertGuestUnclaimed(reservationId);
+
+    await withCsrf(signupAgent, signupAgent.post('/api/auth/logout')).expect(200);
+
+    const loginAgent = await createSessionAgent(app);
+    const loginRes = await withCsrf(loginAgent, loginAgent.post('/api/auth/login')).send({
+      email,
+      password,
+    });
+    expect(loginRes.status).toBe(200);
+    loginAgent.csrfToken = loginRes.body.data?.csrfToken || loginAgent.csrfToken;
+    expect(loginRes.body.data.user.emailVerified).toBe(false);
+    await assertGuestUnclaimed(reservationId);
+
+    const listRes = await loginAgent.get('/api/account/reservations').expect(200);
+    expect(listRes.body.data.reservations).toEqual([]);
+
+    const detailRes = await loginAgent.get(`/api/account/reservations/${reservationId}`);
+    expect(detailRes.status).toBe(404);
+    expect(detailRes.body.error.code).toBe('NOT_FOUND');
+
+    const travelRes = await withCsrf(
+      loginAgent,
+      loginAgent.patch(`/api/account/reservations/${reservationId}/travel`)
+    ).send({ flightNumber: 'ZZ999' });
+    expect(travelRes.status).toBe(404);
+    expect(travelRes.body.error.code).toBe('NOT_FOUND');
+
+    const cancelRes = await withCsrf(
+      loginAgent,
+      loginAgent.post(`/api/account/reservations/${reservationId}/cancel-request`)
+    ).send({ reason: 'attacker cancel' });
+    expect(cancelRes.status).toBe(404);
+    expect(cancelRes.body.error.code).toBe('NOT_FOUND');
+
+    const pdfRes = await loginAgent.get(
+      `/api/account/reservations/${reservationId}/pdf/invoice`
+    );
+    expect(pdfRes.status).toBe(404);
+    expect(pdfRes.body.error.code).toBe('NOT_FOUND');
+
+    const token = await plantVerificationToken(userId);
+    const verifyRes = await withCsrf(loginAgent, loginAgent.post('/api/auth/verify-email')).send({
+      token,
+    });
+    expect(verifyRes.status).toBe(200);
+    expect(verifyRes.body.data.user.emailVerified).toBe(true);
+
+    expect(await getReservationUserId(reservationId)).toBe(userId);
+    expect(await getOrderUserId(reservationId)).toBe(userId);
+
+    const claimedDetail = await loginAgent
+      .get(`/api/account/reservations/${reservationId}`)
+      .expect(200);
+    expect(claimedDetail.body.data.reservation.id).toBe(String(reservationId));
   });
 });

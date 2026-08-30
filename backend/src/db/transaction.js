@@ -7,12 +7,15 @@ const RESERVATION_HOLD_OVERLAP_CONSTRAINT = 'no_overlapping_active_reservation_h
 const ACTIVE_SESSION_HOLD_UNIQUE_INDEX = 'idx_reservations_one_active_hold_per_session';
 
 /**
- * Two-argument pg_advisory_xact_lock namespaces.
+ * Two-argument advisory lock namespaces.
  * Must stay distinct from each other and from session-level hashtext('luxride_migrations').
+ * CAR and SESSION are transaction-scoped (pg_advisory_xact_lock).
+ * CHECKOUT is session-scoped (pg_advisory_lock) so it can span Stripe API calls.
  */
 const ADVISORY_LOCK_NS = Object.freeze({
   CAR: 1,
   SESSION: 2,
+  CHECKOUT: 3,
 });
 
 /**
@@ -128,6 +131,51 @@ async function acquireSessionAdvisoryLock(client, sessionId) {
   ]);
 }
 
+function normalizeReservationCheckoutLockId(reservationId) {
+  const id = Number(reservationId);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Error('Invalid reservation id for checkout lock');
+  }
+  return id;
+}
+
+/**
+ * Session-level checkout lock. Held across Stripe create + DB link.
+ * Acquire only after hold-create / prepare transactions have committed.
+ */
+async function acquireReservationCheckoutLock(client, reservationId) {
+  const id = normalizeReservationCheckoutLockId(reservationId);
+  await client.query('SELECT pg_advisory_lock($1, $2)', [ADVISORY_LOCK_NS.CHECKOUT, id]);
+  return id;
+}
+
+async function releaseReservationCheckoutLock(client, reservationId) {
+  const id = normalizeReservationCheckoutLockId(reservationId);
+  await client.query('SELECT pg_advisory_unlock($1, $2)', [ADVISORY_LOCK_NS.CHECKOUT, id]);
+  return id;
+}
+
+/**
+ * Holds a session-level advisory lock for the reservation while work() runs.
+ * Does not open a transaction; Stripe calls must stay outside BEGIN.
+ * Unlocks before returning the client to the pool.
+ */
+async function withReservationCheckoutLock(reservationId, work) {
+  const id = normalizeReservationCheckoutLockId(reservationId);
+  const client = await pool.connect();
+
+  try {
+    await acquireReservationCheckoutLock(client, id);
+    try {
+      return await work(client);
+    } finally {
+      await releaseReservationCheckoutLock(client, id);
+    }
+  } finally {
+    client.release();
+  }
+}
+
 module.exports = {
   PG_UNIQUE_VIOLATION,
   PG_EXCLUSION_VIOLATION,
@@ -146,4 +194,7 @@ module.exports = {
   acquireCarAdvisoryLock,
   acquireCarAdvisoryLocks,
   acquireSessionAdvisoryLock,
+  acquireReservationCheckoutLock,
+  releaseReservationCheckoutLock,
+  withReservationCheckoutLock,
 };

@@ -2,13 +2,29 @@ jest.mock('../src/repositories/carRepository', () => ({
   findById: jest.fn(),
 }));
 
+jest.mock('../src/repositories/reservationRepository', () => ({
+  findById: jest.fn(),
+}));
+
+jest.mock('../src/services/sql/reservationSqlService', () => ({
+  reserveCheckoutAttempt: jest.fn(),
+}));
+
+jest.mock('../src/db/transaction', () => ({
+  withReservationCheckoutLock: jest.fn(async (_id, work) => work({})),
+}));
+
 jest.mock('../src/services/reservation/reservationStatusService', () => ({
   changeStatus: jest.fn(),
 }));
 
 jest.mock('../src/services/payment/stripeCheckoutService', () => ({
+  buildCheckoutIdempotencyKey: jest.fn(
+    (reservationId, attempt) => `checkout:reservation:${reservationId}:attempt${attempt}`
+  ),
   createStripeCheckoutSession: jest.fn(),
   expireStripeCheckoutSession: jest.fn(),
+  retrieveStripeCheckoutSession: jest.fn(),
   safeExpireSupersededCheckoutSession: jest.fn(),
 }));
 
@@ -53,10 +69,13 @@ jest.mock('../src/services/admin/adminAuditService', () => ({
 }));
 
 const carRepository = require('../src/repositories/carRepository');
+const reservationRepository = require('../src/repositories/reservationRepository');
+const reservationSql = require('../src/services/sql/reservationSqlService');
 const { changeStatus } = require('../src/services/reservation/reservationStatusService');
 const {
   createStripeCheckoutSession,
   expireStripeCheckoutSession,
+  retrieveStripeCheckoutSession,
   safeExpireSupersededCheckoutSession,
 } = require('../src/services/payment/stripeCheckoutService');
 const { validateCheckoutRequest } = require('../src/services/payment/checkout/checkoutValidationService');
@@ -101,6 +120,15 @@ describe('createCheckoutSessionFlow', () => {
     session: { id: 'sess_abc' },
   };
 
+  function mockResolvedReservation(doc, createdReservationThisStep = true) {
+    resolveCheckoutReservation.mockResolvedValue({
+      ok: true,
+      reservationDoc: { ...doc },
+      createdReservationThisStep,
+    });
+    reservationRepository.findById.mockResolvedValue({ ...doc });
+  }
+
   beforeEach(() => {
     jest.clearAllMocks();
     changeStatus.mockReset();
@@ -112,14 +140,12 @@ describe('createCheckoutSessionFlow', () => {
       endDate: new Date('2026-07-05'),
     });
     resolveCheckoutPricing.mockReturnValue({ ok: true, pricing });
-    resolveCheckoutReservation.mockResolvedValue({
-      ok: true,
-      reservationDoc: { ...reservationDoc },
-      createdReservationThisStep: true,
-    });
+    mockResolvedReservation(reservationDoc, true);
+    reservationSql.reserveCheckoutAttempt.mockResolvedValue(1);
     createStripeCheckoutSession.mockResolvedValue(stripeSession);
     expireStripeCheckoutSession.mockReset();
     expireStripeCheckoutSession.mockResolvedValue({ id: stripeSession.id, status: 'expired' });
+    retrieveStripeCheckoutSession.mockReset();
     safeExpireSupersededCheckoutSession.mockResolvedValue({ ok: true, skipped: true });
     changeStatus.mockResolvedValue({
       reservation: {
@@ -140,6 +166,9 @@ describe('createCheckoutSessionFlow', () => {
     const result = await createCheckoutSessionFlow(req);
 
     expect(expireStripeCheckoutSession).toHaveBeenCalledWith(stripeSession.id);
+    expect(reservationSql.reserveCheckoutAttempt).toHaveBeenCalledWith('42', {
+      forceIncrement: true,
+    });
     expect(trackPaymentFailure).toHaveBeenCalledWith(
       'reservation_stripe_session_link_failed',
       expect.objectContaining({
@@ -178,6 +207,7 @@ describe('createCheckoutSessionFlow', () => {
     const result = await createCheckoutSessionFlow(req);
 
     expect(expireStripeCheckoutSession).toHaveBeenCalledWith(stripeSession.id);
+    expect(reservationSql.reserveCheckoutAttempt).toHaveBeenCalledTimes(1);
     expect(logger.error).toHaveBeenCalledWith(
       expect.objectContaining({
         err: expireError,
@@ -210,6 +240,11 @@ describe('createCheckoutSessionFlow', () => {
     expect(safeExpireSupersededCheckoutSession).not.toHaveBeenCalled();
     expect(expireStripeCheckoutSession).not.toHaveBeenCalled();
     expect(trackPaymentFailure).not.toHaveBeenCalled();
+    expect(createStripeCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        idempotencyKey: 'checkout:reservation:42:attempt1',
+      })
+    );
     expect(result).toEqual({
       type: 'redirect',
       statusCode: 303,
@@ -217,16 +252,56 @@ describe('createCheckoutSessionFlow', () => {
     });
   });
 
-  test('expires previous stripe session before creating a new checkout session', async () => {
-    resolveCheckoutReservation.mockResolvedValue({
-      ok: true,
-      reservationDoc: {
+  test('reuses an open Stripe session when the amount still matches', async () => {
+    mockResolvedReservation(
+      {
         ...reservationDoc,
         stripeSessionId: 'cs_previous_active',
         status: 'processing_payment',
       },
-      createdReservationThisStep: false,
+      false
+    );
+    retrieveStripeCheckoutSession.mockResolvedValue({
+      id: 'cs_previous_active',
+      url: 'https://stripe.test/checkout/cs_previous_active',
+      status: 'open',
+      payment_status: 'unpaid',
+      amount_total: 12000,
     });
+
+    const result = await createCheckoutSessionFlow(req);
+
+    expect(createStripeCheckoutSession).not.toHaveBeenCalled();
+    expect(safeExpireSupersededCheckoutSession).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      type: 'redirect',
+      statusCode: 303,
+      url: 'https://stripe.test/checkout/cs_previous_active',
+    });
+  });
+
+  test('expires previous stripe session before creating when the amount changed', async () => {
+    mockResolvedReservation(
+      {
+        ...reservationDoc,
+        stripeSessionId: 'cs_previous_active',
+        status: 'processing_payment',
+      },
+      false
+    );
+    retrieveStripeCheckoutSession
+      .mockResolvedValueOnce({
+        id: 'cs_previous_active',
+        url: 'https://stripe.test/checkout/cs_previous_active',
+        status: 'open',
+        payment_status: 'unpaid',
+        amount_total: 9999,
+      })
+      .mockResolvedValueOnce({
+        id: 'cs_previous_active',
+        status: 'expired',
+        payment_status: 'unpaid',
+      });
     safeExpireSupersededCheckoutSession.mockResolvedValue({ ok: true, expired: true });
 
     await createCheckoutSessionFlow(req);
@@ -238,35 +313,72 @@ describe('createCheckoutSessionFlow', () => {
     expect(createStripeCheckoutSession).toHaveBeenCalled();
   });
 
-  test('continues checkout when superseded session expire reports already expired', async () => {
-    resolveCheckoutReservation.mockResolvedValue({
-      ok: true,
-      reservationDoc: {
+  test('refuses to create when previous session expire is inconclusive', async () => {
+    mockResolvedReservation(
+      {
+        ...reservationDoc,
+        stripeSessionId: 'cs_previous_active',
+        status: 'processing_payment',
+      },
+      false
+    );
+    retrieveStripeCheckoutSession.mockResolvedValue({
+      id: 'cs_previous_active',
+      url: 'https://stripe.test/checkout/cs_previous_active',
+      status: 'open',
+      payment_status: 'unpaid',
+      amount_total: 9999,
+    });
+    safeExpireSupersededCheckoutSession.mockResolvedValue({ ok: false, error: new Error('stripe down') });
+
+    const result = await createCheckoutSessionFlow(req);
+
+    expect(createStripeCheckoutSession).not.toHaveBeenCalled();
+    expect(result).toEqual(
+      expect.objectContaining({
+        type: 'renderOrderPage',
+        message: 'Unable to start payment. Please try again in a minute.',
+      })
+    );
+  });
+
+  test('continues checkout when previous stripe session is already expired', async () => {
+    mockResolvedReservation(
+      {
         ...reservationDoc,
         stripeSessionId: 'cs_previous_expired',
         status: 'pending_payment',
       },
-      createdReservationThisStep: false,
+      false
+    );
+    retrieveStripeCheckoutSession.mockResolvedValue({
+      id: 'cs_previous_expired',
+      status: 'expired',
+      payment_status: 'unpaid',
     });
-    safeExpireSupersededCheckoutSession.mockResolvedValue({ ok: true, alreadyExpired: true });
 
     const result = await createCheckoutSessionFlow(req);
 
+    expect(safeExpireSupersededCheckoutSession).not.toHaveBeenCalled();
     expect(result.type).toBe('redirect');
     expect(createStripeCheckoutSession).toHaveBeenCalled();
   });
 
   test('blocks new checkout when previous stripe session is already paid', async () => {
-    resolveCheckoutReservation.mockResolvedValue({
-      ok: true,
-      reservationDoc: {
+    mockResolvedReservation(
+      {
         ...reservationDoc,
         stripeSessionId: 'cs_previous_paid',
         status: 'processing_payment',
       },
-      createdReservationThisStep: false,
+      false
+    );
+    retrieveStripeCheckoutSession.mockResolvedValue({
+      id: 'cs_previous_paid',
+      status: 'complete',
+      payment_status: 'paid',
+      amount_total: 12000,
     });
-    safeExpireSupersededCheckoutSession.mockResolvedValue({ ok: false, paid: true });
 
     const result = await createCheckoutSessionFlow(req);
 
@@ -282,6 +394,28 @@ describe('createCheckoutSessionFlow', () => {
       expect.objectContaining({
         type: 'renderOrderPage',
         message: 'Your payment is being reviewed. Please contact support if you need help.',
+      })
+    );
+  });
+
+  test('refuses to create when the existing Stripe session cannot be retrieved', async () => {
+    mockResolvedReservation(
+      {
+        ...reservationDoc,
+        stripeSessionId: 'cs_missing',
+        status: 'processing_payment',
+      },
+      false
+    );
+    retrieveStripeCheckoutSession.mockRejectedValue(new Error('No such checkout.session'));
+
+    const result = await createCheckoutSessionFlow(req);
+
+    expect(createStripeCheckoutSession).not.toHaveBeenCalled();
+    expect(result).toEqual(
+      expect.objectContaining({
+        type: 'renderOrderPage',
+        message: 'Unable to start payment. Please try again in a minute.',
       })
     );
   });

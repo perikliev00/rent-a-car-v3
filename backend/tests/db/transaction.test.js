@@ -6,6 +6,8 @@ const {
   acquireCarAdvisoryLock,
   acquireCarAdvisoryLocks,
   acquireSessionAdvisoryLock,
+  acquireReservationCheckoutLock,
+  releaseReservationCheckoutLock,
   ADVISORY_LOCK_NS,
   ACTIVE_SESSION_HOLD_UNIQUE_INDEX,
 } = require('../../src/db/transaction');
@@ -100,5 +102,42 @@ describe('transaction error helpers', () => {
       'Invalid session id for advisory lock'
     );
     expect(client.query).not.toHaveBeenCalled();
+  });
+
+  test('acquireReservationCheckoutLock queries namespaced pg_advisory_lock', async () => {
+    const client = { query: jest.fn().mockResolvedValue({ rows: [] }) };
+
+    await acquireReservationCheckoutLock(client, 42);
+
+    expect(client.query).toHaveBeenCalledWith('SELECT pg_advisory_lock($1, $2)', [
+      ADVISORY_LOCK_NS.CHECKOUT,
+      42,
+    ]);
+  });
+
+  test('releaseReservationCheckoutLock queries namespaced pg_advisory_unlock', async () => {
+    const client = { query: jest.fn().mockResolvedValue({ rows: [] }) };
+
+    await releaseReservationCheckoutLock(client, 42);
+
+    expect(client.query).toHaveBeenCalledWith('SELECT pg_advisory_unlock($1, $2)', [
+      ADVISORY_LOCK_NS.CHECKOUT,
+      42,
+    ]);
+  });
+
+  test('acquireReservationCheckoutLock rejects invalid reservation id', async () => {
+    const client = { query: jest.fn() };
+
+    await expect(acquireReservationCheckoutLock(client, 'bad')).rejects.toThrow(
+      'Invalid reservation id for checkout lock'
+    );
+    expect(client.query).not.toHaveBeenCalled();
+  });
+
+  test('CHECKOUT namespace is distinct from CAR and SESSION', () => {
+    expect(ADVISORY_LOCK_NS.CHECKOUT).toBe(3);
+    expect(ADVISORY_LOCK_NS.CHECKOUT).not.toBe(ADVISORY_LOCK_NS.CAR);
+    expect(ADVISORY_LOCK_NS.CHECKOUT).not.toBe(ADVISORY_LOCK_NS.SESSION);
   });
 });
