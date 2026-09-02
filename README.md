@@ -215,7 +215,10 @@ Copy the example files and fill in your values:
 | `PORT` | `3000` | API port |
 | `CORS_ORIGINS` | dev defaults | Comma-separated allowed origins |
 | `EMAIL_ENABLED` | `false` | Enable SMTP email sending |
-| `STORAGE_DRIVER` | `local` | `local` or `s3` for car images |
+| `STORAGE_DRIVER` | `local` | `local` or `s3` for public car images only |
+| `PRIVATE_STORAGE_DRIVER` | `local` | `local` or `s3` for identity docs, signatures, and checklist photos |
+| `PRIVATE_STORAGE_PERSISTENT` | unset | Required in production when private storage is `local` (attests a durable volume) |
+| `PRIVATE_S3_BUCKET` | unset | Required when `PRIVATE_STORAGE_DRIVER=s3`; private bucket, not the CDN image bucket |
 
 ### Frontend
 
@@ -475,6 +478,7 @@ The `app` service depends on `db`, loads env from `.env`, and exposes port 3000 
 | Database | Managed PostgreSQL 16 |
 | Frontend | Static build (`npm run build`) served via CDN/Nginx |
 | Images | `STORAGE_DRIVER=s3` with S3-compatible bucket + CDN URL |
+| Private documents | `PRIVATE_STORAGE_DRIVER=s3` with a private (non-CDN) bucket, or a backed-up volume at `/app/uploads/private` |
 
 ### 2. Environment (production)
 
@@ -491,6 +495,8 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 STORAGE_DRIVER=s3
 S3_BUCKET=...
 STORAGE_PUBLIC_BASE_URL=https://cdn.your-domain.com
+PRIVATE_STORAGE_DRIVER=s3
+PRIVATE_S3_BUCKET=...
 SENTRY_DSN=https://...
 EMAIL_ENABLED=true
 SMTP_HOST=...
@@ -504,7 +510,8 @@ Production validation (in `backend/src/config/env.js`) enforces:
 - `SESSION_SECRET` strength (min 32 chars, no weak defaults)
 - Live Stripe key (`sk_live_...`)
 - `FRONTEND_BASE_URL` is set
-- S3 vars when `STORAGE_DRIVER=s3`
+- S3 vars when `STORAGE_DRIVER=s3` (public car images only)
+- `PRIVATE_S3_BUCKET` when `PRIVATE_STORAGE_DRIVER=s3`, or `PRIVATE_STORAGE_PERSISTENT=true` for local private storage
 - Full SMTP config when `EMAIL_ENABLED=true`
 
 ### 3. Deploy steps

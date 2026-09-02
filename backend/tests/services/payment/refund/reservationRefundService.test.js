@@ -146,8 +146,98 @@ describe('reservationRefundService.requestReservationRefund', () => {
     expect(createRefund).toHaveBeenCalledWith(
       expect.objectContaining({
         paymentIntentId: 'pi_1',
+        amountCents: 10000,
         idempotencyKey: 'refund:reservation:1:full',
       })
+    );
+    expect(changeStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ newStatus: 'refunded' })
+    );
+    expect(result.status).toBe('succeeded');
+  });
+
+  test('P0: full refund after reprice uses paid remaining, not mutable totalPrice', async () => {
+    resolvePaymentIntentForReservation.mockResolvedValue({
+      paymentIntentId: 'pi_1',
+      amountCents: 10000,
+      currency: 'eur',
+      source: 'stripe_pi',
+      paidAmountCents: 10000,
+    });
+    reservationRepository.findById
+      .mockResolvedValueOnce({
+        id: 1,
+        status: 'confirmed',
+        totalPrice: 50,
+        paidAmountCents: 10000,
+        stripePaymentIntentId: 'pi_1',
+      })
+      .mockResolvedValueOnce({
+        id: 1,
+        status: 'confirmed',
+        totalPrice: 50,
+        paidAmountCents: 10000,
+        stripePaymentIntentId: 'pi_1',
+      })
+      .mockResolvedValue({
+        id: 1,
+        status: 'refunded',
+        totalPrice: 50,
+        paidAmountCents: 10000,
+        stripePaymentIntentId: 'pi_1',
+      });
+    reservationSql.findByIdForUpdate.mockResolvedValue({
+      id: 1,
+      status: 'confirmed',
+      totalPrice: 50,
+      paidAmountCents: 10000,
+      stripePaymentIntentId: 'pi_1',
+    });
+    refundOpSql.findActiveByReservationId
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue({
+        id: 10,
+        status: 'pending',
+        reservationId: 1,
+        amountCents: 10000,
+        idempotencyKey: 'refund:reservation:1:full',
+      });
+    refundOpSql.insertRefundOperation.mockResolvedValue({
+      id: 10,
+      status: 'pending',
+      reservationId: 1,
+      amountCents: 10000,
+      idempotencyKey: 'refund:reservation:1:full',
+    });
+    createRefund.mockResolvedValue({
+      id: 're_1',
+      status: 'succeeded',
+      payment_intent: 'pi_1',
+      amount: 10000,
+    });
+    refundOpSql.updateRefundOperation.mockImplementation(async (id, patch) => ({
+      id,
+      reservationId: 1,
+      status: patch.status || 'pending',
+      stripeRefundId: patch.stripeRefundId || 're_1',
+      amountCents: 10000,
+      idempotencyKey: 'refund:reservation:1:full',
+    }));
+
+    const result = await requestReservationRefund(req, { reservationId: 1 });
+
+    expect(refundOpSql.insertRefundOperation).toHaveBeenCalledWith(
+      expect.objectContaining({ amountCents: 10000 }),
+      null
+    );
+    expect(createRefund).toHaveBeenCalledWith(
+      expect.objectContaining({
+        paymentIntentId: 'pi_1',
+        amountCents: 10000,
+      })
+    );
+    expect(createRefund).not.toHaveBeenCalledWith(
+      expect.objectContaining({ amountCents: 5000 })
     );
     expect(changeStatus).toHaveBeenCalledWith(
       expect.objectContaining({ newStatus: 'refunded' })

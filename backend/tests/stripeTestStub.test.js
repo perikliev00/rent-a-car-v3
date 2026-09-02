@@ -64,4 +64,29 @@ describe('stripeTestStub checkout idempotency', () => {
     expect(session.id).toBeTruthy();
     expect(created).toBe(true);
   });
+
+  test('retrievePaymentIntent exposes remaining after a partial refund', async () => {
+    const session = await stripeTestStub.createSession({
+      pricing: { totalPrice: 100 },
+      reservationId: 9,
+    });
+
+    const before = stripeTestStub.retrievePaymentIntent(session.payment_intent, {
+      expand: ['latest_charge'],
+    });
+    expect(before.amount_received).toBe(10000);
+    expect(before.latest_charge.amount_refunded).toBe(0);
+
+    stripeTestStub.createRefund({
+      paymentIntentId: session.payment_intent,
+      amountCents: 2500,
+      idempotencyKey: 'refund:partial:1',
+    });
+
+    const after = stripeTestStub.retrievePaymentIntent(session.payment_intent, {
+      expand: ['latest_charge'],
+    });
+    expect(after.latest_charge.amount_refunded).toBe(2500);
+    expect(after.amount_received - after.latest_charge.amount_refunded).toBe(7500);
+  });
 });

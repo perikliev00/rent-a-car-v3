@@ -20,6 +20,10 @@ async function findBookedDateOverlap(carId, startDate, endDate, client = null) {
   return reservationSql.findBookedDateOverlap(carId, startDate, endDate, client);
 }
 
+async function findOpenPhysicalRental(carId, client = null, options = {}) {
+  return reservationSql.findOpenPhysicalRental(carId, client, options);
+}
+
 async function create(payload, client = null) {
   return reservationSql.createPendingReservation(payload, client);
 }
@@ -65,6 +69,7 @@ module.exports = {
   markExpired,
   findOverlappingHold,
   findBookedDateOverlap,
+  findOpenPhysicalRental,
   create,
   createWithAvailabilityCheck,
   reholdWithAvailabilityCheck,

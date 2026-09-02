@@ -14,6 +14,7 @@ const {
   findByIdForUpdate,
   findOverlappingHold,
   findBookedDateOverlap,
+  findOpenPhysicalRental,
 } = require('./reservationReadRepository');
 const { insertStatusHistory } = require('../reservationStatusHistorySqlService');
 const {
@@ -173,6 +174,11 @@ async function reholdPendingReservationWithAvailabilityCheck({
     const overlappingReservation = await findOverlappingHold(holdCriteria, client);
     if (overlappingReservation) {
       return { ok: false, conflict: true, reason: 'hold_overlap' };
+    }
+
+    const openPhysicalRental = await findOpenPhysicalRental(normalizedNewCarId, client);
+    if (openPhysicalRental) {
+      return { ok: false, conflict: true, reason: 'booked_overlap' };
     }
 
     const bookedOverlap = await findBookedDateOverlap(

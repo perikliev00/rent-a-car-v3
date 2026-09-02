@@ -42,6 +42,16 @@ async function assertNoActiveReservationHold(carId, start, end, client) {
   }
 }
 
+async function assertNoOpenPhysicalRental(carId, client) {
+  const open = await reservationRepository.findOpenPhysicalRental(carId, client);
+  if (open) {
+    throw new OrderFormError(
+      'OPEN_PHYSICAL_RENTAL',
+      'Selected car has an open rental (picked up / active) and cannot be booked until it is returned.'
+    );
+  }
+}
+
 async function resolveStoredDateRange(carId, prevStart, prevEnd, client) {
   try {
     const blocks = await fetchDateBlocksForCar(carId, client);
@@ -52,6 +62,17 @@ async function resolveStoredDateRange(carId, prevStart, prevEnd, client) {
 }
 
 async function getAvailabilityConflicts(carId, start, end) {
+  const openPhysical = await reservationRepository.findOpenPhysicalRental(carId);
+  if (openPhysical) {
+    return [
+      {
+        code: 'OPEN_PHYSICAL_RENTAL',
+        startDate: new Date(openPhysical.pickupDate).toISOString(),
+        endDate: new Date(openPhysical.returnDate).toISOString(),
+      },
+    ];
+  }
+
   const overlap = await findBookedOverlap(carId, start, end);
   if (!overlap) {
     return [];
@@ -74,6 +95,7 @@ module.exports = {
   findBookedOverlap,
   assertNoBookedOverlap,
   assertNoActiveReservationHold,
+  assertNoOpenPhysicalRental,
   resolveStoredDateRange,
   getAvailabilityConflicts,
 };

@@ -7,6 +7,7 @@ const logger = require('../../utils/logger');
 const logEvent = require('../../monitoring/logEvent');
 const metrics = require('../../monitoring/metrics');
 const { logSystemAction } = require('../admin/adminAuditService');
+const { paidAmountPatch } = require('../payment/stripeSessionValidation');
 
 function isHoldExpired(reservation, now = new Date()) {
   const holdExpiresAt = reservation.holdExpiresAt ? new Date(reservation.holdExpiresAt) : null;
@@ -21,6 +22,8 @@ async function completeReservationFinalization({
   reservation,
   stripeSessionId,
   stripePaymentIntent = null,
+  paidAmountCents = null,
+  paidCurrency = null,
   logPrefix,
   client,
   recoveryContext = null,
@@ -38,6 +41,7 @@ async function completeReservationFinalization({
       stripeSessionId,
       holdExpiresAt: new Date(),
       ...(paymentIntentId ? { stripePaymentIntentId: paymentIntentId } : {}),
+      ...paidAmountPatch(paidAmountCents, paidCurrency),
     },
     client,
   });

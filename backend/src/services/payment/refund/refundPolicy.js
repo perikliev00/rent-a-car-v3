@@ -47,12 +47,18 @@ function requireSucceededLedgerForRefunded(reservation, existing) {
 }
 
 function amountCentsFromReservation(reservation, resolved) {
+  if (resolved.amountCents === 0) {
+    throw refundError(
+      'REFUND_NO_AMOUNT',
+      'Cannot refund: Stripe reports no remaining refundable amount.'
+    );
+  }
   if (resolved.amountCents != null && resolved.amountCents > 0) {
     return resolved.amountCents;
   }
-  const price = Number(reservation.totalPrice);
-  if (Number.isFinite(price) && price > 0) {
-    return Math.round(price * 100);
+  const snapshot = Number(reservation.paidAmountCents);
+  if (Number.isFinite(snapshot) && snapshot > 0) {
+    return snapshot;
   }
   throw refundError('REFUND_NO_AMOUNT', 'Cannot refund: missing refundable amount.');
 }

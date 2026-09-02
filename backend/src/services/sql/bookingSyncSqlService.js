@@ -17,6 +17,49 @@ function overlapError() {
 }
 
 // Премахва изтекли date blocks за една кола или за всички коли.
+// Blocks tied to open physical rentals are extended first so overdue cars stay unbookable.
+async function extendOpenPhysicalRentalBlocks(carId = null, now = new Date(), client = null) {
+  const normalizedCarId = carId ? normalizeCarId(carId) : null;
+  if (carId && normalizedCarId === null) {
+    return;
+  }
+
+  // Keep end strictly after now so a following DELETE ... end_date <= now leaves the row.
+  const extendedEnd = new Date(now.getTime() + 1000);
+
+  if (normalizedCarId) {
+    await clientQuery(
+      client,
+      `
+      UPDATE car_date_blocks b
+      SET end_date = GREATEST(b.end_date, $2::timestamptz)
+      FROM reservations r
+      WHERE b.car_id = $1
+        AND r.car_id = b.car_id
+        AND r.status IN ('picked_up', 'active_rental')
+        AND b.start_date < r.return_date
+        AND b.end_date > r.pickup_date
+      `,
+      [normalizedCarId, extendedEnd]
+    );
+    return;
+  }
+
+  await clientQuery(
+    client,
+    `
+    UPDATE car_date_blocks b
+    SET end_date = GREATEST(b.end_date, $1::timestamptz)
+    FROM reservations r
+    WHERE r.car_id = b.car_id
+      AND r.status IN ('picked_up', 'active_rental')
+      AND b.start_date < r.return_date
+      AND b.end_date > r.pickup_date
+    `,
+    [extendedEnd]
+  );
+}
+
 async function purgeExpired(carId = null, client = null) {
   const now = new Date();
   const normalizedCarId = carId ? normalizeCarId(carId) : null;
@@ -25,10 +68,35 @@ async function purgeExpired(carId = null, client = null) {
     return;
   }
 
+  try {
+    await extendOpenPhysicalRentalBlocks(normalizedCarId, now, client);
+  } catch (err) {
+    // Extending into a later booking can hit GiST; keep the overdue block via DELETE guard below.
+    if (!isCarDateBlockOverlapViolation(err)) {
+      throw err;
+    }
+  }
+
+  const openRentalBlockGuard = `
+    NOT EXISTS (
+      SELECT 1
+      FROM reservations r
+      WHERE r.car_id = car_date_blocks.car_id
+        AND r.status IN ('picked_up', 'active_rental')
+        AND car_date_blocks.start_date < r.return_date
+        AND car_date_blocks.end_date > r.pickup_date
+    )
+  `;
+
   if (normalizedCarId) {
     await clientQuery(
       client,
-      `DELETE FROM car_date_blocks WHERE car_id = $1 AND end_date <= $2`,
+      `
+      DELETE FROM car_date_blocks
+      WHERE car_id = $1
+        AND end_date <= $2
+        AND ${openRentalBlockGuard}
+      `,
       [normalizedCarId, now]
     );
     return;
@@ -36,7 +104,11 @@ async function purgeExpired(carId = null, client = null) {
 
   await clientQuery(
     client,
-    `DELETE FROM car_date_blocks WHERE end_date <= $1`,
+    `
+    DELETE FROM car_date_blocks
+    WHERE end_date <= $1
+      AND ${openRentalBlockGuard}
+    `,
     [now]
   );
 }

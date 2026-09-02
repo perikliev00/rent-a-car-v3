@@ -456,4 +456,151 @@ describeIfDb('DB consistency', () => {
     `);
     expect(result.rowCount).toBe(1);
   });
+
+  test('purgeExpired retains and extends blocks for overdue picked_up rentals', async () => {
+    const carId = await insertCar();
+    const pickup = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
+    const returnDate = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+
+    try {
+      await bookingSync.addRange(carId, pickup, returnDate);
+      // Force block end into the past (addRange may have side effects from purge).
+      await pool.query(
+        `UPDATE car_date_blocks SET end_date = $2 WHERE car_id = $1`,
+        [carId, returnDate]
+      );
+
+      await pool.query(
+        `
+        INSERT INTO reservations (
+          car_id, session_id, pickup_date, return_date,
+          pickup_location, return_location, rental_days, total_price,
+          status, hold_expires_at
+        )
+        VALUES ($1, $2, $3, $4, 'office', 'office', 3, 150, 'picked_up', $5)
+        `,
+        [carId, `overdue-picked-${carId}`, pickup, returnDate, new Date(Date.now() + 3600000)]
+      );
+
+      await bookingSync.purgeExpired(carId);
+
+      const blocks = await pool.query(
+        `SELECT start_date, end_date FROM car_date_blocks WHERE car_id = $1`,
+        [carId]
+      );
+      expect(blocks.rowCount).toBe(1);
+      expect(new Date(blocks.rows[0].end_date).getTime()).toBeGreaterThan(Date.now() - 1000);
+
+      const hold = await reservationSql.createPendingReservationWithAvailabilityCheck({
+        carId,
+        sessionId: `new-hold-overdue-${carId}`,
+        startDate: new Date(Date.now() + 60 * 60 * 1000),
+        endDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+        pickupLocation: 'office',
+        returnLocation: 'office',
+        pricing: { rentalDays: 2, totalPrice: 100 },
+      });
+      expect(hold.reservation).toBeNull();
+      expect(hold.bookedOverlap).toBeTruthy();
+    } finally {
+      await cleanupCar(carId);
+    }
+  });
+
+  test('hold rejected for open physical rental even when date block is missing', async () => {
+    const carId = await insertCar();
+    const pickup = new Date(Date.now() - 4 * 24 * 60 * 60 * 1000);
+    const returnDate = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000);
+
+    try {
+      await pool.query(
+        `
+        INSERT INTO reservations (
+          car_id, session_id, pickup_date, return_date,
+          pickup_location, return_location, rental_days, total_price,
+          status, hold_expires_at
+        )
+        VALUES ($1, $2, $3, $4, 'office', 'office', 3, 150, 'active_rental', $5)
+        `,
+        [carId, `active-no-block-${carId}`, pickup, returnDate, new Date(Date.now() + 3600000)]
+      );
+
+      const blocks = await pool.query(
+        `SELECT id FROM car_date_blocks WHERE car_id = $1`,
+        [carId]
+      );
+      expect(blocks.rowCount).toBe(0);
+
+      const hold = await reservationSql.createPendingReservationWithAvailabilityCheck({
+        carId,
+        sessionId: `hold-no-block-${carId}`,
+        startDate: new Date(Date.now() + 2 * 60 * 60 * 1000),
+        endDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
+        pickupLocation: 'office',
+        returnLocation: 'office',
+        pricing: { rentalDays: 2, totalPrice: 100 },
+      });
+      expect(hold.reservation).toBeNull();
+      expect(hold.bookedOverlap).toBeTruthy();
+    } finally {
+      await cleanupCar(carId);
+    }
+  });
+
+  test('after returned, purge can remove block and car is holdable again', async () => {
+    const carId = await insertCar();
+    const pickup = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
+    const returnDate = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+
+    try {
+      await bookingSync.addRange(carId, pickup, returnDate);
+      await pool.query(
+        `UPDATE car_date_blocks SET end_date = $2 WHERE car_id = $1`,
+        [carId, returnDate]
+      );
+
+      const inserted = await pool.query(
+        `
+        INSERT INTO reservations (
+          car_id, session_id, pickup_date, return_date,
+          pickup_location, return_location, rental_days, total_price,
+          status, hold_expires_at
+        )
+        VALUES ($1, $2, $3, $4, 'office', 'office', 3, 150, 'picked_up', $5)
+        RETURNING id
+        `,
+        [carId, `returned-flow-${carId}`, pickup, returnDate, new Date(Date.now() + 3600000)]
+      );
+      const reservationId = inserted.rows[0].id;
+
+      await bookingSync.purgeExpired(carId);
+      expect(
+        (await pool.query(`SELECT id FROM car_date_blocks WHERE car_id = $1`, [carId])).rowCount
+      ).toBe(1);
+
+      await pool.query(`UPDATE reservations SET status = 'returned' WHERE id = $1`, [
+        reservationId,
+      ]);
+
+      await bookingSync.purgeExpired(carId);
+      expect(
+        (await pool.query(`SELECT id FROM car_date_blocks WHERE car_id = $1`, [carId])).rowCount
+      ).toBe(0);
+
+      const futureStart = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      const futureEnd = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000);
+      const hold = await reservationSql.createPendingReservationWithAvailabilityCheck({
+        carId,
+        sessionId: `after-return-${carId}`,
+        startDate: futureStart,
+        endDate: futureEnd,
+        pickupLocation: 'office',
+        returnLocation: 'office',
+        pricing: { rentalDays: 3, totalPrice: 150 },
+      });
+      expect(hold.reservation).toBeTruthy();
+    } finally {
+      await cleanupCar(carId);
+    }
+  });
 });

@@ -86,6 +86,22 @@ async function retrieveStripeCheckoutSession(sessionId) {
   return stripe.checkout.sessions.retrieve(sessionId);
 }
 
+async function retrieveStripePaymentIntent(paymentIntentId) {
+  if (!paymentIntentId) {
+    throw new Error('paymentIntentId is required');
+  }
+
+  if (stripeTestStub.isStubEnabled()) {
+    return stripeTestStub.retrievePaymentIntent(paymentIntentId, {
+      expand: ['latest_charge'],
+    });
+  }
+
+  return stripe.paymentIntents.retrieve(paymentIntentId, {
+    expand: ['latest_charge'],
+  });
+}
+
 function isStripeExpireAlreadyTerminalError(err) {
   const message = String(err?.message || '').toLowerCase();
   return (
@@ -134,5 +150,6 @@ module.exports = {
   createStripeCheckoutSession,
   expireStripeCheckoutSession,
   retrieveStripeCheckoutSession,
+  retrieveStripePaymentIntent,
   safeExpireSupersededCheckoutSession,
 };

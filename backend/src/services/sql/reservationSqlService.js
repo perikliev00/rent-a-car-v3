@@ -3,6 +3,9 @@ const {
   mapSqlReservation,
 } = require('./reservation/reservationMapper');
 const {
+  OPEN_PHYSICAL_RENTAL_STATUSES,
+  findOpenPhysicalRental,
+  carHasOpenPhysicalRental,
   findActiveBySessionId,
   findById,
   findByIdForUpdate,
@@ -36,7 +39,10 @@ const {
 
 module.exports = {
   ACTIVE_STATUS_SQL,
+  OPEN_PHYSICAL_RENTAL_STATUSES,
   mapSqlReservation,
+  findOpenPhysicalRental,
+  carHasOpenPhysicalRental,
   findActiveBySessionId,
   findById,
   findByIdForUpdate,

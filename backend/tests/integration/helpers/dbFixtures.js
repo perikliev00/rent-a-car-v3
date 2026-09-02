@@ -95,7 +95,7 @@ async function getReservationById(reservationId) {
     `
     SELECT id, car_id, session_id, status, stripe_session_id, stripe_payment_intent_id,
            hold_expires_at, pickup_date, pickup_time, return_date, return_time,
-           total_price, email, full_name, price_snapshot
+           total_price, paid_amount_cents, paid_currency, email, full_name, price_snapshot
     FROM reservations
     WHERE id = $1
     `,

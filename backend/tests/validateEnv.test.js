@@ -26,6 +26,7 @@ function productionEnv(overrides = {}) {
     STRIPE_WEBHOOK_SECRET: 'whsec_live_secret',
     FRONTEND_BASE_URL: 'https://app.example.com',
     CORS_ORIGINS: 'https://app.example.com',
+    PRIVATE_STORAGE_PERSISTENT: 'true',
     ...overrides,
   });
 }
@@ -139,6 +140,53 @@ describe('validateEnv', () => {
     const { validateEnv } = loadEnvModule();
 
     expect(() => validateEnv()).toThrow('Missing required env var(s): STORAGE_PUBLIC_BASE_URL');
+  });
+
+  test('rejects ephemeral local private storage in production', () => {
+    process.env = productionEnv();
+    delete process.env.PRIVATE_STORAGE_PERSISTENT;
+    const { validateEnv } = loadEnvModule();
+
+    expect(() => validateEnv()).toThrow('Private document storage is local and ephemeral');
+  });
+
+  test('allows local private storage in production when persistence is attested', () => {
+    process.env = productionEnv({ PRIVATE_STORAGE_PERSISTENT: 'true' });
+    const { validateEnv } = loadEnvModule();
+    const config = validateEnv();
+
+    expect(config.privateStorageDriver).toBe('local');
+  });
+
+  test('requires PRIVATE_S3_BUCKET in production when PRIVATE_STORAGE_DRIVER=s3', () => {
+    process.env = productionEnv({
+      PRIVATE_STORAGE_DRIVER: 's3',
+    });
+    delete process.env.PRIVATE_STORAGE_PERSISTENT;
+    const { validateEnv } = loadEnvModule();
+
+    expect(() => validateEnv()).toThrow('Missing required env var(s): PRIVATE_S3_BUCKET');
+  });
+
+  test('allows private S3 storage in production without persistence attestation', () => {
+    process.env = productionEnv({
+      PRIVATE_STORAGE_DRIVER: 's3',
+      PRIVATE_S3_BUCKET: 'luxride-private-docs',
+    });
+    delete process.env.PRIVATE_STORAGE_PERSISTENT;
+    const { validateEnv } = loadEnvModule();
+    const config = validateEnv();
+
+    expect(config.privateStorageDriver).toBe('s3');
+  });
+
+  test('rejects unknown PRIVATE_STORAGE_DRIVER in production', () => {
+    process.env = productionEnv({
+      PRIVATE_STORAGE_DRIVER: 'gcs',
+    });
+    const { validateEnv } = loadEnvModule();
+
+    expect(() => validateEnv()).toThrow('Unsupported PRIVATE_STORAGE_DRIVER: gcs');
   });
 
   test('skips validation in test environment', () => {

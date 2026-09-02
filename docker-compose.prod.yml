@@ -34,6 +34,10 @@ services:
       METRICS_TOKEN: ${METRICS_TOKEN:?METRICS_TOKEN is required}
       # Extra scaled API replicas should set this to "false"
       RUN_BACKGROUND_JOBS: "true"
+      # Local private uploads survive container rebuilds. Prefer PRIVATE_STORAGE_DRIVER=s3 in .env.
+      PRIVATE_STORAGE_PERSISTENT: "true"
+    volumes:
+      - backend_private_uploads:/app/uploads/private
     depends_on:
       db:
         condition: service_healthy
@@ -115,6 +119,7 @@ services:
 
 volumes:
   postgres_data:
+  backend_private_uploads:
   prometheus_data:
   grafana_data:
   alertmanager_data:

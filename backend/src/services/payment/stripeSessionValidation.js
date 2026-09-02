@@ -54,6 +54,48 @@ function validateStripePaymentDetails(stripeSession, reservation) {
   return { ok: true };
 }
 
+function paidSnapshotFromStripeSession(stripeSession) {
+  if (!stripeSession) {
+    return { paidAmountCents: null, paidCurrency: null };
+  }
+
+  const cents = Number(stripeSession.amount_total);
+  const currency = stripeSession.currency
+    ? String(stripeSession.currency).toLowerCase()
+    : null;
+
+  return {
+    paidAmountCents: Number.isFinite(cents) && cents > 0 ? Math.round(cents) : null,
+    paidCurrency: currency || null,
+  };
+}
+
+function paidSnapshotFromFinalizationContext(options = {}, stripeSession = null) {
+  if (stripeSession && stripeSession.amount_total != null) {
+    return paidSnapshotFromStripeSession(stripeSession);
+  }
+
+  if (options.stripeSessionAmountTotal != null) {
+    return paidSnapshotFromStripeSession({
+      amount_total: options.stripeSessionAmountTotal,
+      currency: options.stripeSessionCurrency,
+    });
+  }
+
+  return { paidAmountCents: null, paidCurrency: null };
+}
+
+function paidAmountPatch(paidAmountCents, paidCurrency) {
+  if (!(Number(paidAmountCents) > 0)) {
+    return {};
+  }
+
+  return {
+    paidAmountCents: Math.round(Number(paidAmountCents)),
+    paidCurrency: paidCurrency ? String(paidCurrency).toLowerCase() : 'eur',
+  };
+}
+
 function buildStripeSessionSnapshot(session) {
   if (!session) {
     return null;
@@ -74,5 +116,8 @@ module.exports = {
   validateActiveStripeSessionLink,
   getExpectedStripeAmountCents,
   validateStripePaymentDetails,
+  paidSnapshotFromStripeSession,
+  paidSnapshotFromFinalizationContext,
+  paidAmountPatch,
   buildStripeSessionSnapshot,
 };

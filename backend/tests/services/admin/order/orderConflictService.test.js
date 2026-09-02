@@ -1,12 +1,14 @@
 jest.mock('../../../../src/repositories/reservationRepository', () => ({
   findBookedDateOverlap: jest.fn(),
   findOverlappingHold: jest.fn(),
+  findOpenPhysicalRental: jest.fn(),
 }));
 
 const reservationRepository = require('../../../../src/repositories/reservationRepository');
 const {
   assertNoBookedOverlap,
   assertNoActiveReservationHold,
+  assertNoOpenPhysicalRental,
 } = require('../../../../src/services/admin/order/orderConflictService');
 const { OrderFormError } = require('../../../../src/services/admin/order/orderErrors');
 
@@ -29,6 +31,14 @@ describe('orderConflictService', () => {
 
     await expect(assertNoActiveReservationHold(7, start, end)).rejects.toMatchObject({
       code: 'RESERVATION_CONFLICT',
+    });
+  });
+
+  test('assertNoOpenPhysicalRental throws when car is still out', async () => {
+    reservationRepository.findOpenPhysicalRental.mockResolvedValue({ id: 'r1', status: 'picked_up' });
+
+    await expect(assertNoOpenPhysicalRental(7)).rejects.toMatchObject({
+      code: 'OPEN_PHYSICAL_RENTAL',
     });
   });
 });

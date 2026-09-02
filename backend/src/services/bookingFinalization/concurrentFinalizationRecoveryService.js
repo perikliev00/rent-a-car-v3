@@ -107,6 +107,8 @@ async function handleFinalizationOverlap(
     stripeSessionId,
     conflictReason: 'overlap_after_payment',
     paidAmount: options.paidAmount ?? reservation.totalPrice ?? null,
+    paidAmountCents: options.paidAmountCents ?? null,
+    paidCurrency: options.paidCurrency ?? null,
     stripePaymentIntent:
       options.stripePaymentIntent ?? reservation.stripePaymentIntentId ?? null,
     logPrefix,
@@ -136,6 +138,8 @@ async function finalizePaidExpiredHold({
       stripeSessionId,
       stripePaymentIntent:
         options.stripePaymentIntent ?? reservation.stripePaymentIntentId ?? null,
+      paidAmountCents: options.paidAmountCents ?? null,
+      paidCurrency: options.paidCurrency ?? null,
       logPrefix,
       client,
       recoveryContext: { holdExpiresAt },

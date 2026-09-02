@@ -92,6 +92,15 @@ async function applyStatusChange({ reservationId, newStatus, patch = null }, cli
     patch != null && Object.prototype.hasOwnProperty.call(patch, 'stripeSessionId');
   const hasStripePaymentIntentId =
     patch != null && Object.prototype.hasOwnProperty.call(patch, 'stripePaymentIntentId');
+  const hasPaidAmountCents =
+    patch != null && Object.prototype.hasOwnProperty.call(patch, 'paidAmountCents');
+  const hasPaidCurrency =
+    patch != null && Object.prototype.hasOwnProperty.call(patch, 'paidCurrency');
+  const paidAmountCentsValue = hasPaidAmountCents ? Number(patch.paidAmountCents) : null;
+  const paidCurrencyValue =
+    hasPaidCurrency && patch.paidCurrency != null
+      ? String(patch.paidCurrency).toLowerCase()
+      : null;
 
   const result = await clientQuery(
     client,
@@ -102,6 +111,14 @@ async function applyStatusChange({ reservationId, newStatus, patch = null }, cli
       hold_expires_at = CASE WHEN $3::boolean THEN $4 ELSE hold_expires_at END,
       stripe_session_id = CASE WHEN $5::boolean THEN $6 ELSE stripe_session_id END,
       stripe_payment_intent_id = CASE WHEN $7::boolean THEN $8 ELSE stripe_payment_intent_id END,
+      paid_amount_cents = CASE
+        WHEN $22::boolean AND paid_amount_cents IS NULL THEN $23
+        ELSE paid_amount_cents
+      END,
+      paid_currency = CASE
+        WHEN $24::boolean AND paid_currency IS NULL THEN $25
+        ELSE paid_currency
+      END,
       full_name = COALESCE($9, full_name),
       phone_number = COALESCE($10, phone_number),
       email = COALESCE($11, email),
@@ -145,6 +162,12 @@ async function applyStatusChange({ reservationId, newStatus, patch = null }, cli
       pricing?.snapshot?.hotelDelivery != null || pricing?.hotelDelivery != null
         ? Boolean(pricing.snapshot?.hotelDelivery ?? pricing.hotelDelivery)
         : null,
+      hasPaidAmountCents && Number.isFinite(paidAmountCentsValue) && paidAmountCentsValue > 0,
+      hasPaidAmountCents && Number.isFinite(paidAmountCentsValue) && paidAmountCentsValue > 0
+        ? paidAmountCentsValue
+        : null,
+      Boolean(paidCurrencyValue),
+      paidCurrencyValue,
     ]
   );
 

@@ -12,6 +12,7 @@ const {
 const {
   assertNoBookedOverlap,
   assertNoActiveReservationHold,
+  assertNoOpenPhysicalRental,
   getAvailabilityConflicts,
 } = require('./orderConflictService');
 const { buildOrderCreatePayload } = require('./orderMapper');
@@ -108,6 +109,7 @@ async function createOrderCore({ command, range, client }) {
     throw err;
   }
 
+  await assertNoOpenPhysicalRental(command.carId, client);
   await assertNoBookedOverlap(command.carId, range.start, range.end, client);
   await assertNoActiveReservationHold(command.carId, range.start, range.end, client);
 

@@ -87,6 +87,12 @@ function buildCarWhere(criteria = {}, rentalDays = 1, options = {}) {
         AND r.pickup_date < ${endParam}
         AND r.return_date > ${startParam}
     )`);
+    where.push(`NOT EXISTS (
+      SELECT 1
+      FROM reservations r
+      WHERE r.car_id = c.id
+        AND r.status IN ('picked_up', 'active_rental')
+    )`);
   }
 
   if (criteria.transmission) {

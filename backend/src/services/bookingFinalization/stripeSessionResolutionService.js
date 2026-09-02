@@ -5,6 +5,8 @@ const { trackPaymentFailure } = require('../../monitoring/track');
 const {
   validateActiveStripeSessionLink,
   validateStripePaymentDetails,
+  paidSnapshotFromStripeSession,
+  paidSnapshotFromFinalizationContext,
   buildStripeSessionSnapshot,
 } = require('../payment/stripeSessionValidation');
 const { markPaidReservationConflict } = require('./paidConflictManualReviewService');
@@ -42,6 +44,8 @@ async function rejectStripeFinalization({
   client,
   conflictReason,
   paidAmount,
+  paidAmountCents = null,
+  paidCurrency = null,
   trackReason,
   extraContext = {},
 }) {
@@ -60,6 +64,8 @@ async function rejectStripeFinalization({
       stripeSessionId,
       conflictReason,
       paidAmount,
+      paidAmountCents,
+      paidCurrency,
       logPrefix,
       client,
       resultReason: reason,
@@ -169,6 +175,7 @@ async function validateStripeSessionForFinalization({
     );
 
     const paymentStatus = await resolveStripePaymentStatus(stripeSessionId, options);
+    const paidSnapshot = paidSnapshotFromFinalizationContext(options);
 
     return rejectStripeFinalization({
       reservation,
@@ -178,6 +185,8 @@ async function validateStripeSessionForFinalization({
       client,
       conflictReason: 'stale_stripe_session',
       paidAmount: options.paidAmount ?? reservation.totalPrice ?? null,
+      paidAmountCents: paidSnapshot.paidAmountCents,
+      paidCurrency: paidSnapshot.paidCurrency,
       trackReason: 'stale_stripe_session',
       extraContext: {
         paymentStatus,
@@ -205,6 +214,8 @@ async function validateStripeSessionForFinalization({
       'Stripe checkout session failed payment validation'
     );
 
+    const paidSnapshot = paidSnapshotFromStripeSession(stripeSession);
+
     return rejectStripeFinalization({
       reservation,
       stripeSessionId,
@@ -213,6 +224,8 @@ async function validateStripeSessionForFinalization({
       client,
       conflictReason: paymentDetails.reason,
       paidAmount: stripeSession.amount_total != null ? stripeSession.amount_total / 100 : null,
+      paidAmountCents: paidSnapshot.paidAmountCents,
+      paidCurrency: paidSnapshot.paidCurrency,
       trackReason: paymentDetails.reason,
       extraContext: {
         paymentStatus: stripeSession.payment_status,

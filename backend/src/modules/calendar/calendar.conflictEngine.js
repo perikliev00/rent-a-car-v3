@@ -57,6 +57,23 @@ async function checkReservationRangeConflicts({
     );
   }
 
+  const openPhysical = await reservationSql.findOpenPhysicalRental(carIdNum, null, {
+    excludeReservationId,
+  });
+  if (openPhysical) {
+    conflicts.push(
+      conflict(
+        'OPEN_PHYSICAL_RENTAL',
+        'block',
+        'Car has an open rental (picked up / active) and cannot be scheduled until returned.',
+        {
+          overridable: false,
+          overlappingReservationId: String(openPhysical.id),
+        }
+      )
+    );
+  }
+
   const blockResult = await clientQuery(
     null,
     `

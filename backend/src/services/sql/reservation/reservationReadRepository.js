@@ -6,6 +6,45 @@ const {
   normalizeCarId,
 } = require('./reservationMapper');
 
+/** Physically out — must stay unbookable until return checklist. */
+const OPEN_PHYSICAL_RENTAL_STATUSES = Object.freeze(['picked_up', 'active_rental']);
+
+async function findOpenPhysicalRental(carId, client = null, options = {}) {
+  const normalizedCarId = normalizeCarId(carId);
+  if (!normalizedCarId) {
+    return null;
+  }
+
+  const params = [normalizedCarId, OPEN_PHYSICAL_RENTAL_STATUSES];
+  let excludeSql = '';
+  const excludedReservationId = Number(options.excludeReservationId);
+  if (Number.isInteger(excludedReservationId) && excludedReservationId > 0) {
+    params.push(excludedReservationId);
+    excludeSql = ` AND r.id <> $${params.length}`;
+  }
+
+  const result = await clientQuery(
+    client,
+    `
+    SELECT ${RESERVATION_SELECT}
+    FROM reservations r
+    WHERE r.car_id = $1
+      AND r.status = ANY($2::text[])
+      ${excludeSql}
+    ORDER BY r.pickup_date ASC
+    LIMIT 1
+    `,
+    params
+  );
+
+  return mapSqlReservation(result.rows[0]) || null;
+}
+
+async function carHasOpenPhysicalRental(carId, client = null) {
+  const open = await findOpenPhysicalRental(carId, client);
+  return Boolean(open);
+}
+
 async function findActiveBySessionId(sessionId, client = null) {
   if (!sessionId) {
     return null;
@@ -220,6 +259,9 @@ async function findProcessingWithExpiredHold(now = new Date(), client = null) {
 }
 
 module.exports = {
+  OPEN_PHYSICAL_RENTAL_STATUSES,
+  findOpenPhysicalRental,
+  carHasOpenPhysicalRental,
   findActiveBySessionId,
   findById,
   findByIdForUpdate,

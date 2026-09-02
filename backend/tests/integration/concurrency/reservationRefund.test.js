@@ -447,4 +447,44 @@ describeIf('MONEY-REFUND: reservation refund via Stripe', () => {
     expect(finalOp.status).toBe('succeeded');
     expect(finalOp.status).not.toBe('failed');
   });
+
+  test('full refund after quote reprice refunds the original paid amount', async () => {
+    const reservation = await checkoutAndConfirm();
+    const paidCents = Math.round(Number(reservation.total_price) * 100);
+    expect(paidCents).toBeGreaterThan(0);
+    expect(Number(reservation.paid_amount_cents)).toBe(paidCents);
+
+    const { pool } = require('../../helpers/dbTestHarness');
+    const lowered = Number(reservation.total_price) / 2;
+    await pool.query('UPDATE reservations SET total_price = $1 WHERE id = $2', [
+      lowered,
+      reservation.id,
+    ]);
+    await pool.query('UPDATE orders SET total_price = $1 WHERE reservation_id = $2', [
+      lowered,
+      reservation.id,
+    ]);
+
+    const admin = await loginAsAdmin(app);
+    const res = await postAdminReservationRefund(admin, reservation.id, {
+      reason: 'reprice_then_full_refund',
+    });
+    expect({ status: res.status, body: res.body }).toMatchObject({ status: 200 });
+    expect(res.body.data.status).toBe('succeeded');
+
+    const op = await getRefundOperationByReservationId(reservation.id);
+    expect(op.amount_cents).toBe(paidCents);
+    expect(op.amount_cents).not.toBe(Math.round(lowered * 100));
+
+    const stripeRefund = stripeTestStub.refunds.get(op.stripe_refund_id);
+    expect(stripeRefund.amount).toBe(paidCents);
+
+    const refunded = await getReservationById(reservation.id);
+    expect(refunded.status).toBe('refunded');
+    expect(Number(refunded.paid_amount_cents)).toBe(paidCents);
+
+    const order = await getOrderByReservationId(reservation.id);
+    expect(order.is_deleted).toBe(true);
+    expect(order.status).toBe('cancelled');
+  });
 });

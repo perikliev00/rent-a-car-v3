@@ -15,6 +15,7 @@ const {
 } = require('./refundPolicy');
 const {
   persistPaymentIntentIfNeeded,
+  persistPaidAmountIfNeeded,
   createPendingOperation,
 } = require('./refundLedgerService');
 const { applySucceededRefund } = require('./applyRefundService');
@@ -42,20 +43,9 @@ async function requestReservationRefund(req, { reservationId, reason = null }) {
 
   const resolved = await resolvePaymentIntentForReservation(reservation);
   const paymentIntentId = resolved.paymentIntentId;
-  const amountCents = amountCentsFromReservation(reservation, resolved);
   const currency = resolved.currency || 'eur';
   const order = await orderSql.findOrderByReservationId(reservation.id);
   const requestedByUserId = req?.session?.user?.id ?? null;
-  const stripeCtx = {
-    req,
-    reservation,
-    reason,
-    requestedByUserId,
-    amountCents,
-    paymentIntentId,
-    currency,
-    order,
-  };
 
   const reserved = await runWithTransaction(async (tx) => {
     const locked = await reservationSql.findByIdForUpdate(reservationId, tx);
@@ -77,6 +67,14 @@ async function requestReservationRefund(req, { reservationId, reason = null }) {
 
     assertRefundableStatus(locked.status);
     await persistPaymentIntentIfNeeded(locked, paymentIntentId, tx);
+    await persistPaidAmountIfNeeded(
+      locked,
+      {
+        paidAmountCents: resolved.paidAmountCents,
+        paidCurrency: resolved.currency,
+      },
+      tx
+    );
 
     let op = await refundOpSql.findActiveByReservationId(locked.id, tx);
     if (op?.status === 'succeeded') {
@@ -90,6 +88,7 @@ async function requestReservationRefund(req, { reservationId, reason = null }) {
     }
 
     if (!op) {
+      const amountCents = amountCentsFromReservation(locked, resolved);
       const latest = await refundOpSql.findLatestByReservationId(locked.id, tx);
       if (!latest) {
         op = await createPendingOperation({
@@ -142,6 +141,22 @@ async function requestReservationRefund(req, { reservationId, reason = null }) {
   if (reserved.done) {
     return succeededResponse(reserved);
   }
+
+  const amountCents =
+    reserved.op.amountCents != null
+      ? reserved.op.amountCents
+      : amountCentsFromReservation(reserved.reservation, resolved);
+
+  const stripeCtx = {
+    req,
+    reservation: reserved.reservation,
+    reason,
+    requestedByUserId,
+    amountCents,
+    paymentIntentId,
+    currency: resolved.currency || reserved.op.currency || 'eur',
+    order,
+  };
 
   return driveStripeForOperation(reserved.op, stripeCtx);
 }

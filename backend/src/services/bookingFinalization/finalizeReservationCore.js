@@ -18,6 +18,7 @@ const {
   handleFinalizationOverlap,
 } = require('./concurrentFinalizationRecoveryService');
 const { markPaidReservationConflict } = require('./paidConflictManualReviewService');
+const { paidSnapshotFromFinalizationContext } = require('../payment/stripeSessionValidation');
 
 async function finalizeReservationCore(stripeSessionId, options = {}, client = null) {
   const { logPrefix, requireActiveStatus = false, reservationId, carId, sessionId } = options;
@@ -126,6 +127,10 @@ async function finalizeReservationCore(stripeSessionId, options = {}, client = n
   }
 
   const paymentStatus = await resolveStripePaymentStatus(stripeSessionId, options);
+  const paidSnapshot = paidSnapshotFromFinalizationContext(
+    options,
+    sessionValidation.stripeSession
+  );
 
   if (isHoldExpired(reservation)) {
     if (!isStripeSessionPaid(paymentStatus)) {
@@ -156,6 +161,8 @@ async function finalizeReservationCore(stripeSessionId, options = {}, client = n
       options: {
         ...options,
         paidAmount: options.paidAmount ?? reservation.totalPrice ?? null,
+        paidAmountCents: paidSnapshot.paidAmountCents,
+        paidCurrency: paidSnapshot.paidCurrency,
       },
       client,
     });
@@ -173,6 +180,8 @@ async function finalizeReservationCore(stripeSessionId, options = {}, client = n
         stripeSessionId,
         conflictReason: 'paid_after_cancel',
         paidAmount: options.paidAmount ?? reservation.totalPrice ?? null,
+        paidAmountCents: paidSnapshot.paidAmountCents,
+        paidCurrency: paidSnapshot.paidCurrency,
         stripePaymentIntent:
           options.stripePaymentIntent ?? reservation.stripePaymentIntentId ?? null,
         logPrefix,
@@ -187,6 +196,8 @@ async function finalizeReservationCore(stripeSessionId, options = {}, client = n
       options: {
         ...options,
         paidAmount: options.paidAmount ?? reservation.totalPrice ?? null,
+        paidAmountCents: paidSnapshot.paidAmountCents,
+        paidCurrency: paidSnapshot.paidCurrency,
       },
       client,
     });
@@ -247,6 +258,8 @@ async function finalizeReservationCore(stripeSessionId, options = {}, client = n
       stripeSessionId,
       stripePaymentIntent:
         options.stripePaymentIntent ?? reservation.stripePaymentIntentId ?? null,
+      paidAmountCents: paidSnapshot.paidAmountCents,
+      paidCurrency: paidSnapshot.paidCurrency,
       logPrefix,
       client,
     });
@@ -268,7 +281,11 @@ async function finalizeReservationCore(stripeSessionId, options = {}, client = n
     return handleFinalizationOverlap(err, {
       reservation,
       stripeSessionId,
-      options,
+      options: {
+        ...options,
+        paidAmountCents: paidSnapshot.paidAmountCents,
+        paidCurrency: paidSnapshot.paidCurrency,
+      },
       paymentStatus,
       logPrefix,
       client,

@@ -56,6 +56,11 @@ function mapSqlReservation(row) {
     stripeSessionId: row.stripe_session_id || undefined,
     stripePaymentIntentId: row.stripe_payment_intent_id || undefined,
     stripeCheckoutAttempt: Number(row.stripe_checkout_attempt) || 0,
+    paidAmountCents:
+      row.paid_amount_cents != null && Number.isFinite(Number(row.paid_amount_cents))
+        ? Number(row.paid_amount_cents)
+        : undefined,
+    paidCurrency: row.paid_currency || undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -92,6 +97,8 @@ const RESERVATION_SELECT = `
   r.stripe_session_id,
   r.stripe_payment_intent_id,
   r.stripe_checkout_attempt,
+  r.paid_amount_cents,
+  r.paid_currency,
   r.created_at,
   r.updated_at
 `;

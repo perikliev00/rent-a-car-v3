@@ -80,6 +80,7 @@ async function checkCarAvailabilityForRange({
     endDate,
     now,
   });
+  const openPhysicalRental = await reservationRepository.findOpenPhysicalRental(carId);
   const bookedOverlap = await reservationRepository.findBookedDateOverlap(
     carId,
     startDate,
@@ -88,6 +89,7 @@ async function checkCarAvailabilityForRange({
 
   return {
     overlappingReservation,
+    openPhysicalRental,
     bookedOverlap,
   };
 }

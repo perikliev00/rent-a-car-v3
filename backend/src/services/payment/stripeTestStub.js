@@ -7,6 +7,7 @@ const sessions = new Map();
 const sessionsByIdempotency = new Map();
 const refunds = new Map();
 const refundsByIdempotency = new Map();
+const paymentIntents = new Map();
 let counter = 0;
 let refundCounter = 0;
 let failNextCreate = false;
@@ -140,6 +141,7 @@ async function createSession({ reservationId, carId, sessionId, pricing, car, id
   }
 
   sessions.set(id, session);
+  ensurePaymentIntentFromSession(session);
   if (idempotencyKey) {
     sessionsByIdempotency.set(idempotencyKey, session);
   }
@@ -217,6 +219,72 @@ function createOrphanPaidSession({ amountTotal = 10000, currency = 'eur' } = {})
   });
 }
 
+function ensurePaymentIntentFromSession(session) {
+  const piId = String(session.payment_intent);
+  if (!paymentIntents.has(piId)) {
+    paymentIntents.set(piId, {
+      id: piId,
+      amount_received: Number(session.amount_total) || 0,
+      amount_refunded: 0,
+      currency: session.currency || 'eur',
+    });
+  }
+  return paymentIntents.get(piId);
+}
+
+function remainingOf(pi) {
+  return Math.max(0, Number(pi.amount_received || 0) - Number(pi.amount_refunded || 0));
+}
+
+function getOrCreatePaymentIntent(paymentIntentId, fallbackAmount = null) {
+  const id = String(paymentIntentId);
+  if (paymentIntents.has(id)) {
+    return paymentIntents.get(id);
+  }
+
+  for (const session of sessions.values()) {
+    if (String(session.payment_intent) === id) {
+      return ensurePaymentIntentFromSession(session);
+    }
+  }
+
+  const amount = fallbackAmount != null ? Number(fallbackAmount) : 10000;
+  const pi = {
+    id,
+    amount_received: Number.isFinite(amount) && amount > 0 ? amount : 10000,
+    amount_refunded: 0,
+    currency: 'eur',
+  };
+  paymentIntents.set(id, pi);
+  return pi;
+}
+
+function retrievePaymentIntent(paymentIntentId, { expand } = {}) {
+  const pi = getOrCreatePaymentIntent(paymentIntentId);
+  const captured = Number(pi.amount_received) || 0;
+  const result = {
+    id: pi.id,
+    object: 'payment_intent',
+    amount: captured,
+    amount_received: captured,
+    currency: pi.currency || 'eur',
+    latest_charge: `ch_test_${pi.id}`,
+  };
+
+  if (expand && expand.includes('latest_charge')) {
+    result.latest_charge = {
+      id: `ch_test_${pi.id}`,
+      object: 'charge',
+      amount: captured,
+      amount_captured: captured,
+      amount_refunded: Number(pi.amount_refunded) || 0,
+      currency: pi.currency || 'eur',
+    };
+  }
+
+  return result;
+}
+
 function failNextCreateRefund() {
   failNextRefund = true;
 }
@@ -246,24 +314,29 @@ function createRefund({ paymentIntentId, amountCents = null, idempotencyKey }) {
   const status = nextRefundStatus || 'succeeded';
   nextRefundStatus = null;
 
+  const pi = getOrCreatePaymentIntent(paymentIntentId, amountCents);
   let amount = amountCents;
   if (amount == null) {
-    for (const session of sessions.values()) {
-      if (String(session.payment_intent) === String(paymentIntentId)) {
-        amount = session.amount_total;
-        break;
-      }
-    }
+    amount = remainingOf(pi);
   }
   if (amount == null) {
     amount = 10000;
+  }
+
+  const remaining = remainingOf(pi);
+  if (Number(amount) > remaining) {
+    const err = new Error(
+      `The refund amount (${amount}) exceeds the remaining refundable amount (${remaining})`
+    );
+    err.type = 'StripeInvalidRequestError';
+    throw err;
   }
 
   const refund = {
     id: `re_test_${refundCounter}${Date.now()}`,
     object: 'refund',
     amount: Number(amount),
-    currency: 'eur',
+    currency: pi.currency || 'eur',
     payment_intent: String(paymentIntentId),
     status,
   };
@@ -272,6 +345,7 @@ function createRefund({ paymentIntentId, amountCents = null, idempotencyKey }) {
   if (idempotencyKey) {
     refundsByIdempotency.set(idempotencyKey, refund);
   }
+  pi.amount_refunded = Number(pi.amount_refunded || 0) + Number(amount);
 
   if (throwNextRefundAfterRecording) {
     throwNextRefundAfterRecording = false;
@@ -310,6 +384,7 @@ function clearSessions() {
   sessionsByIdempotency.clear();
   refunds.clear();
   refundsByIdempotency.clear();
+  paymentIntents.clear();
   counter = 0;
   refundCounter = 0;
   failNextCreate = false;
@@ -339,6 +414,7 @@ module.exports = {
   createOrphanPaidSession,
   createRefund,
   retrieveRefund,
+  retrievePaymentIntent,
   setRefundState,
   failNextCreateRefund,
   throwNextCreateRefundAfterRecording,

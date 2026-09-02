@@ -1,5 +1,6 @@
 const SMTP_VARS = ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS', 'MAIL_FROM'];
 const S3_VARS = ['S3_BUCKET', 'STORAGE_PUBLIC_BASE_URL'];
+const PRIVATE_S3_VARS = ['PRIVATE_S3_BUCKET'];
 // Payment routes (checkout, webhook, admin) are always mounted and stripe.js
 // initializes the Stripe client at import time, so these are required outside test.
 const STRIPE_VARS = ['STRIPE_SECRET', 'STRIPE_WEBHOOK_SECRET'];
@@ -104,6 +105,31 @@ function validateProductionSecurity() {
   if (storageDriver === 's3') {
     requireEnv(S3_VARS);
   }
+
+  validatePrivateStorageConfig();
+}
+
+function resolvePrivateStorageDriver() {
+  return (process.env.PRIVATE_STORAGE_DRIVER || 'local').toLowerCase();
+}
+
+function validatePrivateStorageConfig() {
+  const driver = resolvePrivateStorageDriver();
+
+  if (driver === 's3') {
+    requireEnv(PRIVATE_S3_VARS);
+    return;
+  }
+
+  if (driver !== 'local') {
+    throw new Error(`Unsupported PRIVATE_STORAGE_DRIVER: ${driver}`);
+  }
+
+  if (!isTruthy(process.env.PRIVATE_STORAGE_PERSISTENT)) {
+    throw new Error(
+      'Private document storage is local and ephemeral. Mount a persistent volume at uploads/private and set PRIVATE_STORAGE_PERSISTENT=true, or set PRIVATE_STORAGE_DRIVER=s3 with PRIVATE_S3_BUCKET.'
+    );
+  }
 }
 
 function buildConfig() {
@@ -121,6 +147,7 @@ function buildConfig() {
     stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
     emailEnabled: isTruthy(process.env.EMAIL_ENABLED),
     storageDriver: (process.env.STORAGE_DRIVER || 'local').toLowerCase(),
+    privateStorageDriver: resolvePrivateStorageDriver(),
     corsOrigins: parseCorsOrigins(process.env.CORS_ORIGINS),
     frontendBaseUrl: resolveFrontendBaseUrl(),
     sessionCookieSameSite: allowedSameSite.has(sessionCookieSameSite)

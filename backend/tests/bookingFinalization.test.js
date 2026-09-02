@@ -141,6 +141,15 @@ describe('processStripeWebhookEvent', () => {
     expect(result.reason).toBe('finalized');
     expect(addRange).toHaveBeenCalled();
     expect(orderSql.createOrderFromReservation).toHaveBeenCalled();
+    expect(changeStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        newStatus: 'paid',
+        patch: expect.objectContaining({
+          paidAmountCents: 12000,
+          paidCurrency: 'eur',
+        }),
+      })
+    );
   });
 
   test('rejects stale stripe session when metadata points to reservation with newer active session', async () => {

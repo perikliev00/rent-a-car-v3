@@ -3,6 +3,33 @@ const reservationSql = require('../../sql/reservationSqlService');
 const { isUniqueViolation } = require('../../../db/transaction');
 const { buildIdempotencyKey } = require('./refundPolicy');
 
+async function persistPaidAmountIfNeeded(
+  reservation,
+  { paidAmountCents, paidCurrency } = {},
+  client = null
+) {
+  if (reservation.paidAmountCents != null && Number(reservation.paidAmountCents) > 0) {
+    return reservation;
+  }
+
+  const cents = Number(paidAmountCents);
+  if (!Number.isFinite(cents) || cents <= 0) {
+    return reservation;
+  }
+
+  return reservationSql.applyStatusChange(
+    {
+      reservationId: reservation.id,
+      newStatus: reservation.status,
+      patch: {
+        paidAmountCents: cents,
+        paidCurrency: paidCurrency || reservation.paidCurrency || 'eur',
+      },
+    },
+    client
+  );
+}
+
 async function persistPaymentIntentIfNeeded(reservation, paymentIntentId, client = null) {
   if (
     reservation.stripePaymentIntentId &&
@@ -114,6 +141,7 @@ async function createPendingOperation({
 
 module.exports = {
   persistPaymentIntentIfNeeded,
+  persistPaidAmountIfNeeded,
   resolveUpdatedRefundOperation,
   markRefundFailed,
   resurrectPending,

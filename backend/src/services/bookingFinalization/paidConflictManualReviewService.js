@@ -4,6 +4,7 @@ const logger = require('../../utils/logger');
 const metrics = require('../../monitoring/metrics');
 const { trackPaymentFailure } = require('../../monitoring/track');
 const { logSystemAction } = require('../admin/adminAuditService');
+const { paidAmountPatch } = require('../payment/stripeSessionValidation');
 
 function collectMissingPaidConflictFields(context) {
   const optionalFields = [
@@ -22,6 +23,8 @@ async function markPaidReservationConflict({
   stripeSessionId,
   conflictReason,
   paidAmount,
+  paidAmountCents = null,
+  paidCurrency = null,
   stripePaymentIntent,
   logPrefix,
   client,
@@ -50,6 +53,7 @@ async function markPaidReservationConflict({
         ...(stripePaymentIntent
           ? { stripePaymentIntentId: stripePaymentIntent }
           : {}),
+        ...paidAmountPatch(paidAmountCents, paidCurrency),
       },
       metadata: {
         conflictReason: conflictReason || 'overlap_after_payment',

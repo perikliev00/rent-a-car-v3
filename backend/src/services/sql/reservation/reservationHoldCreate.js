@@ -13,6 +13,7 @@ const {
   findActiveBySessionId,
   findOverlappingHold,
   findBookedDateOverlap,
+  findOpenPhysicalRental,
 } = require('./reservationReadRepository');
 const { emptyCreateResult, findSessionHoldRows } = require('./reservationHoldHelpers');
 const {
@@ -177,6 +178,11 @@ async function createPendingReservationWithAvailabilityCheck({
     const overlappingReservation = await findOverlappingHold(holdCriteria, client);
     if (overlappingReservation) {
       return emptyCreateResult({ overlappingReservation });
+    }
+
+    const openPhysicalRental = await findOpenPhysicalRental(normalizedCarId, client);
+    if (openPhysicalRental) {
+      return emptyCreateResult({ bookedOverlap: { id: String(normalizedCarId) } });
     }
 
     const bookedOverlap = await findBookedDateOverlap(
