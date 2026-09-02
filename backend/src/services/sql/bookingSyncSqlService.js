@@ -16,6 +16,21 @@ function overlapError() {
   return err;
 }
 
+const OPEN_PHYSICAL_RENTAL_STATUSES = `('picked_up', 'active_rental')`;
+
+function openPhysicalRentalOverlapSql(blockAlias = 'b') {
+  return `
+    EXISTS (
+      SELECT 1
+      FROM reservations r_open
+      WHERE r_open.car_id = ${blockAlias}.car_id
+        AND r_open.status IN ${OPEN_PHYSICAL_RENTAL_STATUSES}
+        AND ${blockAlias}.start_date < r_open.return_date
+        AND ${blockAlias}.end_date > r_open.pickup_date
+    )
+  `;
+}
+
 // Премахва изтекли date blocks за една кола или за всички коли.
 // Blocks tied to open physical rentals are extended first so overdue cars stay unbookable.
 async function extendOpenPhysicalRentalBlocks(carId = null, now = new Date(), client = null) {
@@ -36,7 +51,7 @@ async function extendOpenPhysicalRentalBlocks(carId = null, now = new Date(), cl
       FROM reservations r
       WHERE b.car_id = $1
         AND r.car_id = b.car_id
-        AND r.status IN ('picked_up', 'active_rental')
+        AND r.status IN ${OPEN_PHYSICAL_RENTAL_STATUSES}
         AND b.start_date < r.return_date
         AND b.end_date > r.pickup_date
       `,
@@ -52,11 +67,75 @@ async function extendOpenPhysicalRentalBlocks(carId = null, now = new Date(), cl
     SET end_date = GREATEST(b.end_date, $1::timestamptz)
     FROM reservations r
     WHERE r.car_id = b.car_id
-      AND r.status IN ('picked_up', 'active_rental')
+      AND r.status IN ${OPEN_PHYSICAL_RENTAL_STATUSES}
       AND b.start_date < r.return_date
       AND b.end_date > r.pickup_date
     `,
     [extendedEnd]
+  );
+}
+
+// After return, prior extend may leave end_date slightly in the future; clamp back so DELETE can remove it.
+async function clampClosedPhysicalRentalBlocks(carId = null, now = new Date(), client = null) {
+  const normalizedCarId = carId ? normalizeCarId(carId) : null;
+  if (carId && normalizedCarId === null) {
+    return;
+  }
+
+  const openOverlap = openPhysicalRentalOverlapSql('b2');
+
+  if (normalizedCarId) {
+    await clientQuery(
+      client,
+      `
+      UPDATE car_date_blocks b
+      SET end_date = src.clamp_end
+      FROM (
+        SELECT
+          b2.id AS block_id,
+          MAX(r.return_date) AS clamp_end
+        FROM car_date_blocks b2
+        INNER JOIN reservations r
+          ON r.car_id = b2.car_id
+         AND r.status NOT IN ${OPEN_PHYSICAL_RENTAL_STATUSES}
+         AND r.return_date <= $2::timestamptz
+         AND b2.start_date < r.return_date
+         AND b2.end_date > r.pickup_date
+        WHERE b2.car_id = $1
+          AND NOT (${openOverlap})
+        GROUP BY b2.id
+      ) src
+      WHERE b.id = src.block_id
+        AND b.end_date > src.clamp_end
+      `,
+      [normalizedCarId, now]
+    );
+    return;
+  }
+
+  await clientQuery(
+    client,
+    `
+    UPDATE car_date_blocks b
+    SET end_date = src.clamp_end
+    FROM (
+      SELECT
+        b2.id AS block_id,
+        MAX(r.return_date) AS clamp_end
+      FROM car_date_blocks b2
+      INNER JOIN reservations r
+        ON r.car_id = b2.car_id
+       AND r.status NOT IN ${OPEN_PHYSICAL_RENTAL_STATUSES}
+       AND r.return_date <= $1::timestamptz
+       AND b2.start_date < r.return_date
+       AND b2.end_date > r.pickup_date
+      WHERE NOT (${openOverlap})
+      GROUP BY b2.id
+    ) src
+    WHERE b.id = src.block_id
+      AND b.end_date > src.clamp_end
+    `,
+    [now]
   );
 }
 
@@ -77,12 +156,14 @@ async function purgeExpired(carId = null, client = null) {
     }
   }
 
+  await clampClosedPhysicalRentalBlocks(normalizedCarId, now, client);
+
   const openRentalBlockGuard = `
     NOT EXISTS (
       SELECT 1
       FROM reservations r
       WHERE r.car_id = car_date_blocks.car_id
-        AND r.status IN ('picked_up', 'active_rental')
+        AND r.status IN ${OPEN_PHYSICAL_RENTAL_STATUSES}
         AND car_date_blocks.start_date < r.return_date
         AND car_date_blocks.end_date > r.pickup_date
     )
