@@ -19,6 +19,7 @@ const { applyPricingToOrder } = require('./orderMapper');
 const { runWithOptionalTransaction } = require('./orderShared');
 const { buildOrderEditErrorResult } = require('./orderFormService');
 const { syncLinkedReservationAfterOrderUpdate } = require('./orderReservationSync');
+const { acquireCarAdvisoryLocks } = require('../../../db/transaction');
 
 async function updateOrder(orderId, payload) {
   const contactResult = validateOrderContact(payload);
@@ -97,17 +98,19 @@ async function updateOrderCore({ orderId, payload, contact, range, client }) {
       ? existingOrder.returnDate
       : parseSofiaDate(existingOrder.returnDate, existingOrder.returnTime || '23:59');
 
+  const newCarId =
+    payload.carId && payload.carId.toString
+      ? payload.carId.toString()
+      : String(prevCarId);
+
+  await acquireCarAdvisoryLocks(client, [prevCarId, newCarId]);
+
   const { storedStart, storedEnd } = await resolveStoredDateRange(
     prevCarId,
     prevStart,
     prevEnd,
     client
   );
-
-  const newCarId =
-    payload.carId && payload.carId.toString
-      ? payload.carId.toString()
-      : String(prevCarId);
 
   const car = await carRepository.findByIdForAdmin(newCarId);
   if (!car) {

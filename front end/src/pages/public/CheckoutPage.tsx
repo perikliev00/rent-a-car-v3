@@ -29,7 +29,7 @@ export function CheckoutPage() {
   });
   const [error, setError] = useState('');
 
-  const { data: orderData, isLoading } = useQuery({
+  const { data: orderData, isLoading, isError, error: orderError } = useQuery({
     queryKey: ['order-preview', carId, search, extras, hotelDelivery],
     queryFn: () =>
       createOrder({
@@ -98,7 +98,29 @@ export function CheckoutPage() {
     );
   }
 
-  if (isLoading || !orderData) return <PageLoader />;
+  if (isLoading) return <PageLoader />;
+
+  if (isError || !orderData) {
+    const message =
+      orderError instanceof ApiError
+        ? orderError.message
+        : orderError instanceof Error
+          ? orderError.message
+          : 'Could not load checkout. Please try again.';
+    return (
+      <div className="mx-auto max-w-lg px-4 py-20 text-center">
+        <p className="text-[var(--color-danger)]" data-testid="checkout-load-error">
+          {message}
+        </p>
+        <Link
+          to="/"
+          className="mt-4 inline-block font-medium text-[var(--color-accent-ink)] hover:underline"
+        >
+          Start a new search
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div>

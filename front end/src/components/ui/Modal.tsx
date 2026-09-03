@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 
 export function Modal({
   open,
@@ -14,6 +14,8 @@ export function Modal({
   children: ReactNode;
   wide?: boolean;
 }) {
+  const titleId = useId();
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -36,13 +38,19 @@ export function Modal({
       <div
         role="dialog"
         aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
         className={`relative z-10 max-h-[90vh] w-full overflow-y-auto rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] shadow-xl ${
           wide ? 'max-w-4xl' : 'max-w-lg'
         }`}
       >
         {title ? (
           <div className="flex items-center justify-between border-b border-[var(--color-line)] px-5 py-4">
-            <h2 className="font-display text-lg font-semibold text-[var(--color-ink)]">{title}</h2>
+            <h2
+              id={titleId}
+              className="font-display text-lg font-semibold text-[var(--color-ink)]"
+            >
+              {title}
+            </h2>
             <button
               type="button"
               onClick={onClose}

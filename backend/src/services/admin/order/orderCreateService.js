@@ -19,6 +19,7 @@ const { buildOrderCreatePayload } = require('./orderMapper');
 const { OrderFormError, runWithOptionalTransaction } = require('./orderShared');
 const { buildOrderNewErrorResult } = require('./orderFormService');
 const { ensureLinkedConfirmedReservation } = require('./orderReservationLinkService');
+const { acquireCarAdvisoryLocks } = require('../../../db/transaction');
 
 async function getCarAvailability(carId, query = {}) {
   const { pickupDate, pickupTime, returnDate, returnTime } = query;
@@ -101,6 +102,7 @@ async function createOrderCore({ command, range, client }) {
     throw new OrderFormError('CAR_REQUIRED', 'Car selection is required.');
   }
 
+  await acquireCarAdvisoryLocks(client, [command.carId]);
   await purgeExpired(command.carId, client);
   const car = await carRepository.findByIdForAdmin(command.carId);
   if (!car) {

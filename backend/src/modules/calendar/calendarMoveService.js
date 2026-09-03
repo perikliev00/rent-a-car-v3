@@ -6,7 +6,7 @@ const rbacService = require('../../services/rbac/rbacService');
 const { logAdminAction } = require('../../services/admin/adminAuditService');
 const bookingSync = require('../../services/sql/bookingSyncSqlService');
 const reservationSql = require('../../services/sql/reservationSqlService');
-const { runWithTransaction, clientQuery } = require('../../db/transaction');
+const { runWithTransaction, clientQuery, acquireCarAdvisoryLocks } = require('../../db/transaction');
 const {
   syncLinkedOrderAfterReservationMove,
 } = require('../../services/admin/order/orderReservationSync');
@@ -25,6 +25,61 @@ async function clearOverridableBlocksInRange(carId, start, end, client) {
     `,
     [Number(carId), start, end]
   );
+}
+
+async function assertNoHoldOrOpenPhysicalRental({
+  carId,
+  start,
+  end,
+  excludeReservationId,
+  client,
+}) {
+  const hold = await reservationSql.findOverlappingHold(
+    {
+      carId,
+      startDate: start,
+      endDate: end,
+      now: new Date(),
+      excludeReservationId,
+    },
+    client
+  );
+  if (hold) {
+    throw createHttpError('CALENDAR_CONFLICT', 'Overlaps an active payment hold.', 409, {
+      conflicts: [
+        {
+          code: 'HOLD_OVERLAP',
+          severity: 'block',
+          message: 'Overlaps an active payment hold.',
+          overridable: false,
+          overlappingReservationId: String(hold.id),
+        },
+      ],
+    });
+  }
+
+  const openPhysical = await reservationSql.findOpenPhysicalRental(carId, client, {
+    excludeReservationId,
+  });
+  if (openPhysical) {
+    throw createHttpError(
+      'CALENDAR_CONFLICT',
+      'Car has an open rental (picked up / active) and cannot be scheduled until returned.',
+      409,
+      {
+        conflicts: [
+          {
+            code: 'OPEN_PHYSICAL_RENTAL',
+            severity: 'block',
+            message:
+              'Car has an open rental (picked up / active) and cannot be scheduled until returned.',
+            overridable: false,
+            overlappingReservationId: String(openPhysical.id),
+          },
+        ],
+      }
+    );
+  }
 }
 
 async function moveOrResizeEvent(access, eventId, body, req, mode) {
@@ -69,6 +124,15 @@ async function moveOrResizeEvent(access, eventId, body, req, mode) {
     let orderSynced = false;
 
     await runWithTransaction(async (client) => {
+      await acquireCarAdvisoryLocks(client, [prevCarId, targetCarId]);
+      await assertNoHoldOrOpenPhysicalRental({
+        carId: targetCarId,
+        start,
+        end,
+        excludeReservationId: existing.id,
+        client,
+      });
+
       const { pricing, orderSynced: synced } = await syncLinkedOrderAfterReservationMove({
         reservationId: existing.id,
         carId: targetCarId,

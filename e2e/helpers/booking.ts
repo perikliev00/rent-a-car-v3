@@ -186,7 +186,31 @@ export async function continueToCheckoutAndFillGuest(
   });
   await page.getByRole('button', { name: 'Continue to checkout' }).click();
   await page.waitForURL(new RegExp(`/checkout/${carId}`));
-  await page.getByLabel('Full name').fill(guest.fullName);
+
+  const fullName = page.getByLabel('Full name');
+  const loadError = page.getByTestId('checkout-load-error');
+  const missingDetails = page.getByText('Missing booking details.');
+
+  await expect
+    .poll(
+      async () => {
+        if (await fullName.isVisible().catch(() => false)) return 'form';
+        if (await loadError.isVisible().catch(() => false)) return 'load_error';
+        if (await missingDetails.isVisible().catch(() => false)) return 'missing';
+        return null;
+      },
+      { timeout: 30_000 }
+    )
+    .not.toBeNull();
+
+  if (await loadError.isVisible().catch(() => false)) {
+    throw new Error(`Checkout failed to load: ${await loadError.innerText()}`);
+  }
+  if (await missingDetails.isVisible().catch(() => false)) {
+    throw new Error('Checkout missing booking query params after Continue to checkout');
+  }
+
+  await fullName.fill(guest.fullName);
   await page.getByLabel('Phone number').fill(guest.phoneNumber);
   await page.getByLabel('Email').fill(guest.email);
   await page.getByLabel('Address').fill(guest.address);

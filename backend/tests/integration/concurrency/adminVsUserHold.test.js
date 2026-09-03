@@ -15,6 +15,11 @@ const {
   getDateBlocksForCar,
   countOrdersForCar,
 } = require('../helpers/dbFixtures');
+const { waitUntilAdvisoryLockWaiter, ADVISORY_LOCK_NS } = require('../helpers/lockBarrier');
+const { pool } = require('../../helpers/dbTestHarness');
+const { acquireCarAdvisoryLock } = require('../../../src/db/transaction');
+const reservationSql = require('../../../src/services/sql/reservationSqlService');
+const { parseSofiaDate } = require('../../../src/utils/date/timezone');
 const { RESERVATION_CONFLICT_MESSAGE } = require('../../../src/services/admin/order/orderConflictService');
 
 const runIntegration =
@@ -22,6 +27,8 @@ const runIntegration =
 const describeIf = runIntegration ? describe : describe.skip;
 
 describeIf('Concurrency integration: adminVsUserHold', () => {
+  jest.setTimeout(60_000);
+
   let app;
   let carId;
 
@@ -57,5 +64,53 @@ describeIf('Concurrency integration: adminVsUserHold', () => {
     expect(await countActiveReservationsForCar(carId)).toBe(1);
     expect(await countOrdersForCar(carId)).toBe(0);
     expect(await getDateBlocksForCar(carId)).toHaveLength(0);
+  });
+
+  test('admin create waits on car lock then loses to an overlapping hold', async () => {
+    const adminAgent = await loginAsAdmin(app);
+    const competitor = await pool.connect();
+    const holdPricing = { rentalDays: 4, totalPrice: 200, deliveryPrice: 0, returnPrice: 0 };
+    try {
+      await competitor.query('BEGIN');
+      await acquireCarAdvisoryLock(competitor, carId);
+
+      const adminPromise = Promise.resolve(
+        withCsrf(adminAgent, adminAgent.post('/api/admin/orders')).send(buildAdminOrderBody(carId))
+      );
+
+      await waitUntilAdvisoryLockWaiter(ADVISORY_LOCK_NS.CAR, carId);
+
+      await reservationSql.createPendingReservation(
+        {
+          carId,
+          sessionId: `hold-race-${carId}`,
+          startDate: parseSofiaDate('2030-06-01', '10:00'),
+          endDate: parseSofiaDate('2030-06-05', '10:00'),
+          pickupTime: '10:00',
+          returnTime: '10:00',
+          pickupLocation: 'office',
+          returnLocation: 'office',
+          pricing: holdPricing,
+        },
+        competitor
+      );
+      await competitor.query('COMMIT');
+
+      const adminCreate = await adminPromise;
+      expect(adminCreate.status).toBe(422);
+      expect(adminCreate.body.success).toBe(false);
+      expect(adminCreate.body.error.message).toBe(RESERVATION_CONFLICT_MESSAGE);
+
+      expect(await countActiveReservationsForCar(carId)).toBe(1);
+      expect(await countOrdersForCar(carId)).toBe(0);
+      expect(await getDateBlocksForCar(carId)).toHaveLength(0);
+    } finally {
+      try {
+        await competitor.query('ROLLBACK');
+      } catch {
+        // already committed
+      }
+      competitor.release();
+    }
   });
 });

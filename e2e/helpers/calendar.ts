@@ -35,18 +35,38 @@ export async function openCalendarMonth(page: Page, date: string): Promise<void>
 
 /** Pick a YYYY-MM-DD value in a DateSelect (aria-label on day buttons). */
 export async function pickDateSelect(page: Page, label: string, isoDate: string): Promise<void> {
-  await page.getByRole('button', { name: label, exact: true }).click();
+  const trigger = page.getByRole('button', { name: label, exact: true });
   const picker = page.getByRole('dialog', { name: `${label} picker` });
-  await picker.waitFor({ state: 'visible', timeout: 10_000 });
+
+  async function ensureOpen(): Promise<void> {
+    if (await picker.isVisible().catch(() => false)) return;
+    await trigger.click();
+    await picker.waitFor({ state: 'visible', timeout: 10_000 });
+  }
+
+  await ensureOpen();
+
   for (let i = 0; i < 24; i += 1) {
+    await ensureOpen();
     const dayBtn = picker.getByRole('button', { name: isoDate });
-    if (await dayBtn.isVisible().catch(() => false)) {
-      await dayBtn.click();
+    if ((await dayBtn.count()) > 0) {
+      await dayBtn.first().evaluate((el) => (el as HTMLButtonElement).click());
+      await expect(picker).toBeHidden({ timeout: 5_000 });
       return;
     }
-    await picker.getByRole('button', { name: 'Next month' }).click();
+    await picker.getByRole('button', { name: 'Next month' }).evaluate((el) =>
+      (el as HTMLButtonElement).click()
+    );
   }
   throw new Error(`pickDateSelect: could not find ${isoDate} for ${label}`);
+}
+
+async function dateSelectHiddenValue(page: Page, label: string): Promise<string | null> {
+  const trigger = page.getByRole('button', { name: label, exact: true });
+  return trigger.evaluate((el) => {
+    const hidden = el.parentElement?.querySelector('input[type="hidden"]');
+    return hidden instanceof HTMLInputElement ? hidden.value : null;
+  });
 }
 
 /** Pick HH:mm in a TimeSelect. */
@@ -375,10 +395,10 @@ export async function createTaskFromQuickCreate(
   }
 ): Promise<void> {
   await page.getByTestId('quick-create-menu').getByRole('menuitem', { name: 'Create task' }).click();
-  await expect(page.getByRole('heading', { name: 'Create task' })).toBeVisible({
-    timeout: 10_000,
-  });
-  const dialog = page.getByRole('dialog');
+  const dialog = page
+    .getByRole('dialog')
+    .filter({ has: page.getByRole('heading', { name: 'Create task' }) });
+  await expect(dialog).toBeVisible({ timeout: 10_000 });
   await dialog.getByLabel('Title').fill(options.title);
   if (options.taskTypeLabel) {
     await dialog.getByLabel('Type', { exact: true }).selectOption({ label: options.taskTypeLabel });
@@ -387,10 +407,16 @@ export async function createTaskFromQuickCreate(
     await dialog.getByLabel('Car').selectOption({ label: options.carName });
   }
   if (options.startsDate) {
-    await pickDateSelect(page, 'Starts date', options.startsDate);
+    const current = await dateSelectHiddenValue(page, 'Starts date');
+    if (current !== options.startsDate) {
+      await pickDateSelect(page, 'Starts date', options.startsDate);
+    }
   }
   if (options.dueDate) {
-    await pickDateSelect(page, 'Due date', options.dueDate);
+    const current = await dateSelectHiddenValue(page, 'Due date');
+    if (current !== options.dueDate) {
+      await pickDateSelect(page, 'Due date', options.dueDate);
+    }
   }
   if (options.assigneeEmail) {
     const assignee = dialog.getByLabel('Assignee');

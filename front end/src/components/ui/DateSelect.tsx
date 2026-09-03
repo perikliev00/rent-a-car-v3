@@ -1,4 +1,5 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 export type FieldTone = 'light' | 'onDark';
 
@@ -86,7 +87,9 @@ export function DateSelect({
   const reactId = useId();
   const selectId = id ?? (label ? label.toLowerCase().replace(/\s+/g, '-') : reactId);
   const rootRef = useRef<HTMLDivElement>(null);
+  const pickerRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
+  const [pickerPos, setPickerPos] = useState<{ top: number; left: number } | null>(null);
 
   const selected = parseISODate(value);
   const minDate = min ? parseISODate(min) : null;
@@ -102,13 +105,26 @@ export function DateSelect({
     setViewMonth(base.getMonth());
   }, [open, value, min]);
 
+  useLayoutEffect(() => {
+    if (!open || !rootRef.current) {
+      setPickerPos(null);
+      return;
+    }
+    const rect = rootRef.current.getBoundingClientRect();
+    const width = Math.min(19 * 16, Math.max(0, window.innerWidth - 16));
+    const left = Math.min(Math.max(8, rect.left), Math.max(8, window.innerWidth - width - 8));
+    setPickerPos({ top: rect.bottom + 6, left });
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
 
     const onPointerDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setOpen(false);
+      const target = event.target as Node;
+      if (rootRef.current?.contains(target) || pickerRef.current?.contains(target)) {
+        return;
       }
+      setOpen(false);
     };
 
     const onKeyDown = (event: KeyboardEvent) => {
@@ -211,11 +227,15 @@ export function DateSelect({
       {/* Hidden native input keeps form semantics / tests that query by label value via id */}
       <input type="hidden" name={selectId} value={value} readOnly />
 
-      {open && (
+      {open &&
+        pickerPos &&
+        createPortal(
         <div
+          ref={pickerRef}
           role="dialog"
           aria-label={label ? `${label} picker` : 'Date picker'}
-          className="absolute left-0 z-50 mt-1.5 w-[min(19rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] text-[var(--color-ink)] shadow-[var(--shadow-lift)]"
+          style={{ top: pickerPos.top, left: pickerPos.left }}
+          className="fixed z-[80] w-[min(19rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] text-[var(--color-ink)] shadow-[var(--shadow-lift)]"
         >
           <div className="flex items-center justify-between border-b border-[var(--color-line)] bg-[var(--color-surface)] px-2 py-2.5 sm:px-3 sm:py-3">
             <button
@@ -280,7 +300,8 @@ export function DateSelect({
               );
             })}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {error && <p className="text-sm text-[var(--color-danger)]">{error}</p>}

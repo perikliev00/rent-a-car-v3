@@ -64,4 +64,20 @@ describe('CheckoutPage', () => {
     expect(screen.getByLabelText('Full name')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Pay with Stripe' })).toBeInTheDocument();
   });
+
+  it('shows load error instead of spinning forever when order preview fails', async () => {
+    vi.mocked(createOrder).mockRejectedValue(new Error('Selected car is already booked'));
+
+    renderWithRouter(<CheckoutPage />, {
+      route: `/checkout/1?${buildTestSearchQuery()}`,
+      path: '/checkout/:carId',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('checkout-load-error')).toHaveTextContent(
+        'Selected car is already booked'
+      );
+    });
+    expect(screen.queryByLabelText('Full name')).not.toBeInTheDocument();
+  });
 });

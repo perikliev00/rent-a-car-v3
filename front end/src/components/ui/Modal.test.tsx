@@ -21,7 +21,7 @@ describe('Modal', () => {
       </Modal>
     );
 
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Confirm' })).toBeInTheDocument();
     expect(screen.getByText('Are you sure?')).toBeInTheDocument();
 
     const closeButtons = screen.getAllByRole('button', { name: 'Close' });

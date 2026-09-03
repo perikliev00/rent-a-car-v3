@@ -6,11 +6,32 @@ const {
 const { ADMIN_OPS_STATUSES, isValidStatus } = require('../../domain/reservationStatus');
 const historySql = require('../sql/reservationStatusHistorySqlService');
 const reservationRepository = require('../../repositories/reservationRepository');
-const { runWithTransaction } = require('../../db/transaction');
+const { runWithTransaction, acquireCarAdvisoryLocks } = require('../../db/transaction');
+const {
+  assertNoActiveReservationHold,
+} = require('./order/orderConflictService');
 
 async function confirmManualReviewReservation(req, reservation, reason) {
   return runWithTransaction(async (client) => {
     const carId = reservation.carId?.id || reservation.carId;
+
+    await acquireCarAdvisoryLocks(client, [carId]);
+    try {
+      await assertNoActiveReservationHold(
+        carId,
+        reservation.pickupDate,
+        reservation.returnDate,
+        client
+      );
+    } catch (err) {
+      if (err.isOrderFormError) {
+        const mapped = new Error(err.message);
+        mapped.code = 'VALIDATION_ERROR';
+        mapped.status = 422;
+        throw mapped;
+      }
+      throw err;
+    }
 
     await addRange(carId, reservation.pickupDate, reservation.returnDate, client);
 

@@ -6,9 +6,27 @@ const {
   extendReservationHold,
   attachCarNameToReservation,
   createPendingReservation,
+  checkCarAvailabilityForRange,
 } = require('../../reservationService');
 const { changeStatus } = require('../../reservation/reservationStatusService');
 const { buildRenderOrderPageResponse } = require('./checkoutResponseFactory');
+
+function bookedUnavailableResponse(car, formData, pricing) {
+  return {
+    ok: false,
+    response: buildRenderOrderPageResponse(
+      car,
+      formData,
+      'Selected car is already booked in this period. Please choose different dates or a different car.',
+      {
+        rentalDays: pricing.rentalDays,
+        deliveryPrice: pricing.deliveryPrice,
+        returnPrice: pricing.returnPrice,
+        totalPrice: pricing.totalPrice,
+      }
+    ),
+  };
+}
 
 async function resolveCheckoutReservation({ req, car, formData, startDate, endDate, pricing }) {
   const trimmedContact = normalizeContactDetails(formData);
@@ -63,20 +81,7 @@ async function resolveCheckoutReservation({ req, car, formData, startDate, endDa
         ),
       };
     } else if (bookedOverlap) {
-      return {
-        ok: false,
-        response: buildRenderOrderPageResponse(
-          car,
-          formData,
-          'Selected car is already booked in this period. Please choose different dates or a different car.',
-          {
-            rentalDays: pricing.rentalDays,
-            deliveryPrice: pricing.deliveryPrice,
-            returnPrice: pricing.returnPrice,
-            totalPrice: pricing.totalPrice,
-          }
-        ),
-      };
+      return bookedUnavailableResponse(car, formData, pricing);
     } else {
       reservationDoc = createdReservation;
       createdReservationThisStep = true;
@@ -110,6 +115,16 @@ async function resolveCheckoutReservation({ req, car, formData, startDate, endDa
           }
         ),
       };
+    }
+
+    const { bookedOverlap, openPhysicalRental } = await checkCarAvailabilityForRange({
+      carId: car.id,
+      startDate,
+      endDate,
+      now,
+    });
+    if (bookedOverlap || openPhysicalRental) {
+      return bookedUnavailableResponse(car, formData, pricing);
     }
 
     extendReservationHold(reservationDoc);

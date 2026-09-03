@@ -11,6 +11,7 @@ const { toISODate } = require('./orderMapper');
 const { OrderRestoreError, runWithOptionalTransaction } = require('./orderShared');
 const { ensureLinkedConfirmedReservation } = require('./orderReservationLinkService');
 const { syncLinkedReservationAfterOrderUpdate } = require('./orderReservationSync');
+const { acquireCarAdvisoryLocks } = require('../../../db/transaction');
 
 async function restoreOrder(orderId) {
   try {
@@ -46,6 +47,7 @@ async function restoreOrder(orderId) {
         );
       }
 
+      await acquireCarAdvisoryLocks(client, [order.carId]);
       await assertNoActiveReservationHold(order.carId, range.start, range.end, client);
 
       await purgeExpired(order.carId, client);
