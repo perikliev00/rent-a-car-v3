@@ -3,10 +3,9 @@ import { buildSearchQuery } from '../helpers/booking';
 import {
   createManualBlockViaApi,
   deleteManualBlockViaApi,
+  fillBlockCarDialog,
   moveCalendarEventViaApi,
   openCalendarWeek,
-  pickDateSelect,
-  pickTimeSelect,
   rangeToIso,
 } from '../helpers/calendar';
 import { getSofiaIsoDateString } from '../helpers/dates';
@@ -182,15 +181,14 @@ test.describe("calendar-conflicts", () => {
       });
 
       await openCalendarWeek(adminPage, booked.pickupDate);
-      await adminPage.getByRole('button', { name: 'Block car' }).click();
-      await expect(adminPage.getByRole('heading', { name: 'Block car' })).toBeVisible();
-      await adminPage.getByLabel('Car').selectOption({ label: CAR_NAME });
-      await pickDateSelect(adminPage, 'Start date', booked.pickupDate);
-      await pickTimeSelect(adminPage, 'Start time', booked.pickupTime);
-      await pickDateSelect(adminPage, 'End date', booked.returnDate);
-      await pickTimeSelect(adminPage, 'End time', booked.returnTime);
-      await adminPage.getByLabel('Reason').fill('E2E UI conflict block');
-      await adminPage.getByRole('button', { name: 'Create block' }).click();
+      await fillBlockCarDialog(adminPage, {
+        carName: CAR_NAME,
+        startDate: booked.pickupDate,
+        startTime: booked.pickupTime,
+        endDate: booked.returnDate,
+        endTime: booked.returnTime,
+        reason: 'E2E UI conflict block',
+      });
 
       await expect(adminPage.getByRole('heading', { name: 'Calendar conflict' })).toBeVisible({
         timeout: 15_000,
@@ -235,17 +233,14 @@ test.describe("calendar-manual-blocks", () => {
       request,
     }) => {
       await openCalendarWeek(adminPage, range.pickupDate);
-
-      await adminPage.getByRole('button', { name: 'Block car' }).click();
-      await expect(adminPage.getByRole('heading', { name: 'Block car' })).toBeVisible();
-
-      await adminPage.getByLabel('Car').selectOption({ label: CAR_NAME });
-      await pickDateSelect(adminPage, 'Start date', range.pickupDate);
-      await pickTimeSelect(adminPage, 'Start time', range.pickupTime);
-      await pickDateSelect(adminPage, 'End date', range.returnDate);
-      await pickTimeSelect(adminPage, 'End time', range.returnTime);
-      await adminPage.getByLabel('Reason').fill(reason);
-      await adminPage.getByRole('button', { name: 'Create block' }).click();
+      await fillBlockCarDialog(adminPage, {
+        carName: CAR_NAME,
+        startDate: range.pickupDate,
+        startTime: range.pickupTime,
+        endDate: range.returnDate,
+        endTime: range.returnTime,
+        reason,
+      });
       await expect(adminPage.getByText('Block created')).toBeVisible({ timeout: 15_000 });
 
       expect(await countDateBlocksForCar(carId)).toBeGreaterThanOrEqual(1);

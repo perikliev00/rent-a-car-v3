@@ -85,6 +85,30 @@ export async function pickTimeSelect(page: Page, label: string, hhmm: string): P
   await expect(picker).toBeHidden({ timeout: 5_000 });
 }
 
+/** Open Block car and fill the form. `getByLabel('Car')` also matches the dialog name. */
+export async function fillBlockCarDialog(
+  page: Page,
+  options: {
+    carName: string;
+    startDate: string;
+    startTime: string;
+    endDate: string;
+    endTime: string;
+    reason: string;
+  }
+): Promise<void> {
+  await page.getByRole('button', { name: 'Block car' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Block car' });
+  await expect(dialog).toBeVisible({ timeout: 10_000 });
+  await dialog.getByLabel('Car', { exact: true }).selectOption({ label: options.carName });
+  await pickDateSelect(page, 'Start date', options.startDate);
+  await pickTimeSelect(page, 'Start time', options.startTime);
+  await pickDateSelect(page, 'End date', options.endDate);
+  await pickTimeSelect(page, 'End time', options.endTime);
+  await dialog.getByLabel('Reason').fill(options.reason);
+  await dialog.getByRole('button', { name: 'Create block' }).click();
+}
+
 async function adminSession(
   request: APIRequestContext,
   session?: ApiSession
