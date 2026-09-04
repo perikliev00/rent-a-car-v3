@@ -13,6 +13,7 @@ const {
 const {
   RESERVATION_CONFLICT_MESSAGE,
   assertNoActiveReservationHold,
+  assertNoOpenPhysicalRental,
   resolveStoredDateRange,
 } = require('./orderConflictService');
 const { applyPricingToOrder } = require('./orderMapper');
@@ -144,6 +145,9 @@ async function updateOrderCore({ orderId, payload, contact, range, client }) {
 
   if (!sameCar || !sameStart || !sameEnd) {
     await assertNoActiveReservationHold(newCarId, range.start, range.end, client);
+    await assertNoOpenPhysicalRental(newCarId, client, {
+      excludeReservationId: existingOrder.reservationId,
+    });
   }
 
   if (sameCar && sameStart && sameEnd) {

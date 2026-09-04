@@ -41,4 +41,14 @@ describe('orderConflictService', () => {
       code: 'OPEN_PHYSICAL_RENTAL',
     });
   });
+
+  test('assertNoOpenPhysicalRental forwards excludeReservationId', async () => {
+    reservationRepository.findOpenPhysicalRental.mockResolvedValue(null);
+
+    await assertNoOpenPhysicalRental(7, null, { excludeReservationId: 42 });
+
+    expect(reservationRepository.findOpenPhysicalRental).toHaveBeenCalledWith(7, null, {
+      excludeReservationId: 42,
+    });
+  });
 });

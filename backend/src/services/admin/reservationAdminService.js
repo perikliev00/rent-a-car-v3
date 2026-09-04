@@ -9,6 +9,7 @@ const reservationRepository = require('../../repositories/reservationRepository'
 const { runWithTransaction, acquireCarAdvisoryLocks } = require('../../db/transaction');
 const {
   assertNoActiveReservationHold,
+  assertNoOpenPhysicalRental,
 } = require('./order/orderConflictService');
 
 async function confirmManualReviewReservation(req, reservation, reason) {
@@ -23,6 +24,9 @@ async function confirmManualReviewReservation(req, reservation, reason) {
         reservation.returnDate,
         client
       );
+      await assertNoOpenPhysicalRental(carId, client, {
+        excludeReservationId: reservation.id,
+      });
     } catch (err) {
       if (err.isOrderFormError) {
         const mapped = new Error(err.message);

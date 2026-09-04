@@ -547,6 +547,120 @@ describeIfDb('DB consistency', () => {
     }
   });
 
+  test('staff order update rejects move onto car with overdue open physical rental', async () => {
+    const { updateOrder } = require('../src/services/admin/order/orderUpdateService');
+    const { getSofiaIsoDateString } = require('../src/utils/date/timezone');
+
+    const carX = await insertCar();
+    const carY = await insertCar();
+    const overduePickup = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
+    const overdueReturn = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+    const orderBStart = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000);
+    const orderBEnd = new Date(Date.now() + 13 * 24 * 60 * 60 * 1000);
+    let reservationAId;
+    let orderBId;
+
+    try {
+      await bookingSync.addRange(carX, overduePickup, overdueReturn);
+      await pool.query(`UPDATE car_date_blocks SET end_date = $2 WHERE car_id = $1`, [
+        carX,
+        overdueReturn,
+      ]);
+
+      const reservationA = await pool.query(
+        `
+        INSERT INTO reservations (
+          car_id, session_id, pickup_date, return_date,
+          pickup_location, return_location, rental_days, total_price,
+          status, hold_expires_at
+        )
+        VALUES ($1, $2, $3, $4, 'office', 'office', 3, 150, 'picked_up', $5)
+        RETURNING id, status, car_id, pickup_date, return_date
+        `,
+        [
+          carX,
+          `overdue-open-${carX}`,
+          overduePickup,
+          overdueReturn,
+          new Date(Date.now() + 3600000),
+        ]
+      );
+      reservationAId = reservationA.rows[0].id;
+
+      await bookingSync.purgeExpired(carX);
+
+      const orderB = await pool.query(
+        `
+        INSERT INTO orders (
+          car_id, pickup_date, return_date, pickup_time, return_time,
+          pickup_location, return_location, rental_days, total_price,
+          full_name, phone_number, email, address, status, is_deleted
+        )
+        VALUES (
+          $1, $2, $3, '10:00', '10:00',
+          'office', 'office', 3, 150,
+          'Order B Guest', '123456', $4, 'Addr B', 'active', FALSE
+        )
+        RETURNING id, car_id, pickup_date, return_date, full_name
+        `,
+        [carY, orderBStart, orderBEnd, `order-b-${carY}@example.com`]
+      );
+      orderBId = String(orderB.rows[0].id);
+      await bookingSync.addRange(carY, orderBStart, orderBEnd);
+
+      const moveStart = new Date(Date.now() + 2 * 60 * 60 * 1000);
+      const moveEnd = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+      const result = await updateOrder(orderBId, {
+        carId: carX,
+        pickupDate: getSofiaIsoDateString(moveStart),
+        pickupTime: '12:00',
+        returnDate: getSofiaIsoDateString(moveEnd),
+        returnTime: '12:00',
+        pickupLocation: 'office',
+        returnLocation: 'office',
+        hotelName: '',
+        fullName: 'Order B Guest',
+        phoneNumber: '123456',
+        email: `order-b-${carY}@example.com`,
+        address: 'Addr B',
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.viewModel?.error || '').toMatch(/open rental/i);
+
+      const orderAfter = await pool.query(
+        `SELECT car_id, pickup_date, return_date, full_name FROM orders WHERE id = $1`,
+        [orderBId]
+      );
+      expect(String(orderAfter.rows[0].car_id)).toBe(String(carY));
+      expect(new Date(orderAfter.rows[0].pickup_date).getTime()).toBe(orderBStart.getTime());
+      expect(new Date(orderAfter.rows[0].return_date).getTime()).toBe(orderBEnd.getTime());
+
+      const blocksOnX = await pool.query(
+        `SELECT start_date, end_date FROM car_date_blocks WHERE car_id = $1 ORDER BY start_date`,
+        [carX]
+      );
+      expect(blocksOnX.rowCount).toBe(1);
+      expect(new Date(blocksOnX.rows[0].end_date).getTime()).toBeLessThan(moveStart.getTime());
+
+      const reservationAAfter = await pool.query(
+        `SELECT status, car_id, pickup_date, return_date FROM reservations WHERE id = $1`,
+        [reservationAId]
+      );
+      expect(reservationAAfter.rows[0].status).toBe('picked_up');
+      expect(String(reservationAAfter.rows[0].car_id)).toBe(String(carX));
+      expect(new Date(reservationAAfter.rows[0].pickup_date).getTime()).toBe(
+        overduePickup.getTime()
+      );
+      expect(new Date(reservationAAfter.rows[0].return_date).getTime()).toBe(
+        overdueReturn.getTime()
+      );
+    } finally {
+      await cleanupCar(carX);
+      await cleanupCar(carY);
+    }
+  });
+
   test('after returned, purge can remove block and car is holdable again', async () => {
     const carId = await insertCar();
     const pickup = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);

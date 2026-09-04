@@ -42,8 +42,8 @@ async function assertNoActiveReservationHold(carId, start, end, client) {
   }
 }
 
-async function assertNoOpenPhysicalRental(carId, client) {
-  const open = await reservationRepository.findOpenPhysicalRental(carId, client);
+async function assertNoOpenPhysicalRental(carId, client, options = {}) {
+  const open = await reservationRepository.findOpenPhysicalRental(carId, client, options);
   if (open) {
     throw new OrderFormError(
       'OPEN_PHYSICAL_RENTAL',
