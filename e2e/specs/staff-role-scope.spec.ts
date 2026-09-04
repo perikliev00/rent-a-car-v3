@@ -1,4 +1,5 @@
 import { expect, test } from '../fixtures/base';
+import { ADMIN_BASE_URL } from '../helpers/test-env';
 import { apiGet, apiPost } from '../helpers/csrf';
 import { insertTestAdmin } from '../helpers/db';
 import {
@@ -297,7 +298,7 @@ test.describe("rbac-receptionist-refund", () => {
       );
       expect(allowed.status()).not.toBe(403);
 
-      const context = await browser.newContext();
+      const context = await browser.newContext({ baseURL: ADMIN_BASE_URL });
       const page = await context.newPage();
       await page.goto('/login');
       await page.getByLabel(/^email$/i).fill(accountant.email);

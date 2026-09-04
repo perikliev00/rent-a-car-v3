@@ -14,16 +14,22 @@ import {
   uniqueStaffEmail,
 } from '../helpers/rbac';
 import { seedE2eFixtures } from '../helpers/seed';
-import { API_URL, allocateFutureRange, uniqueEmail } from '../helpers/test-env';
+import { API_URL, ADMIN_BASE_URL, adminUrl, allocateFutureRange, uniqueEmail } from '../helpers/test-env';
 
 test.describe.configure({ mode: 'serial' });
 
 test.describe("admin-authz", () => {
   test.describe('Admin authorization', () => {
     test('unauthenticated visitor is redirected away from admin', async ({ page }) => {
-      await page.goto('/admin');
+      await page.goto(adminUrl('/admin'));
       await expect(page).toHaveURL(/\/login/);
       await expect(page.getByRole('heading', { name: /log in|login|create account/i })).toBeVisible();
+    });
+
+    test('customer frontend does not expose the admin application', async ({ page }) => {
+      await page.goto('/admin');
+      await expect(page.getByText(/page not found/i)).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByRole('heading', { name: 'Dashboard', exact: true })).toHaveCount(0);
     });
 
     test('customer cannot open admin dashboard', async ({ page }) => {
@@ -38,7 +44,7 @@ test.describe("admin-authz", () => {
 
       await expect(page).toHaveURL(/\/verify-email/, { timeout: 15_000 });
 
-      await page.goto('/admin');
+      await page.goto(adminUrl('/admin'));
       await expect(page.getByRole('heading', { name: 'Access Denied' })).toBeVisible({
         timeout: 15_000,
       });
@@ -260,7 +266,7 @@ test.describe("admin-user-role-management", () => {
       expect(userId).toBeTruthy();
 
       const session = await loginAsStaff(request, { email, password: STAFF_PASSWORD });
-      const context = await browser.newContext();
+      const context = await browser.newContext({ baseURL: ADMIN_BASE_URL });
       const page = await context.newPage();
       await page.goto('/login');
       await page.getByLabel(/^email$/i).fill(email);

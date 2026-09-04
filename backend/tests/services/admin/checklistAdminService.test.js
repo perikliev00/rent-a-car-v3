@@ -44,9 +44,19 @@ const {
   reviewCancellationRequest,
 } = require('../../../src/services/admin/checklistAdminService');
 
-describe('reviewCancellationRequest', () => {
-  const req = { session: { user: { id: 9 } } };
+function reqWithPermissions(permissions = []) {
+  return {
+    session: {
+      user: {
+        id: 9,
+        roles: [],
+        permissions,
+      },
+    },
+  };
+}
 
+describe('reviewCancellationRequest', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     cancellationSql.findById.mockResolvedValue({
@@ -62,6 +72,7 @@ describe('reviewCancellationRequest', () => {
   });
 
   test('refundable reservation + approve refunds instead of cancelling', async () => {
+    const req = reqWithPermissions(['can_refund_payments']);
     reservationSql.findById.mockResolvedValue({
       id: 1,
       status: 'confirmed',
@@ -89,7 +100,26 @@ describe('reviewCancellationRequest', () => {
     expect(result.reservation.status).toBe('refunded');
   });
 
+  test('refundable approve without can_refund_payments is forbidden', async () => {
+    const req = reqWithPermissions(['can_cancel_orders']);
+    reservationSql.findById.mockResolvedValue({
+      id: 1,
+      status: 'confirmed',
+      stripePaymentIntentId: 'pi_1',
+    });
+
+    await expect(reviewCancellationRequest(req, 5, { approve: true })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      status: 403,
+    });
+
+    expect(requestReservationRefund).not.toHaveBeenCalled();
+    expect(changeStatus).not.toHaveBeenCalled();
+    expect(cancellationSql.review).not.toHaveBeenCalled();
+  });
+
   test('unpaid / no PI approve cancels as today', async () => {
+    const req = reqWithPermissions(['can_refund_payments']);
     reservationSql.findById.mockResolvedValue({
       id: 1,
       status: 'confirmed',
@@ -116,7 +146,31 @@ describe('reviewCancellationRequest', () => {
     expect(result.reservation.status).toBe('cancelled');
   });
 
-  test('reject does not refund or cancel', async () => {
+  test('non-refundable approve without refund permission cancels only', async () => {
+    const req = reqWithPermissions(['can_cancel_orders']);
+    reservationSql.findById.mockResolvedValue({
+      id: 1,
+      status: 'picked_up',
+    });
+    changeStatus.mockResolvedValue({
+      reservation: { id: 1, status: 'cancelled' },
+      changed: true,
+    });
+
+    const result = await reviewCancellationRequest(req, 5, { approve: true });
+
+    expect(requestReservationRefund).not.toHaveBeenCalled();
+    expect(changeStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ newStatus: 'cancelled' })
+    );
+    expect(cancellationSql.review).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'approved' })
+    );
+    expect(result.reservation.status).toBe('cancelled');
+  });
+
+  test('reject without refund permission does not refund or cancel', async () => {
+    const req = reqWithPermissions(['can_cancel_orders']);
     reservationSql.findById.mockResolvedValue({
       id: 1,
       status: 'confirmed',

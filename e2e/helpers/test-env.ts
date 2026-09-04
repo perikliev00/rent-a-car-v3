@@ -1,4 +1,13 @@
-export const BASE_URL = process.env.BASE_URL || 'http://localhost:5173';
+export const CUSTOMER_BASE_URL =
+  process.env.CUSTOMER_BASE_URL || process.env.BASE_URL || 'http://localhost:5173';
+export const ADMIN_BASE_URL = process.env.ADMIN_BASE_URL || 'http://localhost:5174';
+export const BASE_URL = CUSTOMER_BASE_URL;
+
+export function adminUrl(path = '/'): string {
+  const base = ADMIN_BASE_URL.replace(/\/+$/, '');
+  const suffix = path.startsWith('/') ? path : `/${path}`;
+  return `${base}${suffix}`;
+}
 export const API_URL = process.env.API_URL || 'http://localhost:3000';
 export const DATABASE_URL =
   process.env.DATABASE_URL || 'postgres://luxride:luxride@localhost:5432/luxride_test';

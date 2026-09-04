@@ -23,7 +23,7 @@ function requireStaffApi(req, res, next) {
   }
 
   const access = sessionAccess(req);
-  if (!rbacService.isStaffAccess(access, req.session.user.role)) {
+  if (!rbacService.isStaffAccess(access)) {
     return apiResponse.error(
       res,
       'FORBIDDEN',
@@ -36,7 +36,7 @@ function requireStaffApi(req, res, next) {
 }
 
 /**
- * Legacy admin gate — now means staff access (any assigned role / permissions).
+ * Staff gate — any assigned RBAC role / permissions.
  * Prefer requirePermission / requireStaffApi on new routes.
  */
 function requireAdminApi(req, res, next) {
@@ -50,7 +50,7 @@ function requirePermission(permissionKey) {
     }
 
     const access = sessionAccess(req);
-    if (!rbacService.isStaffAccess(access, req.session.user.role)) {
+    if (!rbacService.isStaffAccess(access)) {
       return apiResponse.error(
         res,
         'FORBIDDEN',
@@ -80,7 +80,7 @@ function requireAnyPermission(permissionKeys) {
     }
 
     const access = sessionAccess(req);
-    if (!rbacService.isStaffAccess(access, req.session.user.role)) {
+    if (!rbacService.isStaffAccess(access)) {
       return apiResponse.error(
         res,
         'FORBIDDEN',

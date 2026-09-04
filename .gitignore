@@ -18,6 +18,7 @@ coverage/
 # Jest / Vitest result JSON
 backend/test-results/
 front end/test-results/
+admin-front-end/test-results/
 
 # E2E (Playwright)
 e2e/playwright-report/

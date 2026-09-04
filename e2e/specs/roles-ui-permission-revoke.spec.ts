@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/base';
+import { ADMIN_BASE_URL } from '../helpers/test-env';
 import { insertTestAdmin } from '../helpers/db';
 import { apiGet } from '../helpers/csrf';
 import {
@@ -62,7 +63,7 @@ test.describe('Roles UI permission revoke (95)', () => {
     const after = await apiGet(request, '/api/admin/orders', supportSession);
     expect([401, 403]).toContain(after.status());
 
-    const ctx1 = await browser.newContext();
+    const ctx1 = await browser.newContext({ baseURL: ADMIN_BASE_URL });
     const page1 = await ctx1.newPage();
     try {
       await page1.goto('/login');
@@ -78,7 +79,7 @@ test.describe('Roles UI permission revoke (95)', () => {
     const restored = await updateRolePermissionsViaApi(request, supportRoleId, originalKeys);
     expect(restored.ok, JSON.stringify(restored.body)).toBeTruthy();
 
-    const ctx2 = await browser.newContext();
+    const ctx2 = await browser.newContext({ baseURL: ADMIN_BASE_URL });
     const page2 = await ctx2.newPage();
     try {
       await page2.goto('/login');

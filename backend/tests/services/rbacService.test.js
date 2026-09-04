@@ -3,11 +3,16 @@ const roleSql = require('../../src/services/sql/roleSqlService');
 const permissionSql = require('../../src/services/sql/permissionSqlService');
 const userRoleSql = require('../../src/services/sql/userRoleSqlService');
 const userSql = require('../../src/services/sql/userSqlService');
+const { clientQuery } = require('../../src/db/transaction');
 
 jest.mock('../../src/services/sql/roleSqlService');
 jest.mock('../../src/services/sql/permissionSqlService');
 jest.mock('../../src/services/sql/userRoleSqlService');
 jest.mock('../../src/services/sql/userSqlService');
+jest.mock('../../src/services/sql/sessionSqlService', () => ({
+  destroySessionsForUser: jest.fn().mockResolvedValue(0),
+  destroySessionsForRole: jest.fn().mockResolvedValue(0),
+}));
 jest.mock('../../src/db/transaction', () => ({
   runWithTransaction: async (work) => work({}),
   clientQuery: jest.fn().mockResolvedValue({ rows: [] }),
@@ -38,6 +43,18 @@ describe('rbacService', () => {
     ).toBe(true);
   });
 
+  test('isStaffAccess ignores stale users.role — RBAC only', () => {
+    expect(rbacService.isStaffAccess({ roles: [], permissions: [] })).toBe(false);
+    expect(rbacService.isStaffAccess({ roles: ['driver'], permissions: [] })).toBe(true);
+    expect(rbacService.isStaffAccess({ roles: [], permissions: ['can_view_orders'] })).toBe(true);
+  });
+
+  test('computeLegacyRoleFromAssigned demotes when empty', () => {
+    expect(rbacService.computeLegacyRoleFromAssigned([])).toBe('user');
+    expect(rbacService.computeLegacyRoleFromAssigned([{ roleSlug: 'driver' }])).toBe('staff');
+    expect(rbacService.computeLegacyRoleFromAssigned([{ roleSlug: 'owner' }])).toBe('admin');
+  });
+
   test('updateRolePermissions rejects owner role edits', async () => {
     roleSql.findRoleById.mockResolvedValue({ id: '1', slug: 'owner', name: 'Owner' });
 
@@ -60,7 +77,7 @@ describe('rbacService', () => {
     });
   });
 
-  test('assignUserRole upgrades legacy user to staff', async () => {
+  test('assignUserRole syncs legacy role to staff', async () => {
     userSql.findUserById.mockResolvedValue({ id: '9', role: 'user', email: 's@b.c' });
     roleSql.findRoleById.mockResolvedValue({ id: '3', slug: 'driver', name: 'Driver' });
     userRoleSql.assignRoleToUser.mockResolvedValue([
@@ -69,5 +86,26 @@ describe('rbacService', () => {
 
     const result = await rbacService.assignUserRole(9, 3, 1);
     expect(result.roles).toEqual([{ id: '3', slug: 'driver', name: 'Driver' }]);
+    expect(clientQuery).toHaveBeenCalledWith(
+      {},
+      expect.stringContaining('UPDATE users SET role'),
+      [9, 'staff']
+    );
+  });
+
+  test('setUserRoles with empty list demotes legacy role to user', async () => {
+    userSql.findUserById.mockResolvedValue({ id: '9', role: 'staff', email: 's@b.c' });
+    roleSql.findRolesByIds.mockResolvedValue([]);
+    roleSql.findRoleBySlug.mockResolvedValue({ id: '1', slug: 'owner' });
+    userRoleSql.userHasRoleSlug.mockResolvedValue(false);
+    userRoleSql.replaceUserRoles.mockResolvedValue([]);
+
+    const result = await rbacService.setUserRoles(9, []);
+    expect(result.roles).toEqual([]);
+    expect(clientQuery).toHaveBeenCalledWith(
+      {},
+      expect.stringContaining('UPDATE users SET role'),
+      [9, 'user']
+    );
   });
 });

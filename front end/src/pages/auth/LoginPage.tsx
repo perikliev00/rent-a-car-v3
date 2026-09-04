@@ -27,7 +27,16 @@ export function LoginPage() {
     setLoading(true);
     try {
       const user = await login(email, password);
-      navigate(isStaffUser(user) ? '/admin' : from || '/account', { replace: true });
+      if (isStaffUser(user)) {
+        const adminUrl = import.meta.env.VITE_ADMIN_FRONTEND_URL?.replace(/\/+$/, '');
+        if (adminUrl) {
+          window.location.assign(adminUrl);
+          return;
+        }
+        navigate('/', { replace: true });
+        return;
+      }
+      navigate(from || '/account', { replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.code === 'ALREADY_LOGGED_IN') {

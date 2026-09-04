@@ -12,7 +12,7 @@ import {
   issueEmailVerificationToken,
 } from '../helpers/db';
 import { seedE2eFixtures, seedLinkedBooking } from '../helpers/seed';
-import { E2E_GUEST, allocateFutureRange, uniqueEmail } from '../helpers/test-env';
+import { E2E_GUEST, adminUrl, allocateFutureRange, uniqueEmail } from '../helpers/test-env';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -53,7 +53,7 @@ test.describe("account-portal", () => {
 
       await expect(page).toHaveURL(/\/verify-email/, { timeout: 15_000 });
 
-      await page.goto('/admin/pricing');
+      await page.goto(adminUrl('/admin/pricing'));
       await expect(page.getByRole('heading', { name: 'Access Denied' })).toBeVisible({
         timeout: 15_000,
       });

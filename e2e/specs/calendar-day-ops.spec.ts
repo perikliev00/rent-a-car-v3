@@ -25,7 +25,7 @@ import {
 } from '../helpers/db';
 import { STAFF_PASSWORD, cleanupTestStaff, insertTestStaff, loginAsStaff } from '../helpers/rbac';
 import { seedE2eFixtures, seedLinkedBooking } from '../helpers/seed';
-import { E2E_GUEST, allocateFutureRange, uniqueEmail } from '../helpers/test-env';
+import { ADMIN_BASE_URL, E2E_GUEST, allocateFutureRange, uniqueEmail } from '../helpers/test-env';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -314,7 +314,7 @@ test.describe("calendar-create-task-slot", () => {
       });
       await expect(adminPage.getByText(title)).toBeVisible({ timeout: 15_000 });
 
-      const driverCtx = await browser.newContext();
+      const driverCtx = await browser.newContext({ baseURL: ADMIN_BASE_URL });
       const driverPage = await driverCtx.newPage();
       try {
         await driverPage.goto('/login');

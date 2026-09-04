@@ -4,6 +4,27 @@ const { changeStatus } = require('../../reservation/reservationStatusService');
 const { logAdminAction } = require('../adminAuditService');
 const { REFUNDABLE_STATUSES } = require('../../payment/refund/refundPolicy');
 const { requestReservationRefund } = require('../../payment/refund/reservationRefundService');
+const rbacService = require('../../rbac/rbacService');
+
+function sessionAccess(req) {
+  const user = req?.session?.user || {};
+  return {
+    roles: Array.isArray(user.roles) ? user.roles : [],
+    permissions: Array.isArray(user.permissions) ? user.permissions : [],
+  };
+}
+
+function assertCanRefundPaidCancellation(req) {
+  if (rbacService.userHasPermission(sessionAccess(req), 'can_refund_payments')) {
+    return;
+  }
+  const err = new Error(
+    'Refund permission is required to approve cancellation of a paid reservation.'
+  );
+  err.code = 'FORBIDDEN';
+  err.status = 403;
+  throw err;
+}
 
 async function listCancellationRequests() {
   return cancellationSql.listPending({ limit: 50 });
@@ -40,6 +61,7 @@ async function reviewCancellationRequest(req, requestId, { approve, adminNote })
 
   if (reservation && reservation.status !== 'cancelled') {
     if (REFUNDABLE_STATUSES.includes(reservation.status)) {
+      assertCanRefundPaidCancellation(req);
       try {
         refundResult = await requestReservationRefund(req, {
           reservationId: existing.reservationId,

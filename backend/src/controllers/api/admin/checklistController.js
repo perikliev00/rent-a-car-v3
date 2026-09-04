@@ -92,6 +92,9 @@ exports.reviewCancellationRequest = asyncHandler(async (req, res, next) => {
     });
     return apiResponse.success(res, data);
   } catch (err) {
+    if (err.code === 'FORBIDDEN') {
+      return apiResponse.error(res, 'FORBIDDEN', err.message, 403);
+    }
     if (err.code === 'INVALID_STATUS_TRANSITION') {
       return apiResponse.error(res, 'INVALID_STATUS_TRANSITION', err.message, 422);
     }

@@ -26,12 +26,12 @@ export default defineConfig({
         'src/test/setup.ts',
         'src/vite-env.d.ts',
       ],
-      // Baseline 2026-08-22 unit coverage (Prompt 1 re-run): statements 52.86%, branches 47.56%, functions 42.6%, lines 54.27%
+      // Customer-only surface after admin split (2026-09-04): statements 70.41%, branches 61.98%, functions 68.39%, lines 72.09%
       thresholds: {
-        statements: 52,
-        branches: 47,
-        functions: 42,
-        lines: 54,
+        statements: 70,
+        branches: 61,
+        functions: 68,
+        lines: 72,
       },
     },
   },

@@ -52,11 +52,24 @@ function userHasAnyPermission(access, keys) {
   return (keys || []).some((k) => set.has(k));
 }
 
-function isStaffAccess(access, legacyRole = null) {
+/**
+ * Staff access is determined only by RBAC (`user_roles` / derived permissions).
+ * `users.role` is a denormalized cache and must never grant access on its own.
+ */
+function isStaffAccess(access) {
   if (!access) return false;
   if ((access.roles || []).length > 0) return true;
   if ((access.permissions || []).length > 0) return true;
-  return legacyRole === 'admin' || legacyRole === 'staff';
+  return false;
+}
+
+function computeLegacyRoleFromAssigned(assigned) {
+  const slugs = (assigned || [])
+    .map((r) => r.roleSlug || r.slug)
+    .filter(Boolean);
+  if (slugs.includes(OWNER_SLUG)) return 'admin';
+  if (slugs.length > 0) return 'staff';
+  return 'user';
 }
 
 async function updateUserLegacyRole(userId, role, client) {
@@ -65,6 +78,10 @@ async function updateUserLegacyRole(userId, role, client) {
     `UPDATE users SET role = $2, updated_at = NOW() WHERE id = $1`,
     [Number(userId), role]
   );
+}
+
+async function syncUserLegacyRole(userId, assigned, client) {
+  await updateUserLegacyRole(userId, computeLegacyRoleFromAssigned(assigned), client);
 }
 
 async function assertCanRemoveOwner(userId, client) {
@@ -107,9 +124,7 @@ async function setUserRoles(userId, roleIds, assignedByUserId = null) {
       client
     );
 
-    if (user.role === 'user' && assigned.length > 0) {
-      await updateUserLegacyRole(userId, 'staff', client);
-    }
+    await syncUserLegacyRole(userId, assigned, client);
 
     return {
       userId: String(userId),
@@ -139,9 +154,7 @@ async function assignUserRole(userId, roleId, assignedByUserId = null) {
       client
     );
 
-    if (user.role === 'user') {
-      await updateUserLegacyRole(userId, 'staff', client);
-    }
+    await syncUserLegacyRole(userId, assigned, client);
 
     return {
       userId: String(userId),
@@ -169,6 +182,8 @@ async function revokeUserRole(userId, roleId) {
     }
 
     const assigned = await userRoleSql.revokeRoleFromUser(userId, roleId, client);
+    await syncUserLegacyRole(userId, assigned, client);
+
     return {
       userId: String(userId),
       roles: assigned.map((r) => ({
@@ -251,6 +266,7 @@ module.exports = {
   userHasPermission,
   userHasAnyPermission,
   isStaffAccess,
+  computeLegacyRoleFromAssigned,
   setUserRoles,
   assignUserRole,
   revokeUserRole,

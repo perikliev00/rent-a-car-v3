@@ -12,13 +12,18 @@ async function checkReservationRangeConflicts({
   start,
   end,
   excludeReservationId = null,
+  excludeBlockId = null,
   force = false,
+  client = null,
 }) {
   const conflicts = [];
   const carIdNum = Number(carId);
+  const excludedBlockId = Number(excludeBlockId);
+  const hasExcludeBlock =
+    Number.isInteger(excludedBlockId) && excludedBlockId > 0;
 
   const carResult = await clientQuery(
-    null,
+    client,
     `
     SELECT id, status, insurance_expiry, technical_inspection_expiry, name
     FROM cars WHERE id = $1 AND is_deleted = FALSE LIMIT 1
@@ -42,12 +47,16 @@ async function checkReservationRangeConflicts({
     );
   }
 
-  const hold = await reservationSql.findOverlappingHold({
-    carId: carIdNum,
-    startDate: start,
-    endDate: end,
-    now: new Date(),
-  });
+  const hold = await reservationSql.findOverlappingHold(
+    {
+      carId: carIdNum,
+      startDate: start,
+      endDate: end,
+      now: new Date(),
+      excludeReservationId,
+    },
+    client
+  );
   if (hold && String(hold.id) !== String(excludeReservationId || '')) {
     conflicts.push(
       conflict('HOLD_OVERLAP', 'block', 'Overlaps an active payment hold.', {
@@ -57,7 +66,7 @@ async function checkReservationRangeConflicts({
     );
   }
 
-  const openPhysical = await reservationSql.findOpenPhysicalRental(carIdNum, null, {
+  const openPhysical = await reservationSql.findOpenPhysicalRental(carIdNum, client, {
     excludeReservationId,
   });
   if (openPhysical) {
@@ -74,17 +83,24 @@ async function checkReservationRangeConflicts({
     );
   }
 
+  const blockParams = [carIdNum, start, end];
+  let excludeBlockSql = '';
+  if (hasExcludeBlock) {
+    blockParams.push(excludedBlockId);
+    excludeBlockSql = ` AND id <> $${blockParams.length}`;
+  }
   const blockResult = await clientQuery(
-    null,
+    client,
     `
     SELECT id, block_type, start_date, end_date
     FROM car_date_blocks
     WHERE car_id = $1
       AND start_date < $3
       AND end_date > $2
+      ${excludeBlockSql}
     LIMIT 5
     `,
-    [carIdNum, start, end]
+    blockParams
   );
   for (const row of blockResult.rows) {
     conflicts.push(
@@ -98,7 +114,7 @@ async function checkReservationRangeConflicts({
 
   // Next pickup after this return — sequence check when resizing/moving
   const nextPickup = await clientQuery(
-    null,
+    client,
     `
     SELECT id, pickup_date
     FROM reservations
@@ -174,7 +190,7 @@ async function checkReservationRangeConflicts({
   }
 
   const damage = await clientQuery(
-    null,
+    client,
     `
     SELECT id FROM car_damage_reports
     WHERE car_id = $1 AND status = 'unresolved'

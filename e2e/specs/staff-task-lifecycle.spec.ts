@@ -1,4 +1,5 @@
 import { expect, test } from '../fixtures/base';
+import { ADMIN_BASE_URL } from '../helpers/test-env';
 import { apiGet, loginAsAdmin } from '../helpers/csrf';
 import { insertTestAdmin } from '../helpers/db';
 import {
@@ -224,7 +225,7 @@ test.describe("manager-task-fail-reopen", () => {
       expect(created.taskId).toBeTruthy();
       const taskId = created.taskId!;
 
-      const driverCtx = await browser.newContext();
+      const driverCtx = await browser.newContext({ baseURL: ADMIN_BASE_URL });
       const driverPage = await driverCtx.newPage();
       try {
         await driverPage.goto('/login');

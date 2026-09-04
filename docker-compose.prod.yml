@@ -61,8 +61,25 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:?VITE_API_BASE_URL is required}
+        VITE_ADMIN_FRONTEND_URL: ${VITE_ADMIN_FRONTEND_URL:-}
     ports:
       - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Host routing: customer on :80, admin on :8080 for local compose.
+  # Production ingress should route example.com -> frontend:80 and admin.example.com -> admin-frontend:80.
+  admin-frontend:
+    build:
+      context: ./admin-front-end
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:?VITE_API_BASE_URL is required}
+        VITE_CUSTOMER_FRONTEND_URL: ${VITE_CUSTOMER_FRONTEND_URL:-}
+    ports:
+      - "8080:80"
     depends_on:
       backend:
         condition: service_healthy

@@ -1,7 +1,6 @@
 import { test as base, type Browser, type Page } from '@playwright/test';
-import { BASE_URL } from '../helpers/test-env';
+import { ADMIN_BASE_URL, ADMIN_EMAIL, ADMIN_PASSWORD } from '../helpers/test-env';
 import { insertTestAdmin } from '../helpers/db';
-import { ADMIN_EMAIL, ADMIN_PASSWORD } from '../helpers/test-env';
 import {
   cleanupTestStaff,
   insertTestStaff,
@@ -13,9 +12,9 @@ async function loginViaUi(
   browser: Browser,
   credentials: { email: string; password: string }
 ): Promise<{ page: Page; context: Awaited<ReturnType<Browser['newContext']>> }> {
-  const context = await browser.newContext();
+  const context = await browser.newContext({ baseURL: ADMIN_BASE_URL });
   const page = await context.newPage();
-  await page.goto(`${BASE_URL.replace(/\/$/, '')}/login`);
+  await page.goto('/login');
   await page.getByLabel(/^email$/i).fill(credentials.email);
   await page.getByLabel(/^password$/i).fill(credentials.password);
   await page.locator('form').getByRole('button', { name: 'Log in' }).click();

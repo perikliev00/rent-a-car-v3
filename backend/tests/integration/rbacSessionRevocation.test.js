@@ -5,6 +5,7 @@ const {
   insertTestStaff,
   cleanupTestStaff,
 } = require('./helpers/dbFixtures');
+const { pool } = require('../helpers/dbTestHarness');
 
 const runIntegration =
   process.env.RUN_INTEGRATION_TESTS === '1' && process.env.DATABASE_URL;
@@ -38,5 +39,34 @@ describeIf('AUTH-002: rbacSessionRevocation', () => {
 
     const after = await session.get('/api/admin/reservations/ops-dashboard');
     expect([401, 403]).toContain(after.status);
+  });
+
+  test('stale users.role=staff cannot restore access after RBAC removal', async () => {
+    const again = await insertTestStaff({
+      roleSlug: 'receptionist',
+      email: staff.email,
+      password: staff.password,
+    });
+    staff = again;
+
+    const admin = await loginAsAdmin(app);
+    const cleared = await putUserRoles(admin, staff.userId, []);
+    expect(cleared.status).toBeLessThan(400);
+
+    // Force stale legacy column (simulates pre-cleanup DB / missed demote)
+    await pool.query(`UPDATE users SET role = 'staff', updated_at = NOW() WHERE id = $1`, [
+      staff.userId,
+    ]);
+
+    const roleRow = await pool.query(`SELECT role FROM users WHERE id = $1`, [staff.userId]);
+    expect(roleRow.rows[0].role).toBe('staff');
+
+    const ur = await pool.query(`SELECT 1 FROM user_roles WHERE user_id = $1`, [staff.userId]);
+    expect(ur.rowCount).toBe(0);
+
+    const reLogin = await loginAsStaff(app, staff);
+    const probe = await reLogin.get('/api/admin/reservations/ops-dashboard');
+    expect([401, 403]).toContain(probe.status);
+    expect(probe.status).not.toBe(200);
   });
 });

@@ -26,6 +26,7 @@ if (fs.existsSync(testEnvPath)) {
 const repoRoot = path.resolve(__dirname, '..');
 const backendDir = path.join(repoRoot, 'backend');
 const frontendDir = path.join(repoRoot, 'front end');
+const adminFrontendDir = path.join(repoRoot, 'admin-front-end');
 
 const testDatabaseUrl =
   process.env.DATABASE_URL || 'postgres://luxride:luxride@localhost:5432/luxride_test';
@@ -40,7 +41,7 @@ const backendEnv = {
   STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET || 'whsec_jest_placeholder_secret',
   SESSION_SECRET: process.env.SESSION_SECRET || 'test-session-secret-32-chars-minimum!!',
   FRONTEND_BASE_URL: 'http://localhost:5173',
-  CORS_ORIGINS: 'http://localhost:5173',
+  CORS_ORIGINS: 'http://localhost:5173,http://localhost:5174',
   ADMIN_EMAIL: process.env.ADMIN_EMAIL || 'admin@luxride.local',
   RATE_LIMIT_LOGIN_MAX: '1000',
   RATE_LIMIT_AUTH_MAX: '1000',
@@ -94,6 +95,19 @@ export default defineConfig({
       env: {
         ...process.env,
         VITE_API_BASE_URL: 'http://localhost:3000',
+        VITE_ADMIN_FRONTEND_URL: 'http://localhost:5174',
+      },
+    },
+    {
+      command: 'npm run dev',
+      cwd: adminFrontendDir,
+      url: 'http://localhost:5174',
+      reuseExistingServer,
+      timeout: 120_000,
+      env: {
+        ...process.env,
+        VITE_API_BASE_URL: 'http://localhost:3000',
+        VITE_CUSTOMER_FRONTEND_URL: 'http://localhost:5173',
       },
     },
   ],

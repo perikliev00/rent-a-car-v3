@@ -2,9 +2,10 @@
   "name": "luxride",
   "private": true,
   "scripts": {
-    "test": "npm run test:unit && npm run test:frontend",
+    "test": "npm run test:unit && npm run test:frontend && npm run test:admin-frontend",
     "test:unit": "npm --prefix backend test",
     "test:frontend": "npm --prefix \"front end\" test",
+    "test:admin-frontend": "npm --prefix admin-front-end test",
     "test:db": "npm --prefix backend run test:db",
     "test:integration": "npm --prefix backend run test:integration",
     "test:e2e": "npm --prefix e2e test",

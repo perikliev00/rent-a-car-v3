@@ -19,6 +19,7 @@ import { buildCheckoutCompletedEvent, postSignedWebhook } from '../helpers/strip
 import {
   ADMIN_EMAIL,
   ADMIN_PASSWORD,
+  ADMIN_BASE_URL,
   API_URL,
   E2E_GUEST,
   allocateFutureRange,
@@ -112,12 +113,12 @@ test.describe("booking-happy-path", () => {
       expect(order.status).toBe('active');
       expect(await countDateBlocksForCar(carId)).toBe(1);
 
-      await page.goto('/login');
+      await page.goto(`${ADMIN_BASE_URL}/login`);
       await page.getByLabel(/^email$/i).fill(ADMIN_EMAIL);
       await page.getByLabel(/^password$/i).fill(ADMIN_PASSWORD);
       await page.locator('form').getByRole('button', { name: 'Log in' }).click();
       await page.waitForURL(/\/admin/);
-      await page.goto('/admin/orders');
+      await page.goto(`${ADMIN_BASE_URL}/admin/orders`);
       await expect(page.getByRole('heading', { name: 'Orders' })).toBeVisible();
       await expect(page.getByText(guestEmail)).toBeVisible();
       await expect(page.getByText(CAR_NAME)).toBeVisible();

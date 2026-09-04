@@ -129,7 +129,7 @@ export function AdminLayout() {
     <div className="flex min-h-screen bg-[var(--color-surface)]">
       <aside className="hidden w-64 flex-shrink-0 bg-asphalt text-slate-300 lg:flex lg:flex-col">
         <div className="border-b border-white/10 px-6 py-5">
-          <Link to="/" className="font-display text-lg font-bold text-white">
+          <Link to="/admin" className="font-display text-lg font-bold text-white">
             Lux<span className="text-[var(--color-accent)]">Ride</span>
             <span className="ml-2 text-xs font-sans font-normal tracking-wide text-slate-400">
               Admin
@@ -161,9 +161,14 @@ export function AdminLayout() {
           ))}
         </nav>
         <div className="border-t border-white/10 p-4">
-          <Link to="/" className="block text-sm text-slate-400 transition-colors hover:text-white">
-            ← Back to site
-          </Link>
+          {import.meta.env.VITE_CUSTOMER_FRONTEND_URL ? (
+            <a
+              href={import.meta.env.VITE_CUSTOMER_FRONTEND_URL.replace(/\/+$/, '')}
+              className="block text-sm text-slate-400 transition-colors hover:text-white"
+            >
+              ← Back to site
+            </a>
+          ) : null}
           <Button
             variant="ghost"
             size="sm"

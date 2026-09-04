@@ -240,17 +240,30 @@ async function moveOrResizeEvent(access, eventId, body, req, mode) {
     const block = await repo.findBlockById(parsed.id);
     if (!block) throw createHttpError('NOT_FOUND', 'Block not found.', 404);
     const targetCarId = body.carId != null ? Number(body.carId) : Number(block.car_id);
-    const conflicts = await conflictEngine.checkReservationRangeConflicts({
-      carId: targetCarId,
-      start,
-      end,
+
+    const updated = await runWithTransaction(async (client) => {
+      await acquireCarAdvisoryLocks(client, [block.car_id, targetCarId]);
+
+      const conflicts = await conflictEngine.checkReservationRangeConflicts({
+        carId: targetCarId,
+        start,
+        end,
+        excludeBlockId: parsed.id,
+        client,
+      });
+      conflictEngine.assertWritable(conflicts, { force, canOverride });
+
+      return repo.updateManualBlock(
+        parsed.id,
+        {
+          start,
+          end,
+          carId: targetCarId,
+        },
+        client
+      );
     });
-    conflictEngine.assertWritable(conflicts, { force, canOverride });
-    const updated = await repo.updateManualBlock(parsed.id, {
-      start,
-      end,
-      carId: targetCarId,
-    });
+
     await logAdminAction(req, {
       action: 'calendar.block.move',
       entityType: 'car_date_block',

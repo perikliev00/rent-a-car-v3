@@ -60,15 +60,29 @@ describe('RBAC auth middleware', () => {
     expect(response.status).toBe(200);
   });
 
-  test('requireAdminApi allows legacy admin without roles array', async () => {
+  test('requireAdminApi denies legacy admin without RBAC roles', async () => {
     const app = createAuthTestApp(
-      { isLoggedIn: true, user: { role: 'admin', email: 'admin@example.com' } },
+      { isLoggedIn: true, user: { role: 'admin', email: 'admin@example.com', roles: [], permissions: [] } },
       (app) => {
         app.get('/x', requireAdminApi, (_req, res) => res.json({ ok: true }));
       }
     );
     const response = await request(app).get('/x');
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(403);
+  });
+
+  test('requireStaffApi denies stale staff role without RBAC roles', async () => {
+    const app = createAuthTestApp(
+      {
+        isLoggedIn: true,
+        user: { role: 'staff', email: 'ex@example.com', roles: [], permissions: [] },
+      },
+      (app) => {
+        app.get('/x', requireStaffApi, (_req, res) => res.json({ ok: true }));
+      }
+    );
+    const response = await request(app).get('/x');
+    expect(response.status).toBe(403);
   });
 
   test('requirePermission denies missing permission', async () => {

@@ -5,6 +5,7 @@ const { CALENDAR_PERMISSIONS } = require('./calendar.permissions');
 const rbacService = require('../../services/rbac/rbacService');
 const { logAdminAction } = require('../../services/admin/adminAuditService');
 const { createHttpError, emitCalendarUpdated } = require('./calendar.shared');
+const { runWithTransaction, acquireCarAdvisoryLocks } = require('../../db/transaction');
 
 async function createManualEvent(access, body, req) {
   if (!rbacService.userHasPermission(access, CALENDAR_PERMISSIONS.CREATE_BLOCKS)) {
@@ -20,24 +21,32 @@ async function createManualEvent(access, body, req) {
     throw createHttpError('VALIDATION_ERROR', 'Invalid block type.', 422);
   }
 
-  const conflicts = await conflictEngine.checkReservationRangeConflicts({
-    carId: body.carId,
-    start,
-    end,
-  });
-  conflictEngine.assertWritable(conflicts, {
-    force: Boolean(body.force),
-    canOverride: rbacService.userHasPermission(access, CALENDAR_PERMISSIONS.OVERRIDE),
-  });
+  const force = Boolean(body.force);
+  const canOverride = rbacService.userHasPermission(access, CALENDAR_PERMISSIONS.OVERRIDE);
 
-  const row = await repo.createManualBlock({
-    carId: body.carId,
-    start,
-    end,
-    blockType,
-    reason: body.reason,
-    notes: body.notes,
-    createdByUserId: access.userId,
+  const row = await runWithTransaction(async (client) => {
+    await acquireCarAdvisoryLocks(client, [body.carId]);
+
+    const conflicts = await conflictEngine.checkReservationRangeConflicts({
+      carId: body.carId,
+      start,
+      end,
+      client,
+    });
+    conflictEngine.assertWritable(conflicts, { force, canOverride });
+
+    return repo.createManualBlock(
+      {
+        carId: body.carId,
+        start,
+        end,
+        blockType,
+        reason: body.reason,
+        notes: body.notes,
+        createdByUserId: access.userId,
+      },
+      client
+    );
   });
 
   await logAdminAction(req, {
@@ -76,24 +85,33 @@ async function updateManualEvent(access, blockId, body, req) {
     throw createHttpError('VALIDATION_ERROR', 'Invalid block type.', 422);
   }
   const targetCarId = body.carId != null ? Number(body.carId) : Number(existing.car_id);
+  const force = Boolean(body.force);
+  const canOverride = rbacService.userHasPermission(access, CALENDAR_PERMISSIONS.OVERRIDE);
 
-  const conflicts = await conflictEngine.checkReservationRangeConflicts({
-    carId: targetCarId,
-    start,
-    end,
-  });
-  conflictEngine.assertWritable(conflicts, {
-    force: Boolean(body.force),
-    canOverride: rbacService.userHasPermission(access, CALENDAR_PERMISSIONS.OVERRIDE),
-  });
+  const updated = await runWithTransaction(async (client) => {
+    await acquireCarAdvisoryLocks(client, [existing.car_id, targetCarId]);
 
-  const updated = await repo.updateManualBlock(blockId, {
-    start,
-    end,
-    carId: targetCarId,
-    blockType,
-    reason: body.reason !== undefined ? body.reason : existing.reason,
-    notes: body.notes !== undefined ? body.notes : existing.notes,
+    const conflicts = await conflictEngine.checkReservationRangeConflicts({
+      carId: targetCarId,
+      start,
+      end,
+      excludeBlockId: blockId,
+      client,
+    });
+    conflictEngine.assertWritable(conflicts, { force, canOverride });
+
+    return repo.updateManualBlock(
+      blockId,
+      {
+        start,
+        end,
+        carId: targetCarId,
+        blockType,
+        reason: body.reason !== undefined ? body.reason : existing.reason,
+        notes: body.notes !== undefined ? body.notes : existing.notes,
+      },
+      client
+    );
   });
   if (!updated) throw createHttpError('NOT_FOUND', 'Block not found.', 404);
 

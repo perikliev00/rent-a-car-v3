@@ -53,6 +53,7 @@ test.describe("booking-hold-expiry", () => {
 
     test('expired hold frees search availability and shows in Failed / Expired', async ({
       request,
+      page,
       adminPage,
     }) => {
       await cleanupReservationsForCar(carId);
@@ -103,8 +104,8 @@ test.describe("booking-hold-expiry", () => {
         adminPage.getByRole('button', { name: String(reservationId), exact: true }).first()
       ).toBeVisible();
 
-      await fillHomeSearch(adminPage, range);
-      await expect(adminPage.getByRole('heading', { name: CAR_NAME })).toBeVisible({
+      await fillHomeSearch(page, range);
+      await expect(page.getByRole('heading', { name: CAR_NAME })).toBeVisible({
         timeout: 15_000,
       });
     });

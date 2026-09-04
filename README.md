@@ -1,6 +1,6 @@
 # LuxRide
 
-Premium car rental platform for Bulgaria. Browse a fleet of vehicles, search by dates and locations, hold a car temporarily, pay securely via Stripe Checkout, and receive booking confirmation emails. Includes an admin panel for managing cars, orders, contacts, and payments.
+Premium car rental platform for Bulgaria. Browse a fleet of vehicles, search by dates and locations, hold a car temporarily, pay securely via Stripe Checkout, and receive booking confirmation emails. Staff manage cars, orders, contacts, and payments in a separate admin application.
 
 ## Screenshots
 
@@ -30,7 +30,7 @@ Premium car rental platform for Bulgaria. Browse a fleet of vehicles, search by 
 | Monitoring | Prometheus metrics, Grafana dashboards, Alertmanager, Sentry (optional) |
 | Tests | Jest + Supertest |
 
-### Frontend (`front end/`)
+### Customer frontend (`front end/`)
 
 | Layer | Technology |
 |-------|------------|
@@ -42,13 +42,19 @@ Premium car rental platform for Bulgaria. Browse a fleet of vehicles, search by 
 | Routing | React Router v7 |
 | Tests | Vitest + Testing Library |
 
+### Admin frontend (`admin-front-end/`)
+
+Same stack as the customer frontend. Runs on port **5174** in development.
+
 ## Project Structure
 
 ```
 rent-a-car-v3/
-├── backend/          # Express API, SQL schema, migrations, Docker
-├── front end/        # React SPA
-├── docs/screenshots/ # README screenshots
+├── backend/           # Express API, SQL schema, migrations, Docker
+├── front end/         # Customer/public React SPA
+├── admin-front-end/   # Staff admin React SPA
+├── e2e/               # Playwright tests
+├── docs/screenshots/  # README screenshots
 └── README.md
 ```
 
@@ -90,11 +96,22 @@ npm run dev            # http://localhost:3000
 
 ## Frontend Setup
 
+Customer app:
+
 ```bash
 cd "front end"
 npm install
-cp .env.example .env   # set VITE_API_BASE_URL
+cp .env.example .env   # set VITE_API_BASE_URL (optional VITE_ADMIN_FRONTEND_URL)
 npm run dev            # http://localhost:5173
+```
+
+Admin app:
+
+```bash
+cd admin-front-end
+npm install
+cp .env.example .env   # set VITE_API_BASE_URL (optional VITE_CUSTOMER_FRONTEND_URL)
+npm run dev            # http://localhost:5174
 ```
 
 ### Frontend scripts
@@ -195,7 +212,8 @@ Seed is idempotent — safe to re-run without duplicating data.
 Copy the example files and fill in your values:
 
 - **Backend:** [`backend/.env.example`](backend/.env.example)
-- **Frontend:** [`front end/.env.example`](front%20end/.env.example)
+- **Customer frontend:** [`front end/.env.example`](front%20end/.env.example)
+- **Admin frontend:** [`admin-front-end/.env.example`](admin-front-end/.env.example)
 
 ### Required (backend, non-test)
 
@@ -205,7 +223,7 @@ Copy the example files and fill in your values:
 | `SESSION_SECRET` | Min 32 characters; used for session cookies |
 | `STRIPE_SECRET` | Stripe secret key (`sk_test_...` in dev, `sk_live_...` in prod) |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret (`whsec_...`) |
-| `FRONTEND_BASE_URL` | Required in production; defaults to `http://localhost:5173` in dev |
+| `FRONTEND_BASE_URL` | Required in production; customer site (Stripe success/cancel, email verify). Defaults to `http://localhost:5173` in dev |
 
 ### Commonly configured
 
@@ -213,7 +231,7 @@ Copy the example files and fill in your values:
 |----------|---------|-------------|
 | `NODE_ENV` | `development` | Environment |
 | `PORT` | `3000` | API port |
-| `CORS_ORIGINS` | dev defaults | Comma-separated allowed origins |
+| `CORS_ORIGINS` | dev defaults | Comma-separated allowed frontend origins (customer and admin) |
 | `EMAIL_ENABLED` | `false` | Enable SMTP email sending |
 | `STORAGE_DRIVER` | `local` | `local` or `s3` for public car images only |
 | `PRIVATE_STORAGE_DRIVER` | `local` | `local` or `s3` for identity docs, signatures, and checklist photos |
@@ -303,7 +321,7 @@ npm run e2e
 npm run e2e:ui
 ```
 
-E2E starts backend (`STRIPE_STUB=1`) and frontend via Playwright `webServer`, or reuses already-running dev servers locally.
+E2E starts backend (`STRIPE_STUB=1`), the customer frontend (`:5173`), and the admin frontend (`:5174`) via Playwright `webServer`, or reuses already-running dev servers locally.
 
 ### Frontend
 
@@ -313,9 +331,13 @@ npm test          # single run
 npm run test:watch
 npm run test:coverage
 npm run check     # lint + typecheck + test (no coverage)
+
+cd ../admin-front-end
+npm test
+npm run check
 ```
 
-Tests are co-located under `front end/src/` (API client, routes, utilities).
+Tests are co-located under each app’s `src/` directory.
 
 ## Stripe Payment Flow
 
@@ -489,7 +511,7 @@ NODE_ENV=production
 DATABASE_URL=postgres://...
 SESSION_SECRET=<32+ random chars>
 FRONTEND_BASE_URL=https://your-domain.com
-CORS_ORIGINS=https://your-domain.com
+CORS_ORIGINS=https://your-domain.com,https://admin.your-domain.com
 STRIPE_SECRET=sk_live_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 STORAGE_DRIVER=s3
@@ -519,17 +541,19 @@ Production validation (in `backend/src/config/env.js`) enforces:
 1. **Database** — Provision PostgreSQL, run `npm run db:setup` against production DB.
 2. **Stripe** — Register webhook endpoint `https://api.your-domain.com/webhook/stripe` for `checkout.session.completed`.
 3. **API** — Build and deploy Docker container behind a reverse proxy with `trust proxy` enabled (Express sets this in production).
-4. **Frontend** — `cd "front end" && npm run build`, deploy `dist/` with `VITE_API_BASE_URL` pointing to the API.
-5. **Verify** — Health check (`GET /health/live`), readiness (`GET /health/ready`), test booking flow end-to-end with Stripe test mode first.
-6. **Monitoring** — See [Observability](#observability) below.
+4. **Customer frontend** — `cd "front end" && npm run build`, deploy `dist/` with `VITE_API_BASE_URL` pointing to the API. Optional `VITE_ADMIN_FRONTEND_URL` for staff redirect.
+5. **Admin frontend** — `cd admin-front-end && npm run build`, deploy `dist/` on the admin hostname. Same `VITE_API_BASE_URL`.
+6. **Verify** — Health check (`GET /health/live`), readiness (`GET /health/ready`), test booking flow end-to-end with Stripe test mode first. Confirm Stripe success/cancel still land on the customer site.
+7. **Monitoring** — See [Observability](#observability) below.
 
 ### 4. CI
 
 GitHub Actions (`.github/workflows/ci.yml`) runs on push/PR:
 
 - **Backend:** `npm run test:coverage` (Jest unit tests + coverage artifact; fails if coverage drops below the floor). Jest JSON results upload as `backend-unit-jest-results` even if the job fails.
-- **Frontend:** `npm run check` (lint + typecheck + Vitest, no coverage floor), then `npm run test:coverage` (coverage artifact + floor). Vitest JSON results upload as `frontend-unit-vitest-results`.
-- **Integration + E2E:** PostgreSQL service, `npm run test:integration`, Playwright. JSON + HTML reports and integration Jest results upload as artifacts (`if: always()`). Playwright retries in the JSON are the flake signal.
+- **Customer frontend:** `npm run check` (lint + typecheck + Vitest, no coverage floor), then `npm run test:coverage` (coverage artifact + floor).
+- **Admin frontend:** same `check` + `test:coverage` under `admin-front-end/`.
+- **Integration + E2E:** PostgreSQL service, `npm run test:integration`, Playwright (customer `:5173` and admin `:5174`). JSON + HTML reports and integration Jest results upload as artifacts (`if: always()`). Playwright retries in the JSON are the flake signal.
 
 ### 5. Post-deploy operations
 

@@ -3,6 +3,12 @@ import { useAuth } from '../../auth/useAuth';
 import { isStaffUser } from '../../auth/permissions';
 import { Button } from '../ui/Button';
 
+function adminFrontendUrl(): string | undefined {
+  const raw = import.meta.env.VITE_ADMIN_FRONTEND_URL;
+  if (!raw || !raw.trim()) return undefined;
+  return raw.replace(/\/+$/, '');
+}
+
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   `relative text-sm font-semibold uppercase tracking-[0.06em] transition-colors ${
     isActive
@@ -39,10 +45,10 @@ export function PublicLayout() {
                     My account
                   </Link>
                 )}
-                {isStaffUser(user) && (
-                  <Link to="/admin" className="opacity-90 hover:opacity-100">
+                {isStaffUser(user) && adminFrontendUrl() && (
+                  <a href={adminFrontendUrl()} className="opacity-90 hover:opacity-100">
                     Admin
-                  </Link>
+                  </a>
                 )}
                 <button
                   type="button"
@@ -103,12 +109,12 @@ export function PublicLayout() {
                     </Button>
                   </Link>
                 )}
-                {isStaffUser(user) && (
-                  <Link to="/admin" className="md:hidden">
+                {isStaffUser(user) && adminFrontendUrl() && (
+                  <a href={adminFrontendUrl()} className="md:hidden">
                     <Button variant="outline" size="sm">
                       Admin
                     </Button>
-                  </Link>
+                  </a>
                 )}
               </>
             ) : (

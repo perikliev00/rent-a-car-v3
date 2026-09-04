@@ -124,7 +124,7 @@ exports.postLogin = asyncHandler(async (req, res, next) => {
       logger.warn({ err: claimErr, userId: user.id }, 'Failed to claim reservations on login');
     }
 
-    if (rbacService.isStaffAccess(access, user.role)) {
+    if (rbacService.isStaffAccess(access)) {
       logEvent.info('admin.login.success', {
         requestId: req.requestId,
         userId: user.id,

@@ -73,6 +73,40 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  frontend-admin:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: admin-front-end
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: admin-front-end/package-lock.json
+
+      - run: npm ci
+      - run: npm run check
+      - run: npm run test:coverage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: admin-frontend-unit-coverage
+          path: |
+            admin-front-end/coverage/coverage-summary.json
+            admin-front-end/coverage/lcov.info
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: admin-frontend-unit-vitest-results
+          path: admin-front-end/test-results/vitest-results.json
+          if-no-files-found: error
+          retention-days: 14
+
   integration-e2e:
     runs-on: ubuntu-latest
 
@@ -100,7 +134,7 @@ jobs:
       STRIPE_WEBHOOK_SECRET: whsec_ci_placeholder_secret
       SESSION_SECRET: test-session-secret-32-chars-minimum!!
       FRONTEND_BASE_URL: http://localhost:5173
-      CORS_ORIGINS: http://localhost:5173
+      CORS_ORIGINS: http://localhost:5173,http://localhost:5174
 
     steps:
       - uses: actions/checkout@v4
@@ -112,6 +146,7 @@ jobs:
           cache-dependency-path: |
             backend/package-lock.json
             front end/package-lock.json
+            admin-front-end/package-lock.json
             e2e/package-lock.json
 
       - name: Setup test database
@@ -131,6 +166,7 @@ jobs:
       - name: Install E2E dependencies
         run: |
           npm --prefix "front end" ci
+          npm --prefix admin-front-end ci
           npm --prefix e2e ci
           npm run e2e:install
 

@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { AdminRoute } from './AdminRoute';
 import { useAuth } from './useAuth';
@@ -53,13 +53,14 @@ describe('AdminRoute', () => {
     expect(screen.queryByText('Admin content')).not.toBeInTheDocument();
   });
 
-  it('denies access to non-admin users', () => {
+  it('denies access to non-admin users', async () => {
+    const logout = vi.fn();
     mockedUseAuth.mockReturnValue({
       user: { id: '1', email: 'user@example.com', role: 'user' },
       isLoading: false,
       login: vi.fn(),
       signup: vi.fn(),
-      logout: vi.fn(),
+      logout,
       refresh: vi.fn(),
     });
 
@@ -72,6 +73,7 @@ describe('AdminRoute', () => {
 
     expect(screen.getByRole('heading', { name: 'Access Denied' })).toBeInTheDocument();
     expect(screen.queryByText('Admin content')).not.toBeInTheDocument();
+    await waitFor(() => expect(logout).toHaveBeenCalled());
   });
 
   it('renders children for admin users', () => {
