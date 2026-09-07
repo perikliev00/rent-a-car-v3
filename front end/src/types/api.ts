@@ -101,7 +101,7 @@ export interface CarComplianceItem {
   issuedAt: string | null;
   expiresAt: string | null;
   notes: string | null;
-  documentUrl: string | null;
+  hasDocument?: boolean;
   status: CarComplianceStatus;
   createdByUserId: number | null;
   createdAt?: string;

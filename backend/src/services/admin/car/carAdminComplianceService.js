@@ -1,11 +1,15 @@
+const fs = require('fs');
+const path = require('path');
 const carRepository = require('../../../repositories/carRepository');
 const complianceSql = require('../../sql/carComplianceSqlService');
+const privateStorage = require('../../storage/privateStorageService');
+const publicStorage = require('../../storage');
 const { COMPLIANCE_TYPES } = require('../../../constants/carEnums');
 const {
-  buildImagePath,
   deleteManagedImageIfUnused,
   emptyToNull,
 } = require('./carAdminHelpers');
+const { removeUploadedFile } = require('../../../middleware/fileUpload/uploadUtils');
 
 async function getFleetAlerts() {
   const fleetAlertsSql = require('../../sql/carFleetAlertsSqlService');
@@ -21,7 +25,6 @@ async function reconcileFleetAlertsQuietly() {
   try {
     await reconcileFleetAlerts(new Date());
   } catch (err) {
-    // Alerts refresh on the next background job; do not fail the mutation
     const logger = require('../../../utils/logger');
     logger.error({ err, context: 'reconcileFleetAlertsQuietly' }, 'Fleet alert reconcile after mutation failed');
   }
@@ -49,15 +52,52 @@ async function syncInsuranceInspectionCompliance(carId, payload, userId = null) 
   await complianceSql.syncCarExpiryCache(carId);
 }
 
-function buildCompliancePayload(body, file = null, existing = null) {
+async function storeComplianceUpload(file) {
+  if (!file) return null;
+  try {
+    const stored = await privateStorage.storePrivateFile({
+      tempPath: file.path,
+      originalName: file.originalname,
+      category: 'compliance',
+      mimeType: file.mimetype,
+    });
+    return stored.storageKey;
+  } catch (err) {
+    await removeUploadedFile(file);
+    throw err;
+  }
+}
+
+async function openLegacyPublicReadStream(legacyUrl) {
+  if (!legacyUrl || !publicStorage.isManagedPublicUrl(legacyUrl)) {
+    return null;
+  }
+  if (typeof publicStorage.openManagedPublicReadStream === 'function') {
+    return publicStorage.openManagedPublicReadStream(legacyUrl);
+  }
+  if (publicStorage.driver === 'local' && publicStorage.PUBLIC_CAR_IMAGES_DIR) {
+    const filename = path.basename(legacyUrl);
+    const filePath = path.resolve(publicStorage.PUBLIC_CAR_IMAGES_DIR, filename);
+    if (!filePath.startsWith(path.resolve(publicStorage.PUBLIC_CAR_IMAGES_DIR))) {
+      return null;
+    }
+    try {
+      await fs.promises.access(filePath, fs.constants.R_OK);
+    } catch {
+      return null;
+    }
+    return {
+      stream: fs.createReadStream(filePath),
+      mimeType: 'image/jpeg',
+    };
+  }
+  return null;
+}
+
+function buildCompliancePayload(body, documentStorageKey = null, existing = null) {
   const itemType = body.itemType || existing?.itemType;
   if (!COMPLIANCE_TYPES.includes(itemType)) {
     throw new Error('Invalid compliance type');
-  }
-
-  let documentUrl = null;
-  if (file) {
-    documentUrl = buildImagePath(file);
   }
 
   return {
@@ -67,7 +107,7 @@ function buildCompliancePayload(body, file = null, existing = null) {
     issuedAt: emptyToNull(body.issuedAt),
     expiresAt: emptyToNull(body.expiresAt),
     notes: emptyToNull(body.notes),
-    documentUrl,
+    documentStorageKey,
     status: body.status === 'missing' ? 'missing' : undefined,
   };
 }
@@ -75,54 +115,85 @@ function buildCompliancePayload(body, file = null, existing = null) {
 async function listCompliance(carId) {
   const car = await carRepository.findByIdForAdmin(carId);
   if (!car || car.isDeleted) throw new Error('Car not found');
-  return complianceSql.listByCarId(carId);
+  const items = await complianceSql.listByCarId(carId);
+  return items.map(complianceSql.toPublicComplianceItem);
 }
 
 async function createCompliance(carId, body, file = null, userId = null) {
   const car = await carRepository.findByIdForAdmin(carId);
   if (!car || car.isDeleted) throw new Error('Car not found');
 
-  const payload = buildCompliancePayload(body, file);
-  const item = await complianceSql.create(carId, {
-    ...payload,
-    createdByUserId: userId,
-  });
+  const documentStorageKey = await storeComplianceUpload(file);
+  const payload = buildCompliancePayload(body, documentStorageKey);
+  let item;
+  try {
+    item = await complianceSql.create(carId, {
+      ...payload,
+      createdByUserId: userId,
+    });
+  } catch (err) {
+    if (documentStorageKey) {
+      await privateStorage.deletePrivateFile(documentStorageKey);
+    }
+    throw err;
+  }
 
   if (item.itemType === 'civil_insurance' || item.itemType === 'technical_inspection') {
     await complianceSql.syncCarExpiryCache(carId);
   }
   await reconcileFleetAlertsQuietly();
-  return item;
+  return complianceSql.toPublicComplianceItem(item);
 }
 
 async function updateCompliance(carId, itemId, body, file = null) {
   const existing = await complianceSql.findById(carId, itemId);
   if (!existing) throw new Error('Compliance item not found');
 
-  const payload = buildCompliancePayload(body, file, existing);
-  const item = await complianceSql.update(carId, itemId, {
-    itemType: payload.itemType,
-    title: body.title !== undefined ? payload.title : existing.title,
-    referenceNumber:
-      body.referenceNumber !== undefined ? payload.referenceNumber : existing.referenceNumber,
-    issuedAt: body.issuedAt !== undefined ? payload.issuedAt : existing.issuedAt,
-    expiresAt: body.expiresAt !== undefined ? payload.expiresAt : existing.expiresAt,
-    notes: body.notes !== undefined ? payload.notes : existing.notes,
-    documentUrl: payload.documentUrl,
-    status: body.status === 'missing' ? 'missing' : undefined,
-  });
+  const documentStorageKey = await storeComplianceUpload(file);
+  const payload = buildCompliancePayload(body, documentStorageKey, existing);
+  let item;
+  try {
+    item = await complianceSql.update(carId, itemId, {
+      itemType: payload.itemType,
+      title: body.title !== undefined ? payload.title : existing.title,
+      referenceNumber:
+        body.referenceNumber !== undefined ? payload.referenceNumber : existing.referenceNumber,
+      issuedAt: body.issuedAt !== undefined ? payload.issuedAt : existing.issuedAt,
+      expiresAt: body.expiresAt !== undefined ? payload.expiresAt : existing.expiresAt,
+      notes: body.notes !== undefined ? payload.notes : existing.notes,
+      documentStorageKey,
+      status: body.status === 'missing' ? 'missing' : undefined,
+    });
+  } catch (err) {
+    if (documentStorageKey) {
+      await privateStorage.deletePrivateFile(documentStorageKey);
+    }
+    throw err;
+  }
+
+  if (documentStorageKey) {
+    if (existing.documentStorageKey) {
+      await privateStorage.deletePrivateFile(existing.documentStorageKey);
+    }
+    if (existing.documentUrl) {
+      await deleteManagedImageIfUnused(existing.documentUrl);
+    }
+  }
 
   if (item.itemType === 'civil_insurance' || item.itemType === 'technical_inspection') {
     await complianceSql.syncCarExpiryCache(carId);
   }
   await reconcileFleetAlertsQuietly();
-  return item;
+  return complianceSql.toPublicComplianceItem(item);
 }
 
 async function deleteCompliance(carId, itemId) {
   const existing = await complianceSql.findById(carId, itemId);
   if (!existing) throw new Error('Compliance item not found');
   const removed = await complianceSql.remove(carId, itemId);
+  if (existing.documentStorageKey) {
+    await privateStorage.deletePrivateFile(existing.documentStorageKey);
+  }
   if (existing.documentUrl) {
     await deleteManagedImageIfUnused(existing.documentUrl);
   }
@@ -133,7 +204,56 @@ async function deleteCompliance(carId, itemId) {
     await complianceSql.syncCarExpiryCache(carId);
   }
   await reconcileFleetAlertsQuietly();
-  return removed;
+  return complianceSql.toPublicComplianceItem(removed);
+}
+
+async function openComplianceDocumentDownload(carId, itemId) {
+  const car = await carRepository.findByIdForAdmin(carId);
+  if (!car || car.isDeleted) throw new Error('Car not found');
+
+  const item = await complianceSql.findById(carId, itemId);
+  if (!item) {
+    const err = new Error('Compliance item not found');
+    err.code = 'NOT_FOUND';
+    err.status = 404;
+    throw err;
+  }
+  if (!item.hasDocument) {
+    const err = new Error('File is no longer available');
+    err.code = 'NOT_FOUND';
+    err.status = 404;
+    throw err;
+  }
+
+  if (item.documentStorageKey) {
+    const opened = await privateStorage.openPrivateReadStream(item.documentStorageKey);
+    if (!opened) {
+      const err = new Error('File is no longer available');
+      err.code = 'NOT_FOUND';
+      err.status = 404;
+      throw err;
+    }
+    return {
+      item,
+      stream: opened.stream,
+      mimeType: 'application/octet-stream',
+      filename: `${item.itemType || 'compliance'}-${item.id}`,
+    };
+  }
+
+  const opened = await openLegacyPublicReadStream(item.documentUrl);
+  if (!opened) {
+    const err = new Error('File is no longer available');
+    err.code = 'NOT_FOUND';
+    err.status = 404;
+    throw err;
+  }
+  return {
+    item,
+    stream: opened.stream,
+    mimeType: opened.mimeType || 'image/jpeg',
+    filename: `${item.itemType || 'compliance'}-${item.id}`,
+  };
 }
 
 module.exports = {
@@ -145,4 +265,5 @@ module.exports = {
   createCompliance,
   updateCompliance,
   deleteCompliance,
+  openComplianceDocumentDownload,
 };

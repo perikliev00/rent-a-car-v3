@@ -22,6 +22,7 @@ const apiResponse = require('../../utils/apiResponse');
 const asyncHandler = require('../../utils/asyncHandler');
 const { forwardControllerError } = require('../../utils/controllerError');
 const { NotFoundError } = require('../../utils/appError');
+const metrics = require('../../monitoring/metrics');
 
 exports.createOrder = asyncHandler(async (req, res, next) => {
   const errors = validationResult(req);
@@ -174,6 +175,7 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
       }
 
       await attachCarNameToReservation(existingForSession);
+      metrics.incrementReservationConflict('active_session');
       return apiResponse.error(
         res,
         'CONFLICT',
@@ -213,6 +215,7 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
       if (sessionHoldAfterOverlap) {
         return respondForExistingSessionHold(sessionHoldAfterOverlap);
       }
+      metrics.incrementReservationConflict('hold_overlap');
       return apiResponse.error(
         res,
         'CONFLICT',
@@ -222,6 +225,7 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
     }
 
     if (bookedOverlap) {
+      metrics.incrementReservationConflict('booked_overlap');
       return apiResponse.error(
         res,
         'CONFLICT',

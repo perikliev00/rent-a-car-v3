@@ -49,12 +49,12 @@ export async function fillHomeSearch(page: Page, range: AllocatedFutureRange): P
   await page.waitForURL(/\/search/);
 }
 
+type OrderPageState = 'review' | 'rehold' | 'release' | 'retry' | 'rate_limited';
+
 async function clickWhenEnabled(locator: Locator, timeout = 15_000): Promise<void> {
   await expect(locator).toBeEnabled({ timeout });
   await locator.click();
 }
-
-type OrderPageState = 'review' | 'rehold' | 'release' | 'retry' | 'rate_limited';
 
 async function waitForOrderPageState(page: Page, timeout = 20_000): Promise<OrderPageState> {
   // Do not use locator.or() across conflict copy + Retry — they co-exist and trip strict mode.
@@ -101,6 +101,27 @@ async function waitForOrderPageState(page: Page, timeout = 20_000): Promise<Orde
   return state!;
 }
 
+/** Wait out server rate-limit window by re-opening the order page until not rate-limited. */
+async function waitOutRateLimit(
+  page: Page,
+  carId: number,
+  range: AllocatedFutureRange,
+  options?: { hotelDelivery?: boolean; extrasCodes?: string[] }
+): Promise<OrderPageState> {
+  let recovered: OrderPageState = 'rate_limited';
+  await expect
+    .poll(
+      async () => {
+        await page.goto(buildOrderUrl(carId, range, options));
+        recovered = await waitForOrderPageState(page);
+        return recovered;
+      },
+      { timeout: 60_000, intervals: [2_000, 3_000, 5_000, 8_000] }
+    )
+    .not.toBe('rate_limited');
+  return recovered;
+}
+
 /**
  * Open order page once without cleaning up conflicts — for concurrent-hold races.
  * Returns `review` if this session won the hold, otherwise `unavailable`.
@@ -131,23 +152,21 @@ export async function openOrderAndResolveConflict(
   for (let attempt = 0; attempt < 4; attempt += 1) {
     await page.goto(buildOrderUrl(carId, range, options));
 
-    const state = await waitForOrderPageState(page);
+    let state = await waitForOrderPageState(page);
+
+    if (state === 'rate_limited') {
+      state = await waitOutRateLimit(page, carId, range, options);
+    }
 
     if (state === 'review') return;
 
-    if (state === 'rate_limited') {
-      await page.waitForTimeout(2_500);
-      continue;
-    }
-
     if (state === 'retry') {
       await page.getByRole('button', { name: 'Retry' }).click();
-      const afterRetry = await waitForOrderPageState(page);
-      if (afterRetry === 'review') return;
+      let afterRetry = await waitForOrderPageState(page);
       if (afterRetry === 'rate_limited') {
-        await page.waitForTimeout(2_500);
-        continue;
+        afterRetry = await waitOutRateLimit(page, carId, range, options);
       }
+      if (afterRetry === 'review') return;
       // CSRF recovered but still conflicted — clear leftover holds once, then recreate.
       await cleanupReservationsForCar(carId);
       continue;
@@ -165,6 +184,8 @@ export async function openOrderAndResolveConflict(
       await clickWhenEnabled(page.getByRole('button', { name: 'Release existing reservation' }));
       continue;
     }
+
+    await cleanupReservationsForCar(carId);
   }
 
   // Final fallback: clear leftover holds, leave the previous view, then open once more.

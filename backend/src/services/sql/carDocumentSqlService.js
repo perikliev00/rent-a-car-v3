@@ -2,13 +2,35 @@ const { clientQuery } = require('../../db/transaction');
 
 function mapDocument(row) {
   if (!row) return null;
+  const storageKey = row.storage_key || null;
+  const legacyUrl = row.url || null;
   return {
     id: Number(row.id),
     carId: String(row.car_id),
     name: row.name,
-    url: row.url,
+    storageKey,
+    legacyUrl,
+    originalFilename: row.original_filename || row.name || 'document',
+    mimeType: row.mime_type || 'application/octet-stream',
+    sizeBytes: row.size_bytes != null ? Number(row.size_bytes) : null,
+    hasFile: Boolean(storageKey || legacyUrl),
     uploadedByUserId: row.uploaded_by_user_id != null ? Number(row.uploaded_by_user_id) : null,
     createdAt: row.created_at,
+  };
+}
+
+function toPublicDocument(doc) {
+  if (!doc) return null;
+  return {
+    id: doc.id,
+    carId: doc.carId,
+    name: doc.name,
+    originalFilename: doc.originalFilename,
+    mimeType: doc.mimeType,
+    sizeBytes: doc.sizeBytes,
+    hasFile: doc.hasFile,
+    uploadedByUserId: doc.uploadedByUserId,
+    createdAt: doc.createdAt,
   };
 }
 
@@ -44,14 +66,26 @@ async function create(carId, payload, client = null) {
   const result = await clientQuery(
     client,
     `
-    INSERT INTO car_documents (car_id, name, url, uploaded_by_user_id)
-    VALUES ($1, $2, $3, $4)
+    INSERT INTO car_documents (
+      car_id,
+      name,
+      url,
+      storage_key,
+      original_filename,
+      mime_type,
+      size_bytes,
+      uploaded_by_user_id
+    )
+    VALUES ($1, $2, NULL, $3, $4, $5, $6, $7)
     RETURNING *
     `,
     [
       Number(carId),
       payload.name,
-      payload.url,
+      payload.storageKey,
+      payload.originalFilename || payload.name || 'document',
+      payload.mimeType || 'application/octet-stream',
+      payload.sizeBytes,
       payload.uploadedByUserId ?? null,
     ]
   );
@@ -76,4 +110,5 @@ module.exports = {
   findById,
   create,
   remove,
+  toPublicDocument,
 };

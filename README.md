@@ -593,12 +593,43 @@ Also enforced at runtime: CORS allowlist, `trust proxy`, CSRF on mutating `/api`
 
 ### 4. CI
 
-GitHub Actions (`.github/workflows/ci.yml`) runs on push/PR:
+GitHub Actions (`.github/workflows/ci.yml`) runs on every push/PR. The aggregate job **`CI`** must be green before merge once branch protection is enabled.
 
-- **Backend:** `npm run test:coverage` (Jest unit tests + coverage artifact; fails if coverage drops below the floor). Jest JSON results upload as `backend-unit-jest-results` even if the job fails.
-- **Customer frontend:** `npm run check` (lint + typecheck + Vitest, no coverage floor), then `npm run test:coverage` (coverage artifact + floor).
-- **Admin frontend:** same `check` + `test:coverage` under `admin-front-end/`.
-- **Integration + E2E:** PostgreSQL service, `npm run test:integration`, Playwright (customer `:5173` and admin `:5174`). JSON + HTML reports and integration Jest results upload as artifacts (`if: always()`). Playwright retries in the JSON are the flake signal.
+| Job | What it runs |
+|-----|----------------|
+| `backend-lint` | ESLint |
+| `backend-unit` | Jest unit + coverage floor |
+| `frontend` / `frontend-admin` | lint + typecheck + Vitest + coverage + production `build` |
+| `db-consistency` | PostgreSQL + `npm run test:db` |
+| `integration` | PostgreSQL + `npm run test:integration` |
+| `migration-test` | empty DB → `db:setup` → assert all migrations applied → idempotent `db:migrate` |
+| `e2e-playwright` | fresh PostgreSQL + Playwright; **fails if any test needed a retry** (flake signal) |
+| `docker-build` | builds API + customer + admin images tagged with commit SHA; **on `main` push also pushes them to GHCR** and records digests |
+| `security-scan` | `npm audit --audit-level=high` for backend, frontends, e2e |
+| `CI` (`ci-gate`) | fails unless every job above succeeded |
+
+Playwright JSON/HTML and Jest results upload as artifacts (`if: always()`). Do not ignore failing integration/E2E — fix root causes.
+
+**Deploy** (`.github/workflows/deploy.yml`): after a successful CI run on `main`, **does not rebuild**. It pulls the SHA images CI already pushed, records digests, deploys staging, then production with the **same digests**. Manual `workflow_dispatch` must pass a commit SHA that already has green CI on `main` and images in GHCR. Set repo variables `VITE_API_BASE_URL` (required on main), optional `VITE_ADMIN_FRONTEND_URL` / `VITE_CUSTOMER_FRONTEND_URL`. Hosts use `IMAGE_PREFIX=ghcr.io/<org>/<repo> IMAGE_TAG=<sha>` with `docker-compose.prod.yml` — never `up --build` for promote.
+
+#### Making CI mandatory (after 3 fully green runs)
+
+Gate: wait until **`CI` is fully green three times in a row** on `main` (no Playwright retries in the flake check). Then:
+
+```bash
+# requires: gh auth login with repo admin
+bash scripts/enable-main-protection.sh
+```
+
+Or in GitHub UI:
+
+1. **Settings → Rules → Rulesets** (or Branch protection) for `main`
+2. Require a pull request before merging; block direct pushes
+3. Require status checks: at minimum the aggregate **`CI`** job (or every individual job above)
+4. Require branches to be up to date; do not allow admin bypass if you want a hard gate
+5. Deploy only via the Deploy workflow / environment protection on `staging` and `production`
+
+Until that gate is met, keep fixing flakes — do not mark checks optional and do not raise Playwright `retries`.
 
 ### 5. Post-deploy operations
 
@@ -641,6 +672,10 @@ Key business gauges (polled every 30s from DB):
 - `paid_not_confirmed_count` — **critical** — Stripe paid but reservation not confirmed
 - `processing_paid_count` — stuck in `processing_payment` with Stripe session
 - `active_reservations_count`, `db_pool_*`, `unresolved_payment_failures_count`
+- `ready_status`, `migrations_ok`, `migrations_pending`
+- `storage_free_bytes` / `storage_size_bytes` (upload volumes + `postgres_data` via RO mount `/mnt/pgdata`)
+- `pg_database_size_bytes` — logical DB size (growth signal; free space still comes from `storage_*` on `postgres_data`)
+- Worker-only: `worker_heartbeat_unixtime`, `background_job_*`
 
 ### Structured business events (Pino logs)
 
@@ -660,11 +695,14 @@ Slow requests (> `SLOW_REQUEST_MS`, default 1000) log as `http.slow_request`.
 
 ### Alerts (Alertmanager, port 9093)
 
-Prometheus rules in `monitoring/prometheus/alerts.yml`. Critical alerts:
+Prometheus rules in `monitoring/prometheus/alerts.yml`. Critical alerts include:
 
-- **PaidButNotConfirmed** — fires when `paid_not_confirmed_count > 0` or `processing_paid_count > 0` for 1 minute
-- **ReservationConflictAfterPayment**
-- **DbPoolExhausted**
+- **ApiDown** / **ReadinessFailed** / **MigrationsPendingOrFailed**
+- **PaidButNotConfirmed** — Stripe paid but reservation not confirmed
+- **ReservationConflictAfterPayment** / **DbPoolExhausted**
+- **WorkerDown** / **WorkerStale** / **DiskSpaceLow**
+
+Warning alerts include Stripe webhook failures, high 5xx, background job failures, booking conflict spikes, and storage errors.
 
 Configure webhook delivery in root `.env`:
 
@@ -672,7 +710,18 @@ Configure webhook delivery in root `.env`:
 ALERTMANAGER_WEBHOOK_URL=https://hooks.slack.com/services/...
 ```
 
-Also configure Sentry via `SENTRY_DSN` for error tracking.
+Sentry:
+
+- Backend / worker: `SENTRY_DSN`
+- Customer + admin frontends: `VITE_SENTRY_DSN` (optional build arg / repo variable)
+
+### Runbooks
+
+| Scenario | Doc |
+|----------|-----|
+| Stripe webhook failure | [docs/runbooks/webhook-failure.md](docs/runbooks/webhook-failure.md) |
+| Roll back previous version | [docs/runbooks/rollback.md](docs/runbooks/rollback.md) |
+| Restore the database | [docs/runbooks/db-restore.md](docs/runbooks/db-restore.md) |
 
 ### Local monitoring stack
 
@@ -683,6 +732,7 @@ docker compose -f docker-compose.dev.yml up --build
 - Prometheus: http://localhost:9090
 - Grafana: http://localhost:3001 (admin / admin by default)
 - Alertmanager: http://localhost:9093
+- Worker exposes `/prometheus` on the compose network (scraped as job `worker`)
 
 ## License
 

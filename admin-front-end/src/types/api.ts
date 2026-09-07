@@ -101,7 +101,7 @@ export interface CarComplianceItem {
   issuedAt: string | null;
   expiresAt: string | null;
   notes: string | null;
-  documentUrl: string | null;
+  hasDocument: boolean;
   status: CarComplianceStatus;
   createdByUserId: number | null;
   createdAt?: string;
@@ -175,7 +175,10 @@ export interface CarDocument {
   id: number;
   carId: string;
   name: string;
-  url: string;
+  originalFilename: string;
+  mimeType: string;
+  sizeBytes: number | null;
+  hasFile: boolean;
   uploadedByUserId: number | null;
   createdAt?: string;
 }

@@ -1,4 +1,5 @@
 import type { ApiErrorBody, ApiResponse, ApiSuccess } from '../types/api';
+import { setSentryRequestId } from '../sentry';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000';
 
@@ -216,6 +217,8 @@ async function request<T>(url: string, options: RequestInit, retriedCsrf = false
     );
   }
 
+  setSentryRequestId(res.headers.get('X-Request-Id') ?? res.headers.get('X-Correlation-Id'));
+
   const body = await parseResponseBody(res);
 
   if (!body.success) {
@@ -260,6 +263,20 @@ export async function apiFormData<T>(path: string, formData: FormData, method = 
     credentials: 'include',
     body: formData,
   });
+}
+
+export async function downloadAuthenticated(path: string, fallbackName: string): Promise<void> {
+  const res = await fetch(`${API_BASE}${toVersionedApiPath(path)}`, { credentials: 'include' });
+  if (!res.ok) {
+    throw new Error('Download failed');
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fallbackName;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 export { API_BASE };

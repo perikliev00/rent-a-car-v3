@@ -22,3 +22,11 @@ scrape_configs:
       credentials: __METRICS_TOKEN__
     static_configs:
       - targets: ['backend:3000']
+
+  - job_name: worker
+    metrics_path: /prometheus
+    authorization:
+      type: Bearer
+      credentials: __METRICS_TOKEN__
+    static_configs:
+      - targets: ['worker:3000']

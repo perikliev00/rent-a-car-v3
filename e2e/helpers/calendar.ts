@@ -428,7 +428,7 @@ export async function createTaskFromQuickCreate(
     await dialog.getByLabel('Type', { exact: true }).selectOption({ label: options.taskTypeLabel });
   }
   if (options.carName) {
-    await dialog.getByLabel('Car').selectOption({ label: options.carName });
+    await dialog.getByLabel('Car', { exact: true }).selectOption({ label: options.carName });
   }
   if (options.startsDate) {
     const current = await dateSelectHiddenValue(page, 'Starts date');

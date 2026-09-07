@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   deleteCarDocument,
+  downloadCarDocument,
   getCarDocuments,
   uploadCarDocument,
 } from '../../../api/admin/cars';
@@ -36,6 +37,14 @@ export function useCarDocuments(id: string, tab: Tab) {
     onError: (err) => toast((err as Error).message, 'error'),
   });
 
+  async function downloadDocument(docId: number, filename: string) {
+    try {
+      await downloadCarDocument(id, docId, filename);
+    } catch (err) {
+      toast((err as Error).message, 'error');
+    }
+  }
+
   async function deleteDocument(docId: number) {
     try {
       await deleteCarDocument(id, docId);
@@ -53,6 +62,7 @@ export function useCarDocuments(id: string, tab: Tab) {
     docFile,
     setDocFile,
     docMutation,
+    downloadDocument,
     deleteDocument,
   };
 }

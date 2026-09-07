@@ -131,6 +131,14 @@ router.post(
   ...adminCarDocumentUpload,
   carController.uploadDocument
 );
+router.get(
+  '/:id/documents/:docId/download',
+  canManageCars,
+  adminCarIdParamValidation,
+  ...docIdParamValidation,
+  validateRequest,
+  carController.downloadDocument
+);
 router.delete(
   '/:id/documents/:docId',
   canManageCars,
@@ -165,6 +173,14 @@ router.put(
   ...complianceValidationRules,
   validateRequest,
   carController.updateCompliance
+);
+router.get(
+  '/:id/compliance/:itemId/download',
+  canManageCars,
+  adminCarIdParamValidation,
+  ...complianceItemIdParamValidation,
+  validateRequest,
+  carController.downloadComplianceDocument
 );
 router.delete(
   '/:id/compliance/:itemId',

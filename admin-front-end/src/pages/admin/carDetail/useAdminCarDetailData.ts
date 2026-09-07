@@ -52,6 +52,8 @@ export function useAdminCarDetailData({ id, tab }: { id: string; tab: Tab }) {
     deleteServiceRecord: service.deleteServiceRecord,
     resolveDamage: damage.resolveDamage,
     deleteDamage: damage.deleteDamage,
+    downloadDocument: documents.downloadDocument,
     deleteDocument: documents.deleteDocument,
+    downloadComplianceDocument: compliance.downloadComplianceDocument,
   };
 }

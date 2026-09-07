@@ -110,6 +110,61 @@ const dbPoolWaiting = new client.Gauge({
   help: 'Database connection pool waiting clients',
 });
 
+const readyStatus = new client.Gauge({
+  name: 'ready_status',
+  help: '1 when /ready checks pass, else 0',
+});
+
+const migrationsOk = new client.Gauge({
+  name: 'migrations_ok',
+  help: '1 when expected migrations are applied, else 0',
+});
+
+const migrationsPending = new client.Gauge({
+  name: 'migrations_pending',
+  help: 'Number of pending SQL migrations',
+});
+
+const workerHeartbeatUnixtime = new client.Gauge({
+  name: 'worker_heartbeat_unixtime',
+  help: 'Unix timestamp of the last worker heartbeat',
+});
+
+const backgroundJobFailuresTotal = new client.Counter({
+  name: 'background_job_failures_total',
+  help: 'Background job failures',
+  labelNames: ['job'],
+});
+
+const backgroundJobLastSuccessUnixtime = new client.Gauge({
+  name: 'background_job_last_success_unixtime',
+  help: 'Unix timestamp of the last successful background job run',
+  labelNames: ['job'],
+});
+
+const storageErrorsTotal = new client.Counter({
+  name: 'storage_errors_total',
+  help: 'Storage operation failures',
+  labelNames: ['driver', 'op'],
+});
+
+const storageFreeBytes = new client.Gauge({
+  name: 'storage_free_bytes',
+  help: 'Free bytes on a monitored storage path',
+  labelNames: ['path'],
+});
+
+const storageSizeBytes = new client.Gauge({
+  name: 'storage_size_bytes',
+  help: 'Total bytes on a monitored storage path',
+  labelNames: ['path'],
+});
+
+const pgDatabaseSizeBytes = new client.Gauge({
+  name: 'pg_database_size_bytes',
+  help: 'PostgreSQL current database size in bytes',
+});
+
 function normalizeRoute(route) {
   if (!route || route === 'unknown') {
     return 'unknown';
@@ -196,6 +251,45 @@ function setGaugeValues(values) {
   if (values.dbPoolWaiting != null) {
     dbPoolWaiting.set(values.dbPoolWaiting);
   }
+  if (values.readyStatus != null) {
+    readyStatus.set(values.readyStatus);
+  }
+  if (values.migrationsOk != null) {
+    migrationsOk.set(values.migrationsOk);
+  }
+  if (values.migrationsPending != null) {
+    migrationsPending.set(values.migrationsPending);
+  }
+  if (values.storagePaths && typeof values.storagePaths === 'object') {
+    for (const [pathLabel, sizes] of Object.entries(values.storagePaths)) {
+      if (sizes?.freeBytes != null) {
+        storageFreeBytes.set({ path: pathLabel }, sizes.freeBytes);
+      }
+      if (sizes?.sizeBytes != null) {
+        storageSizeBytes.set({ path: pathLabel }, sizes.sizeBytes);
+      }
+    }
+  }
+  if (values.pgDatabaseSizeBytes != null) {
+    pgDatabaseSizeBytes.set(values.pgDatabaseSizeBytes);
+  }
+}
+
+function setWorkerHeartbeat(unixtime = Math.floor(Date.now() / 1000)) {
+  workerHeartbeatUnixtime.set(unixtime);
+}
+
+function incrementBackgroundJobFailure(job) {
+  backgroundJobFailuresTotal.inc({ job: job || 'unknown' });
+}
+
+function setBackgroundJobLastSuccess(job, unixtime = Math.floor(Date.now() / 1000)) {
+  if (!job) return;
+  backgroundJobLastSuccessUnixtime.set({ job }, unixtime);
+}
+
+function incrementStorageErrors(driver = 'unknown', op = 'unknown') {
+  storageErrorsTotal.inc({ driver, op });
 }
 
 async function getMetrics() {
@@ -216,5 +310,9 @@ module.exports = {
   incrementEmailConfirmationFailures,
   incrementBusinessEvent,
   setGaugeValues,
+  setWorkerHeartbeat,
+  incrementBackgroundJobFailure,
+  setBackgroundJobLastSuccess,
+  incrementStorageErrors,
   getMetrics,
 };

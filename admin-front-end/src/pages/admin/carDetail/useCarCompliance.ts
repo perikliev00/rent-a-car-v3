@@ -4,6 +4,7 @@ import {
   complianceTypeHasExpiry,
   createCarCompliance,
   deleteCarCompliance,
+  downloadCarComplianceDocument,
   getCarCompliance,
 } from '../../../api/admin/cars';
 import { toast } from '../../../components/ui/toastStore';
@@ -66,6 +67,14 @@ export function useCarCompliance(id: string, tab: Tab) {
     onError: (err) => toast((err as Error).message, 'error'),
   });
 
+  async function downloadComplianceDocument(itemId: number, filename: string) {
+    try {
+      await downloadCarComplianceDocument(id, itemId, filename);
+    } catch (err) {
+      toast((err as Error).message, 'error');
+    }
+  }
+
   async function deleteComplianceItem(itemId: number) {
     try {
       await deleteCarCompliance(id, itemId);
@@ -85,6 +94,7 @@ export function useCarCompliance(id: string, tab: Tab) {
     complianceFile,
     setComplianceFile,
     complianceMutation,
+    downloadComplianceDocument,
     deleteComplianceItem,
   };
 }

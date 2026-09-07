@@ -6,7 +6,7 @@ import type {
   CarFleetStatus,
   CarServiceRecord,
 } from '../../types/api';
-import { api, apiFormData } from '../client';
+import { api, apiFormData, downloadAuthenticated } from '../client';
 
 export async function getAdminCars(): Promise<{ cars: Car[] }> {
   return api<{ cars: Car[] }>('/api/admin/cars');
@@ -141,6 +141,17 @@ export async function uploadCarDocument(
   return apiFormData(`/api/admin/cars/${id}/documents`, formData);
 }
 
+export async function downloadCarDocument(
+  carId: string,
+  docId: number,
+  filename: string
+): Promise<void> {
+  return downloadAuthenticated(
+    `/api/admin/cars/${carId}/documents/${docId}/download`,
+    filename
+  );
+}
+
 export async function deleteCarDocument(
   carId: string,
   docId: number
@@ -165,6 +176,17 @@ export async function updateCarCompliance(
   formData: FormData
 ): Promise<{ item: CarComplianceItem }> {
   return apiFormData(`/api/admin/cars/${carId}/compliance/${itemId}`, formData, 'PUT');
+}
+
+export async function downloadCarComplianceDocument(
+  carId: string,
+  itemId: number,
+  filename: string
+): Promise<void> {
+  return downloadAuthenticated(
+    `/api/admin/cars/${carId}/compliance/${itemId}/download`,
+    filename
+  );
 }
 
 export async function deleteCarCompliance(

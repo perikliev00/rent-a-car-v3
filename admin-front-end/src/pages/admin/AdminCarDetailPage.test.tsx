@@ -68,6 +68,8 @@ vi.mock('../../api/admin/cars', () => ({
   deleteCarDamageReport: vi.fn(),
   deleteCarDocument: vi.fn(),
   deleteCarServiceRecord: vi.fn(),
+  downloadCarComplianceDocument: vi.fn(),
+  downloadCarDocument: vi.fn(),
   resolveCarDamageReport: vi.fn(),
   updateAdminCar: vi.fn(),
   uploadCarDocument: vi.fn(),

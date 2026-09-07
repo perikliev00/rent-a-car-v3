@@ -1,12 +1,12 @@
 import { Button } from '../../../components/ui/Button';
 import { Card, CardBody } from '../../../components/ui/Card';
 import { Input } from '../../../components/ui/Input';
-import { imageUrl } from '../../../utils/format';
 
 type DocItem = {
   id: number;
   name: string;
-  url: string;
+  originalFilename?: string;
+  hasFile?: boolean;
 };
 
 export function CarDocumentsTab({
@@ -17,6 +17,7 @@ export function CarDocumentsTab({
   onUpload,
   docsLoading,
   documents,
+  onDownload,
   onDelete,
 }: {
   docName: string;
@@ -26,6 +27,7 @@ export function CarDocumentsTab({
   onUpload: () => void;
   docsLoading: boolean;
   documents: DocItem[] | undefined;
+  onDownload: (id: number, filename: string) => void;
   onDelete: (id: number) => void;
 }) {
   return (
@@ -46,10 +48,10 @@ export function CarDocumentsTab({
               onChange={(e) => setDocName(e.target.value)}
             />
             <div>
-              <label className="block text-sm font-medium">Image file</label>
+              <label className="block text-sm font-medium">File (JPG, PNG, WEBP, or PDF)</label>
               <input
                 type="file"
-                accept="image/*"
+                accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf"
                 className="mt-1 text-sm"
                 required
                 onChange={(e) => setDocFile(e.target.files?.[0] ?? null)}
@@ -78,17 +80,23 @@ export function CarDocumentsTab({
                   key={d.id}
                   className="flex flex-wrap items-center justify-between gap-2 text-sm"
                 >
-                  <a
-                    href={imageUrl(d.url)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[var(--color-ink)] underline-offset-2 hover:underline"
-                  >
-                    {d.name}
-                  </a>
-                  <Button size="sm" variant="danger" onClick={() => void onDelete(d.id)}>
-                    Delete
-                  </Button>
+                  <span className="text-[var(--color-ink)]">{d.name}</span>
+                  <div className="flex gap-2">
+                    {d.hasFile !== false ? (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() =>
+                          void onDownload(d.id, d.originalFilename || d.name || 'document')
+                        }
+                      >
+                        Download
+                      </Button>
+                    ) : null}
+                    <Button size="sm" variant="danger" onClick={() => void onDelete(d.id)}>
+                      Delete
+                    </Button>
+                  </div>
                 </li>
               ))}
             </ul>

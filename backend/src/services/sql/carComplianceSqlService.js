@@ -20,6 +20,8 @@ function deriveComplianceStatus({ expiresAt, statusHint = null, todayStr = null 
 function mapComplianceItem(row) {
   if (!row) return null;
   const itemType = row.item_type;
+  const documentStorageKey = row.document_storage_key || null;
+  const documentUrl = row.document_url || null;
   return {
     id: Number(row.id),
     carId: String(row.car_id),
@@ -30,11 +32,33 @@ function mapComplianceItem(row) {
     issuedAt: toDateOnly(row.issued_at),
     expiresAt: toDateOnly(row.expires_at),
     notes: row.notes || null,
-    documentUrl: row.document_url || null,
+    documentStorageKey,
+    documentUrl,
+    hasDocument: Boolean(documentStorageKey || documentUrl),
     status: row.status,
     createdByUserId: row.created_by_user_id != null ? Number(row.created_by_user_id) : null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+function toPublicComplianceItem(item) {
+  if (!item) return null;
+  return {
+    id: item.id,
+    carId: item.carId,
+    itemType: item.itemType,
+    label: item.label,
+    title: item.title,
+    referenceNumber: item.referenceNumber,
+    issuedAt: item.issuedAt,
+    expiresAt: item.expiresAt,
+    notes: item.notes,
+    hasDocument: item.hasDocument,
+    status: item.status,
+    createdByUserId: item.createdByUserId,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
   };
 }
 
@@ -106,10 +130,11 @@ async function create(carId, payload, client = null) {
       expires_at,
       notes,
       document_url,
+      document_storage_key,
       status,
       created_by_user_id
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
     RETURNING *
     `,
     [
@@ -121,6 +146,7 @@ async function create(carId, payload, client = null) {
       payload.expiresAt || null,
       payload.notes || null,
       payload.documentUrl || null,
+      payload.documentStorageKey || null,
       status,
       payload.createdByUserId ?? null,
     ]
@@ -145,8 +171,12 @@ async function update(carId, itemId, payload, client = null) {
       issued_at = $6,
       expires_at = $7,
       notes = $8,
-      document_url = COALESCE($9, document_url),
-      status = $10,
+      document_url = CASE
+        WHEN $10::text IS NOT NULL THEN NULL
+        ELSE COALESCE($9, document_url)
+      END,
+      document_storage_key = COALESCE($10, document_storage_key),
+      status = $11,
       updated_at = NOW()
     WHERE id = $1 AND car_id = $2
     RETURNING *
@@ -161,6 +191,7 @@ async function update(carId, itemId, payload, client = null) {
       payload.expiresAt || null,
       payload.notes || null,
       payload.documentUrl || null,
+      payload.documentStorageKey || null,
       status,
     ]
   );
@@ -184,6 +215,7 @@ async function upsertByType(carId, itemType, payload, client = null) {
         expiresAt: payload.expiresAt !== undefined ? payload.expiresAt : existing.expiresAt,
         notes: payload.notes !== undefined ? payload.notes : existing.notes,
         documentUrl: payload.documentUrl,
+        documentStorageKey: payload.documentStorageKey,
         status: payload.status,
       },
       client
@@ -199,6 +231,7 @@ async function upsertByType(carId, itemType, payload, client = null) {
       expiresAt: payload.expiresAt || null,
       notes: payload.notes || null,
       documentUrl: payload.documentUrl || null,
+      documentStorageKey: payload.documentStorageKey || null,
       status: payload.status,
       createdByUserId: payload.createdByUserId ?? null,
     },
@@ -268,6 +301,7 @@ async function listOpenComplianceForAlerts(client = null) {
 module.exports = {
   deriveComplianceStatus,
   mapComplianceItem,
+  toPublicComplianceItem,
   listByCarId,
   findById,
   findLatestByType,

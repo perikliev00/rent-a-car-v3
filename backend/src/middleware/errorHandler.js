@@ -30,6 +30,7 @@ function normalizeError(err) {
   }
 
   if (isActiveSessionHoldUniqueViolation(err)) {
+    metrics.incrementReservationConflict('active_session_hold');
     return new ConflictError(
       'You already have an active reservation. Please complete or release it before starting another.'
     );
@@ -40,10 +41,12 @@ function normalizeError(err) {
   }
 
   if (isCarDateBlockOverlapViolation(err)) {
+    metrics.incrementReservationConflict('car_block_overlap');
     return new ConflictError('The requested booking overlaps with an existing reservation.');
   }
 
   if (isReservationHoldOverlapViolation(err)) {
+    metrics.incrementReservationConflict('hold_overlap');
     return new ConflictError('Selected car is already reserved in this period.');
   }
 
@@ -52,6 +55,7 @@ function normalizeError(err) {
   }
 
   if (err && err.code === 'OVERLAP') {
+    metrics.incrementReservationConflict('overlap');
     return new ConflictError('The requested booking overlaps with an existing reservation.');
   }
 

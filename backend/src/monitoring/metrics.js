@@ -89,6 +89,22 @@ function setGaugeValues(values) {
   prometheus.setGaugeValues(values);
 }
 
+function setWorkerHeartbeat(unixtime) {
+  prometheus.setWorkerHeartbeat(unixtime);
+}
+
+function incrementBackgroundJobFailure(job) {
+  prometheus.incrementBackgroundJobFailure(job);
+}
+
+function setBackgroundJobLastSuccess(job, unixtime) {
+  prometheus.setBackgroundJobLastSuccess(job, unixtime);
+}
+
+function incrementStorageErrors(driver, op) {
+  prometheus.incrementStorageErrors(driver, op);
+}
+
 function getSnapshot() {
   const avgDurationMs =
     state.requests.total > 0
@@ -130,6 +146,10 @@ module.exports = {
   incrementBusinessEvent,
   recordDbQuery,
   setGaugeValues,
+  setWorkerHeartbeat,
+  incrementBackgroundJobFailure,
+  setBackgroundJobLastSuccess,
+  incrementStorageErrors,
   getSnapshot,
   getPrometheusMetrics: prometheus.getMetrics,
 };

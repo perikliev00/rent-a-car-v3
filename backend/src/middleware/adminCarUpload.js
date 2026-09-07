@@ -6,6 +6,7 @@ const {
   validateUploadedImage,
   validateUploadedImages,
 } = require('./fileUpload/validateUploadedImage');
+const { adminPrivateDocumentUpload } = require('./privateUpload');
 
 const adminCarImageUpload = [
   adminUploadLimiter,
@@ -15,13 +16,7 @@ const adminCarImageUpload = [
   validateUploadedImage,
 ];
 
-const adminCarDocumentUpload = [
-  adminUploadLimiter,
-  upload.single('file'),
-  handleMulterError,
-  handleFileRejected,
-  validateUploadedImage,
-];
+const adminCarDocumentUpload = adminPrivateDocumentUpload;
 
 const adminCarDamagePhotosUpload = [
   adminUploadLimiter,

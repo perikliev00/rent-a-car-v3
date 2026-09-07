@@ -19,6 +19,7 @@
     "db:setup": "npm --prefix backend run db:setup --",
     "e2e": "npm run test:e2e",
     "e2e:ui": "npm --prefix e2e run test:ui",
-    "e2e:install": "npm --prefix e2e exec playwright install --with-deps chromium"
+    "e2e:install": "npm --prefix e2e exec playwright install --with-deps chromium",
+    "e2e:check-flakes": "node scripts/check-playwright-flakes.js"
   }
 }

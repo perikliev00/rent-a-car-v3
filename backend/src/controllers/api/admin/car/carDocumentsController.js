@@ -43,6 +43,23 @@ const uploadDocument = asyncHandler(async (req, res, next) => {
   }
 });
 
+const downloadDocument = asyncHandler(async (req, res, next) => {
+  try {
+    const { stream, mimeType, filename } = await carAdminService.openDocumentDownload(
+      req.params.id,
+      req.params.docId
+    );
+    res.setHeader('Content-Type', mimeType || 'application/octet-stream');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${encodeURIComponent(filename || 'document')}"`
+    );
+    stream.pipe(res);
+  } catch (err) {
+    return notFoundOrForward(err, req, res, next, 'api.downloadCarDocument', 'Error downloading document.');
+  }
+});
+
 const deleteDocument = asyncHandler(async (req, res, next) => {
   try {
     await carAdminService.deleteDocument(req.params.id, req.params.docId);
@@ -55,5 +72,6 @@ const deleteDocument = asyncHandler(async (req, res, next) => {
 module.exports = {
   listDocuments,
   uploadDocument,
+  downloadDocument,
   deleteDocument,
 };

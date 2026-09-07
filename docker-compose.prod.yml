@@ -1,5 +1,13 @@
 # LuxRide — production stack (built images, no hot reload)
-# Usage: docker compose -f docker-compose.prod.yml up --build -d
+# Usage:
+#   Local build:  docker compose -f docker-compose.prod.yml up --build -d
+#   SHA promote (no rebuild):
+#     IMAGE_PREFIX=ghcr.io/<org>/<repo> IMAGE_TAG=<commit-sha> PULL_POLICY=always \
+#       docker compose -f docker-compose.prod.yml pull
+#     IMAGE_PREFIX=ghcr.io/<org>/<repo> IMAGE_TAG=<commit-sha> PULL_POLICY=always \
+#       docker compose -f docker-compose.prod.yml up -d
+# Staging and production must use the same IMAGE_TAG (commit SHA) / digests from CI.
+# Never rebuild for prod promote.
 
 services:
   db:
@@ -19,6 +27,8 @@ services:
     restart: unless-stopped
 
   backend:
+    image: ${IMAGE_PREFIX:-luxride}/api:${IMAGE_TAG:-local}
+    pull_policy: ${PULL_POLICY:-missing}
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -36,8 +46,11 @@ services:
       RUN_BACKGROUND_JOBS: "false"
       # Local private uploads survive container rebuilds. Prefer PRIVATE_STORAGE_DRIVER=s3 in .env.
       PRIVATE_STORAGE_PERSISTENT: "true"
+      # RO mount of postgres volume for DiskSpaceLow (statfs); see POSTGRES_DATA_MONITOR_PATH.
+      POSTGRES_DATA_MONITOR_PATH: /mnt/pgdata
     volumes:
       - backend_private_uploads:/app/uploads/private
+      - postgres_data:/mnt/pgdata:ro
     depends_on:
       db:
         condition: service_healthy
@@ -56,6 +69,8 @@ services:
     restart: unless-stopped
 
   worker:
+    image: ${IMAGE_PREFIX:-luxride}/api:${IMAGE_TAG:-local}
+    pull_policy: ${PULL_POLICY:-missing}
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -70,8 +85,10 @@ services:
       METRICS_TOKEN: ${METRICS_TOKEN:?METRICS_TOKEN is required}
       RUN_BACKGROUND_JOBS: "true"
       PRIVATE_STORAGE_PERSISTENT: "true"
+      POSTGRES_DATA_MONITOR_PATH: /mnt/pgdata
     volumes:
       - backend_private_uploads:/app/uploads/private
+      - postgres_data:/mnt/pgdata:ro
     depends_on:
       db:
         condition: service_healthy
@@ -90,12 +107,16 @@ services:
     restart: unless-stopped
 
   frontend:
+    image: ${IMAGE_PREFIX:-luxride}/frontend:${IMAGE_TAG:-local}
+    pull_policy: ${PULL_POLICY:-missing}
     build:
       context: "./front end"
       dockerfile: Dockerfile
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:?VITE_API_BASE_URL is required}
         VITE_ADMIN_FRONTEND_URL: ${VITE_ADMIN_FRONTEND_URL:-}
+        VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
+        VITE_SENTRY_TRACES_SAMPLE_RATE: ${VITE_SENTRY_TRACES_SAMPLE_RATE:-0.1}
     ports:
       - "80:80"
     depends_on:
@@ -106,12 +127,16 @@ services:
   # Host routing: customer on :80, admin on :8080 for local compose.
   # Production ingress should route example.com -> frontend:80 and admin.example.com -> admin-frontend:80.
   admin-frontend:
+    image: ${IMAGE_PREFIX:-luxride}/admin-frontend:${IMAGE_TAG:-local}
+    pull_policy: ${PULL_POLICY:-missing}
     build:
       context: ./admin-front-end
       dockerfile: Dockerfile
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:?VITE_API_BASE_URL is required}
         VITE_CUSTOMER_FRONTEND_URL: ${VITE_CUSTOMER_FRONTEND_URL:-}
+        VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
+        VITE_SENTRY_TRACES_SAMPLE_RATE: ${VITE_SENTRY_TRACES_SAMPLE_RATE:-0.1}
     ports:
       - "8080:80"
     depends_on:
@@ -135,6 +160,8 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+      worker:
+        condition: service_started
       alertmanager:
         condition: service_started
     restart: unless-stopped

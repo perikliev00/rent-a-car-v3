@@ -17,7 +17,7 @@ export type AdminOrderFormValues = {
 };
 
 export async function fillCreateOrderForm(page: Page, values: AdminOrderFormValues): Promise<void> {
-  await page.getByLabel('Car').selectOption({ label: values.carName });
+  await page.getByLabel('Car', { exact: true }).selectOption({ label: values.carName });
   await page.getByLabel('Full name').fill(values.fullName ?? E2E_GUEST.fullName);
   await page.getByLabel('Email').fill(values.email);
   await page.getByLabel('Phone').fill(values.phoneNumber ?? E2E_GUEST.phoneNumber);

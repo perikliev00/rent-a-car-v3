@@ -1,4 +1,5 @@
 import type { ApiErrorBody, ApiResponse, ApiSuccess } from '../types/api';
+import { setSentryRequestId } from '../sentry';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000';
 
@@ -215,6 +216,8 @@ async function request<T>(url: string, options: RequestInit, retriedCsrf = false
       0,
     );
   }
+
+  setSentryRequestId(res.headers.get('X-Request-Id') ?? res.headers.get('X-Correlation-Id'));
 
   const body = await parseResponseBody(res);
 

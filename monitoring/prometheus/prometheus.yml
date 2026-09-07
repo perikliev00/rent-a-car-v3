@@ -19,3 +19,9 @@ scrape_configs:
     metrics_path: /prometheus
     static_configs:
       - targets: ['backend:3000']
+
+  # Optional: when running a dedicated worker process on the compose network.
+  - job_name: worker
+    metrics_path: /prometheus
+    static_configs:
+      - targets: ['worker:3000']

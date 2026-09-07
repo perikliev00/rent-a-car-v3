@@ -25,6 +25,7 @@ const {
 const {
   listDocuments,
   uploadDocument,
+  downloadDocument,
   deleteDocument,
 } = require('./car/carDocumentsController');
 const {
@@ -32,6 +33,7 @@ const {
   createCompliance,
   updateCompliance,
   deleteCompliance,
+  downloadComplianceDocument,
 } = require('./car/carComplianceController');
 
 module.exports = {
@@ -53,9 +55,11 @@ module.exports = {
   deleteDamageReport,
   listDocuments,
   uploadDocument,
+  downloadDocument,
   deleteDocument,
   listCompliance,
   createCompliance,
   updateCompliance,
   deleteCompliance,
+  downloadComplianceDocument,
 };

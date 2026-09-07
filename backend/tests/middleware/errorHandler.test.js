@@ -1,14 +1,21 @@
 const express = require('express');
 const request = require('supertest');
-const { AppError, ConflictError } = require('../../src/utils/appError');
-const { handleNotFound, errorHandler } = require('../../src/middleware/errorHandler');
 
 jest.mock('../../src/monitoring/metrics', () => ({
   incrementErrors: jest.fn(),
+  incrementReservationConflict: jest.fn(),
 }));
 jest.mock('../../src/config/sentry', () => ({
   captureException: jest.fn(),
 }));
+
+const metrics = require('../../src/monitoring/metrics');
+const { AppError, ConflictError } = require('../../src/utils/appError');
+const { handleNotFound, errorHandler } = require('../../src/middleware/errorHandler');
+const {
+  RESERVATION_HOLD_OVERLAP_CONSTRAINT,
+  CAR_DATE_BLOCKS_OVERLAP_CONSTRAINT,
+} = require('../../src/db/transaction');
 
 function createErrorApp(path = '/api/cars') {
   const app = express();
@@ -24,6 +31,18 @@ function createErrorApp(path = '/api/cars') {
     next(err);
   });
   app.get('/api/overlap', (_req, _res, next) => next({ code: 'OVERLAP', message: 'overlap' }));
+  app.get('/api/hold-overlap', (_req, _res, next) => {
+    const err = new Error('hold overlap');
+    err.code = '23P01';
+    err.constraint = RESERVATION_HOLD_OVERLAP_CONSTRAINT;
+    next(err);
+  });
+  app.get('/api/block-overlap', (_req, _res, next) => {
+    const err = new Error('block overlap');
+    err.code = '23P01';
+    err.constraint = CAR_DATE_BLOCKS_OVERLAP_CONSTRAINT;
+    next(err);
+  });
   app.get('/api/unique', (_req, _res, next) => {
     const err = new Error('unique');
     err.code = '23505';
@@ -52,6 +71,10 @@ describe('handleNotFound', () => {
 });
 
 describe('errorHandler', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   test('uses standard API envelope for /api/cars errors', async () => {
     const app = createErrorApp('/api/cars');
 
@@ -70,6 +93,7 @@ describe('errorHandler', () => {
     expect(response.body.success).toBeUndefined();
     expect(response.body.error.code).toBe('CONFLICT');
     expect(response.body.error.message).toBe('Chat conflict.');
+    expect(metrics.incrementReservationConflict).not.toHaveBeenCalled();
   });
 
   test('normalizes legacy errors with publicMessage', async () => {
@@ -81,12 +105,31 @@ describe('errorHandler', () => {
     expect(response.body.error.message).toBe('Legacy public message');
   });
 
-  test('normalizes OVERLAP code to conflict', async () => {
+  test('normalizes OVERLAP code to conflict and tracks booking conflict', async () => {
     const app = createErrorApp();
 
     const response = await request(app).get('/api/overlap').expect(409);
 
     expect(response.body.error.code).toBe('CONFLICT');
+    expect(metrics.incrementReservationConflict).toHaveBeenCalledWith('overlap');
+  });
+
+  test('tracks hold and car-block overlaps', async () => {
+    const app = createErrorApp();
+
+    await request(app).get('/api/hold-overlap').expect(409);
+    await request(app).get('/api/block-overlap').expect(409);
+
+    expect(metrics.incrementReservationConflict).toHaveBeenCalledWith('hold_overlap');
+    expect(metrics.incrementReservationConflict).toHaveBeenCalledWith('car_block_overlap');
+  });
+
+  test('does not track generic unique violations as booking conflicts', async () => {
+    const app = createErrorApp();
+
+    await request(app).get('/api/unique').expect(409);
+
+    expect(metrics.incrementReservationConflict).not.toHaveBeenCalled();
   });
 
   test('normalizes unknown errors to internal server error', async () => {

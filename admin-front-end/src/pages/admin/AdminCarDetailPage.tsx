@@ -105,6 +105,7 @@ export function AdminCarDetailPage() {
           onAddCompliance={() => data.complianceMutation.mutate()}
           complianceLoading={data.complianceQuery.isLoading}
           items={data.complianceQuery.data?.items}
+          onDownloadDocument={data.downloadComplianceDocument}
           onDeleteItem={data.deleteComplianceItem}
         />
       )}
@@ -144,6 +145,7 @@ export function AdminCarDetailPage() {
           onUpload={() => data.docMutation.mutate()}
           docsLoading={data.docsQuery.isLoading}
           documents={data.docsQuery.data?.documents}
+          onDownload={data.downloadDocument}
           onDelete={data.deleteDocument}
         />
       )}

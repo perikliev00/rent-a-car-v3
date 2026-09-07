@@ -6,13 +6,13 @@ import { Button } from '../../../components/ui/Button';
 import { Card, CardBody } from '../../../components/ui/Card';
 import { Input } from '../../../components/ui/Input';
 import { Select } from '../../../components/ui/Select';
-import { imageUrl } from '../../../utils/format';
 import { complianceStatusClass, type ComplianceForm } from './carDetailTypes';
 
 type ComplianceItem = {
   id: number;
   label: string;
-  documentUrl?: string | null;
+  itemType?: string;
+  hasDocument?: boolean;
   referenceNumber?: string | null;
   expiresAt?: string | null;
   status: string;
@@ -26,6 +26,7 @@ export function CarComplianceTab({
   onAddCompliance,
   complianceLoading,
   items,
+  onDownloadDocument,
   onDeleteItem,
 }: {
   complianceForm: ComplianceForm;
@@ -35,6 +36,7 @@ export function CarComplianceTab({
   onAddCompliance: () => void;
   complianceLoading: boolean;
   items: ComplianceItem[] | undefined;
+  onDownloadDocument: (itemId: number, filename: string) => void;
   onDeleteItem: (itemId: number) => void;
 }) {
   return (
@@ -132,10 +134,10 @@ export function CarComplianceTab({
               onChange={(e) => setComplianceForm({ ...complianceForm, notes: e.target.value })}
             />
             <div>
-              <label className="block text-sm font-medium">Image (optional)</label>
+              <label className="block text-sm font-medium">File (optional — JPG, PNG, WEBP, PDF)</label>
               <input
                 type="file"
-                accept="image/*"
+                accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf"
                 className="mt-1 text-sm"
                 onChange={(e) => setComplianceFile(e.target.files?.[0] ?? null)}
               />
@@ -173,15 +175,19 @@ export function CarComplianceTab({
                     <tr key={item.id} className="border-b border-[var(--color-line)]/60">
                       <td className="py-1.5 pr-3">
                         <div className="text-[var(--color-ink)]">{item.label}</div>
-                        {item.documentUrl ? (
-                          <a
-                            href={imageUrl(item.documentUrl)}
-                            target="_blank"
-                            rel="noreferrer"
+                        {item.hasDocument ? (
+                          <button
+                            type="button"
                             className="text-[var(--color-muted)] underline-offset-2 hover:underline"
+                            onClick={() =>
+                              void onDownloadDocument(
+                                item.id,
+                                `${item.itemType || 'compliance'}-${item.id}`
+                              )
+                            }
                           >
-                            View file
-                          </a>
+                            Download file
+                          </button>
                         ) : null}
                       </td>
                       <td className="py-1.5 pr-3">{item.referenceNumber || '—'}</td>

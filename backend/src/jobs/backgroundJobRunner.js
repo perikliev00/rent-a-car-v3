@@ -1,4 +1,5 @@
 const logger = require('../utils/logger');
+const metrics = require('../monitoring/metrics');
 const { withJobLock } = require('../db/transaction');
 const { cleanUpOutdatedDates } = require('../services/carService');
 const { cleanUpAbandonedReservations } = require('../services/reservationService');
@@ -32,9 +33,18 @@ async function runLockedJob(jobKey, work) {
     const outcome = await withJobLock(jobKey, async () => work());
     if (outcome?.skipped) {
       logger.debug({ jobKey }, 'Background job skipped (lock held)');
+      return outcome;
     }
+
+    if (outcome?.error) {
+      metrics.incrementBackgroundJobFailure(jobKey);
+      return outcome;
+    }
+
+    metrics.setBackgroundJobLastSuccess(jobKey);
     return outcome;
   } catch (err) {
+    metrics.incrementBackgroundJobFailure(jobKey);
     logger.error({ err, jobKey }, 'Background job error');
     return { skipped: false, error: err };
   }

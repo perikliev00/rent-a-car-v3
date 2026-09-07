@@ -98,9 +98,34 @@ const deleteCompliance = asyncHandler(async (req, res, next) => {
   }
 });
 
+const downloadComplianceDocument = asyncHandler(async (req, res, next) => {
+  try {
+    const { stream, mimeType, filename } = await carAdminService.openComplianceDocumentDownload(
+      req.params.id,
+      req.params.itemId
+    );
+    res.setHeader('Content-Type', mimeType || 'application/octet-stream');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${encodeURIComponent(filename || 'compliance-document')}"`
+    );
+    stream.pipe(res);
+  } catch (err) {
+    return notFoundOrForward(
+      err,
+      req,
+      res,
+      next,
+      'api.downloadCarComplianceDocument',
+      'Error downloading compliance document.'
+    );
+  }
+});
+
 module.exports = {
   listCompliance,
   createCompliance,
   updateCompliance,
   deleteCompliance,
+  downloadComplianceDocument,
 };

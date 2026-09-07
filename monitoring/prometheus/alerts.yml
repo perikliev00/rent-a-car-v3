@@ -1,6 +1,39 @@
 groups:
   - name: luxride_critical
     rules:
+      - alert: ApiDown
+        expr: up{job="backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: luxride-backend
+        annotations:
+          summary: "API scrape target is down"
+          description: "Prometheus cannot scrape the backend /prometheus endpoint."
+          runbook_url: "docs/runbooks/rollback.md"
+
+      - alert: ReadinessFailed
+        expr: ready_status == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: luxride-backend
+        annotations:
+          summary: "API readiness checks failing"
+          description: "/ready reports not_ready (database, Stripe config, or migrations)."
+          runbook_url: "docs/runbooks/db-restore.md"
+
+      - alert: MigrationsPendingOrFailed
+        expr: migrations_ok == 0 OR migrations_pending > 0
+        for: 5m
+        labels:
+          severity: critical
+          service: luxride-backend
+        annotations:
+          summary: "Database migrations pending or failed"
+          description: "migrations_ok is 0 or migrations_pending > 0 — deploy/migrate before serving traffic."
+          runbook_url: "docs/runbooks/db-restore.md"
+
       - alert: PaidButNotConfirmed
         expr: paid_not_confirmed_count > 0 OR processing_paid_count > 0
         for: 1m
@@ -10,6 +43,7 @@ groups:
         annotations:
           summary: "Payment received but reservation not confirmed"
           description: "paid_not_confirmed={{ $value }} — client paid but booking was not auto-confirmed. Investigate immediately."
+          runbook_url: "docs/runbooks/webhook-failure.md"
 
       - alert: ReservationConflictAfterPayment
         expr: increase(reservation_conflicts_total{reason="overlap_after_payment"}[5m]) > 0
@@ -20,6 +54,7 @@ groups:
         annotations:
           summary: "Reservation conflict after payment"
           description: "A paid booking hit an overlap conflict and may require manual review."
+          runbook_url: "docs/runbooks/webhook-failure.md"
 
       - alert: DbPoolExhausted
         expr: db_pool_waiting > 0
@@ -30,6 +65,56 @@ groups:
         annotations:
           summary: "Database connection pool exhausted"
           description: "{{ $value }} clients waiting for a DB connection."
+          runbook_url: "docs/runbooks/db-restore.md"
+
+      - alert: WorkerDown
+        expr: up{job="worker"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: luxride-worker
+        annotations:
+          summary: "Background worker scrape target is down"
+          description: "Prometheus cannot scrape the worker /prometheus endpoint."
+          runbook_url: "docs/runbooks/rollback.md"
+
+      - alert: WorkerStale
+        expr: (time() - worker_heartbeat_unixtime{job="worker"}) > 120
+        for: 2m
+        labels:
+          severity: critical
+          service: luxride-worker
+        annotations:
+          summary: "Worker heartbeat is stale"
+          description: "No worker heartbeat for more than 2 minutes — jobs may have stopped."
+          runbook_url: "docs/runbooks/rollback.md"
+
+      - alert: DiskSpaceLow
+        expr: |
+          (
+            storage_free_bytes
+            /
+            clamp_min(storage_size_bytes, 1)
+          ) < 0.1
+        for: 5m
+        labels:
+          severity: critical
+          service: luxride-backend
+        annotations:
+          summary: "Low disk space on monitored storage path"
+          description: "Free space below 10% on path={{ $labels.path }} (uploads and/or postgres_data volume)."
+          runbook_url: "docs/runbooks/db-restore.md"
+
+      - alert: PostgresDatabaseGrowingFast
+        expr: increase(pg_database_size_bytes[1h]) > 536870912
+        for: 15m
+        labels:
+          severity: warning
+          service: luxride-backend
+        annotations:
+          summary: "PostgreSQL database size grew more than 512MiB in 1h"
+          description: "Logical DB growth spike — check bloat, retention, and disk free space on postgres_data."
+          runbook_url: "docs/runbooks/db-restore.md"
 
   - name: luxride_warning
     rules:
@@ -42,6 +127,7 @@ groups:
         annotations:
           summary: "Stripe webhook failures detected"
           description: "Webhook failures increased in the last 5 minutes."
+          runbook_url: "docs/runbooks/webhook-failure.md"
 
       - alert: CheckoutErrorRateHigh
         expr: |
@@ -58,6 +144,7 @@ groups:
         annotations:
           summary: "Checkout error rate above 5%"
           description: "Checkout failures and abandonments exceed 5% of started checkouts."
+          runbook_url: "docs/runbooks/webhook-failure.md"
 
       - alert: TooMany500Errors
         expr: sum(rate(http_requests_total{status_code=~"5.."}[5m])) > 0.1
@@ -68,6 +155,7 @@ groups:
         annotations:
           summary: "High 5xx error rate"
           description: "More than 0.1 5xx responses per second over 3 minutes."
+          runbook_url: "docs/runbooks/rollback.md"
 
       - alert: AdminLoginFailuresSpike
         expr: increase(admin_login_failures_total[5m]) > 10
@@ -88,3 +176,36 @@ groups:
         annotations:
           summary: "Booking confirmation email failed"
           description: "At least one confirmation email failed to send."
+
+      - alert: BackgroundJobFailures
+        expr: increase(background_job_failures_total[15m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: luxride-worker
+        annotations:
+          summary: "Background job failures detected"
+          description: "One or more worker jobs failed in the last 15 minutes."
+          runbook_url: "docs/runbooks/rollback.md"
+
+      - alert: BookingConflictsSpike
+        expr: increase(reservation_conflicts_total[15m]) > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: luxride-backend
+        annotations:
+          summary: "Unusual number of booking conflicts"
+          description: "More than 5 reservation conflicts in 15 minutes (holds, booked overlaps, reholds, and paid conflicts)."
+          runbook_url: "docs/runbooks/webhook-failure.md"
+
+      - alert: StorageErrors
+        expr: increase(storage_errors_total[10m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: luxride-backend
+        annotations:
+          summary: "Storage operation errors"
+          description: "Upload/read/delete storage failures increased in the last 10 minutes."
+          runbook_url: "docs/runbooks/db-restore.md"

@@ -10,7 +10,11 @@ initSentry();
 const express = require('express');
 const pool = require('./db/pool');
 const logger = require('./utils/logger');
+const metrics = require('./monitoring/metrics');
+const requireMetricsToken = require('./middleware/requireMetricsToken');
 const { getLiveStatus, getReadyStatus } = require('./services/healthService');
+const { startGaugePoller } = require('./monitoring/gaugePoller');
+const { startWorkerHeartbeat } = require('./monitoring/workerHeartbeat');
 const {
   startBackgroundJobs,
   stopBackgroundJobs,
@@ -19,6 +23,8 @@ const {
 const app = express();
 let server = null;
 let isShuttingDown = false;
+let gaugePollerTimer = null;
+let heartbeatTimer = null;
 
 app.get('/health/live', (_req, res) => {
   res.json(getLiveStatus());
@@ -46,6 +52,19 @@ app.get('/ready', async (_req, res, next) => {
   }
 });
 
+app.get('/metrics', requireMetricsToken, (_req, res) => {
+  res.json(metrics.getSnapshot());
+});
+
+app.get('/prometheus', requireMetricsToken, async (_req, res, next) => {
+  try {
+    res.set('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+    res.send(await metrics.getPrometheusMetrics());
+  } catch (err) {
+    next(err);
+  }
+});
+
 async function gracefulShutdown(trigger, error = null) {
   if (isShuttingDown) {
     return;
@@ -55,6 +74,14 @@ async function gracefulShutdown(trigger, error = null) {
   logger.error({ trigger, err: error }, 'Starting worker graceful shutdown');
 
   stopBackgroundJobs();
+  if (gaugePollerTimer) {
+    clearInterval(gaugePollerTimer);
+    gaugePollerTimer = null;
+  }
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+  }
 
   const forceExitTimer = setTimeout(() => {
     logger.error('Worker graceful shutdown timed out. Forcing exit.');
@@ -90,6 +117,8 @@ async function gracefulShutdown(trigger, error = null) {
     logger.info({ dbTime: pgResult.rows[0].now }, 'PostgreSQL connected (worker)');
 
     await startBackgroundJobs({ pool });
+    gaugePollerTimer = startGaugePoller(pool);
+    heartbeatTimer = startWorkerHeartbeat();
 
     server = app.listen(config.port, () => {
       logger.info(

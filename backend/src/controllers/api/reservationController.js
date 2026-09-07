@@ -11,6 +11,7 @@ const apiResponse = require('../../utils/apiResponse');
 const asyncHandler = require('../../utils/asyncHandler');
 const { forwardControllerError } = require('../../utils/controllerError');
 const logger = require('../../utils/logger');
+const metrics = require('../../monitoring/metrics');
 
 exports.releaseActiveReservation = asyncHandler(async (req, res, next) => {
   try {
@@ -125,6 +126,7 @@ exports.releaseAndReholdReservation = asyncHandler(async (req, res, next) => {
           409
         );
       }
+      metrics.incrementReservationConflict('rehold_overlap');
       return apiResponse.error(
         res,
         'CONFLICT',

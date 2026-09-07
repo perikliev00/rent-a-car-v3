@@ -3,6 +3,7 @@ const path = require('path');
 const {
   S3Client,
   PutObjectCommand,
+  GetObjectCommand,
   DeleteObjectCommand,
   ListObjectsV2Command,
 } = require('@aws-sdk/client-s3');
@@ -142,6 +143,34 @@ async function deleteByPublicUrl(publicUrl) {
   return true;
 }
 
+async function openManagedPublicReadStream(publicUrl) {
+  if (!isManagedPublicUrl(publicUrl)) return null;
+
+  const filename = filenameFromPublicUrl(publicUrl);
+  const { bucket } = getConfig();
+  const client = createS3Client();
+
+  try {
+    const response = await client.send(
+      new GetObjectCommand({
+        Bucket: bucket,
+        Key: buildObjectKey(filename),
+      })
+    );
+    if (!response.Body) return null;
+    return {
+      stream: response.Body,
+      mimeType: response.ContentType || 'image/jpeg',
+    };
+  } catch (err) {
+    const status = err?.$metadata?.httpStatusCode;
+    if (err?.name === 'NotFound' || err?.name === 'NoSuchKey' || status === 404) {
+      return null;
+    }
+    throw err;
+  }
+}
+
 async function listManagedPublicUrls() {
   const { bucket, keyPrefix } = getConfig();
   const client = createS3Client();
@@ -219,6 +248,7 @@ module.exports = {
   deleteByPath,
   processUploadedFile,
   deleteByPublicUrl,
+  openManagedPublicReadStream,
   listManagedPublicUrls,
   cleanupOrphans,
   cleanupStaleTempFiles,

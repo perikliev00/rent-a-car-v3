@@ -21,6 +21,7 @@
     "db:backup": "node sql/backup.js",
     "db:restore": "node sql/restore.js",
     "db:setup": "node sql/applySchema.js && node sql/migrate.js",
+    "db:assert-migrations": "node scripts/assertMigrationsApplied.js",
     "reconcile:stripe": "node scripts/reconcileStripeSessions.js",
     "lint": "eslint .",
     "format": "prettier --write ."

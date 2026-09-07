@@ -24,9 +24,14 @@ jest.mock('../../src/modules/notifications/notifications.scheduler', () => ({
 jest.mock('../../src/modules/notifications/notifications.worker', () => ({
   processDueNotifications: jest.fn().mockResolvedValue({ processed: 0 }),
 }));
+jest.mock('../../src/monitoring/metrics', () => ({
+  incrementBackgroundJobFailure: jest.fn(),
+  setBackgroundJobLastSuccess: jest.fn(),
+}));
 
 const { withJobLock } = require('../../src/db/transaction');
 const { cleanUpOutdatedDates } = require('../../src/services/carService');
+const metrics = require('../../src/monitoring/metrics');
 const {
   JOB_KEYS,
   runLockedJob,
@@ -51,6 +56,7 @@ describe('backgroundJobRunner', () => {
     await expect(runLockedJob(JOB_KEYS.OUTDATED_DATES, work)).resolves.toEqual({ skipped: true });
     expect(withJobLock).toHaveBeenCalledWith(JOB_KEYS.OUTDATED_DATES, expect.any(Function));
     expect(work).not.toHaveBeenCalled();
+    expect(metrics.setBackgroundJobLastSuccess).not.toHaveBeenCalled();
   });
 
   test('runLockedJob invokes work when lock is acquired', async () => {
@@ -65,6 +71,20 @@ describe('backgroundJobRunner', () => {
       result: 'ok',
     });
     expect(work).toHaveBeenCalledTimes(1);
+    expect(metrics.setBackgroundJobLastSuccess).toHaveBeenCalledWith(JOB_KEYS.FLEET_ALERTS);
+  });
+
+  test('runLockedJob records failure metrics when work throws', async () => {
+    withJobLock.mockImplementation(async (_key, work) => work());
+    const boom = new Error('job failed');
+
+    await expect(
+      runLockedJob(JOB_KEYS.CAR_IMAGES, async () => {
+        throw boom;
+      })
+    ).resolves.toEqual({ skipped: false, error: boom });
+
+    expect(metrics.incrementBackgroundJobFailure).toHaveBeenCalledWith(JOB_KEYS.CAR_IMAGES);
   });
 
   test('startBackgroundJobs runs locked jobs immediately then registers intervals', async () => {
@@ -81,7 +101,5 @@ describe('backgroundJobRunner', () => {
       JOB_KEYS.NOTIFICATIONS_WORKER,
       expect.any(Function)
     );
-
-    stopBackgroundJobs();
   });
 });

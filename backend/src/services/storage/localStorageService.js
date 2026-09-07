@@ -56,6 +56,20 @@ async function deleteByPath(filePath) {
   }
 }
 
+async function openManagedPublicReadStream(publicUrl) {
+  const filePath = resolveLocalPathFromPublicUrl(publicUrl);
+  if (!filePath) return null;
+  try {
+    await fs.promises.access(filePath, fs.constants.R_OK);
+  } catch {
+    return null;
+  }
+  return {
+    stream: fs.createReadStream(filePath),
+    mimeType: 'image/jpeg',
+  };
+}
+
 async function processUploadedFile({ tempPath, tempFilename }) {
   if (!tempPath) {
     throw new Error('Missing temp upload path.');
@@ -153,6 +167,7 @@ module.exports = {
   deleteByPath,
   processUploadedFile,
   deleteByPublicUrl,
+  openManagedPublicReadStream,
   listManagedPublicUrls,
   cleanupOrphans,
   cleanupStaleTempFiles,

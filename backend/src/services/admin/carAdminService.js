@@ -22,12 +22,14 @@ const {
   listDocuments,
   uploadDocument,
   deleteDocument,
+  openDocumentDownload,
 } = require('./car/carAdminDocumentsService');
 const {
   listCompliance,
   createCompliance,
   updateCompliance,
   deleteCompliance,
+  openComplianceDocumentDownload,
   getFleetAlerts,
   reconcileFleetAlerts,
 } = require('./car/carAdminComplianceService');
@@ -51,10 +53,12 @@ module.exports = {
   listDocuments,
   uploadDocument,
   deleteDocument,
+  openDocumentDownload,
   listCompliance,
   createCompliance,
   updateCompliance,
   deleteCompliance,
+  openComplianceDocumentDownload,
   getFleetAlerts,
   reconcileFleetAlerts,
   buildCarFormState,

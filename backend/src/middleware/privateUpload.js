@@ -189,6 +189,15 @@ const customerDocumentUpload = [
   rejectIfFileValidationFailed,
 ];
 
+const adminPrivateDocumentUpload = [
+  adminUploadLimiter,
+  documentUpload.single('file'),
+  handleMulterError,
+  handleFileRejected,
+  validatePrivateDocument,
+  rejectIfFileValidationFailed,
+];
+
 const checklistUpload = [
   adminUploadLimiter,
   imageUpload.fields([
@@ -204,6 +213,7 @@ const checklistUpload = [
 
 module.exports = {
   customerDocumentUpload,
+  adminPrivateDocumentUpload,
   checklistUpload,
   validatePrivateDocument,
   validatePrivateImages,

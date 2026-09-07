@@ -4,22 +4,49 @@ on:
   push:
   pull_request:
 
-jobs:
-  backend:
-    runs-on: ubuntu-latest
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
+permissions:
+  contents: read
+  packages: write
+
+env:
+  NODE_VERSION: '22'
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/${{ github.repository }}
+
+jobs:
+  backend-lint:
+    name: backend-lint
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: backend
-
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
 
+  backend-unit:
+    name: backend-unit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
       - run: npm ci
       - run: npm run test:coverage
       - uses: actions/upload-artifact@v4
@@ -40,23 +67,22 @@ jobs:
           retention-days: 14
 
   frontend:
+    name: frontend
     runs-on: ubuntu-latest
-
     defaults:
       run:
         working-directory: front end
-
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: front end/package-lock.json
-
       - run: npm ci
       - run: npm run check
       - run: npm run test:coverage
+      - run: npm run build
       - uses: actions/upload-artifact@v4
         with:
           name: frontend-unit-coverage
@@ -74,23 +100,22 @@ jobs:
           retention-days: 14
 
   frontend-admin:
+    name: frontend-admin
     runs-on: ubuntu-latest
-
     defaults:
       run:
         working-directory: admin-front-end
-
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: admin-front-end/package-lock.json
-
       - run: npm ci
       - run: npm run check
       - run: npm run test:coverage
+      - run: npm run build
       - uses: actions/upload-artifact@v4
         with:
           name: admin-frontend-unit-coverage
@@ -107,9 +132,73 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  integration-e2e:
+  security-scan:
+    name: security-scan
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            front end/package-lock.json
+            admin-front-end/package-lock.json
+            e2e/package-lock.json
+      - name: Install dependencies
+        run: |
+          npm --prefix backend ci
+          npm --prefix "front end" ci
+          npm --prefix admin-front-end ci
+          npm --prefix e2e ci
+      - name: npm audit (high+)
+        run: |
+          npm --prefix backend audit --audit-level=high
+          npm --prefix "front end" audit --audit-level=high
+          npm --prefix admin-front-end audit --audit-level=high
+          npm --prefix e2e audit --audit-level=high
 
+  migration-test:
+    name: migration-test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: luxride_migrate
+          POSTGRES_USER: luxride
+          POSTGRES_PASSWORD: luxride
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U luxride -d luxride_migrate"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://luxride:luxride@localhost:5432/luxride_migrate
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - name: Apply schema + migrations
+        run: npm run db:setup
+      - name: Assert all migrations recorded
+        run: npm run db:assert-migrations
+      - name: Re-run migrate (idempotent no-op)
+        run: npm run db:migrate
+
+  db-consistency:
+    name: db-consistency
+    runs-on: ubuntu-latest
     services:
       postgres:
         image: postgres:16-alpine
@@ -124,7 +213,41 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+    env:
+      DATABASE_URL: postgres://luxride:luxride@localhost:5432/luxride_test
+      RUN_DB_TESTS: 'true'
+      SESSION_SECRET: test-session-secret-32-chars-minimum!!
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm run db:setup
+      - run: npm run test:db
 
+  integration:
+    name: integration
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: luxride_test
+          POSTGRES_USER: luxride
+          POSTGRES_PASSWORD: luxride
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U luxride -d luxride_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       DATABASE_URL: postgres://luxride:luxride@localhost:5432/luxride_test
       RUN_INTEGRATION_TESTS: '1'
@@ -135,44 +258,19 @@ jobs:
       SESSION_SECRET: test-session-secret-32-chars-minimum!!
       FRONTEND_BASE_URL: http://localhost:5173
       CORS_ORIGINS: http://localhost:5173,http://localhost:5174
-
+    defaults:
+      run:
+        working-directory: backend
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: |
-            backend/package-lock.json
-            front end/package-lock.json
-            admin-front-end/package-lock.json
-            e2e/package-lock.json
-
-      - name: Setup test database
-        working-directory: backend
-        run: npm ci && npm run db:setup
-
-      - name: Run DB consistency tests
-        working-directory: backend
-        env:
-          RUN_DB_TESTS: 'true'
-        run: npm run test:db
-
-      - name: Run integration tests
-        working-directory: backend
-        run: npm run test:integration
-
-      - name: Install E2E dependencies
-        run: |
-          npm --prefix "front end" ci
-          npm --prefix admin-front-end ci
-          npm --prefix e2e ci
-          npm run e2e:install
-
-      - name: Run Playwright E2E tests
-        run: npm run e2e
-
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm run db:setup
+      - run: npm run test:integration
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -181,6 +279,58 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  e2e-playwright:
+    name: e2e-playwright
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: luxride_test
+          POSTGRES_USER: luxride
+          POSTGRES_PASSWORD: luxride
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U luxride -d luxride_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://luxride:luxride@localhost:5432/luxride_test
+      STRIPE_STUB: '1'
+      EMAIL_ENABLED: 'false'
+      STRIPE_SECRET: sk_test_ci_placeholder_key_123456789012
+      STRIPE_WEBHOOK_SECRET: whsec_ci_placeholder_secret
+      SESSION_SECRET: test-session-secret-32-chars-minimum!!
+      FRONTEND_BASE_URL: http://localhost:5173
+      CORS_ORIGINS: http://localhost:5173,http://localhost:5174
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            front end/package-lock.json
+            admin-front-end/package-lock.json
+            e2e/package-lock.json
+      - name: Setup test database
+        working-directory: backend
+        run: npm ci && npm run db:setup
+      - name: Install app + E2E dependencies
+        run: |
+          npm --prefix "front end" ci
+          npm --prefix admin-front-end ci
+          npm --prefix e2e ci
+          npm run e2e:install
+      - name: Run Playwright E2E tests
+        run: npm run e2e
+      - name: Fail on Playwright retries (flake signal)
+        if: always()
+        run: npm run e2e:check-flakes
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -188,7 +338,6 @@ jobs:
           path: e2e/test-results/results.json
           if-no-files-found: warn
           retention-days: 14
-
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -196,3 +345,134 @@ jobs:
           path: e2e/playwright-report/
           if-no-files-found: warn
           retention-days: 14
+
+  docker-build:
+    name: docker-build
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tag }}
+      api_digest: ${{ steps.push.outputs.api_digest }}
+      frontend_digest: ${{ steps.push.outputs.frontend_digest }}
+      admin_digest: ${{ steps.push.outputs.admin_digest }}
+      pushed: ${{ steps.meta.outputs.push }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set image tag / push policy
+        id: meta
+        run: |
+          echo "tag=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          # Push immutable release artifacts only from main; deploy never rebuilds.
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "push=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "push=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Resolve frontend build args
+        id: vite
+        run: |
+          API_URL="${{ vars.VITE_API_BASE_URL }}"
+          ADMIN_URL="${{ vars.VITE_ADMIN_FRONTEND_URL }}"
+          CUSTOMER_URL="${{ vars.VITE_CUSTOMER_FRONTEND_URL }}"
+          SENTRY_DSN="${{ vars.VITE_SENTRY_DSN }}"
+          SENTRY_RATE="${{ vars.VITE_SENTRY_TRACES_SAMPLE_RATE }}"
+          if [ "${{ steps.meta.outputs.push }}" = "true" ]; then
+            if [ -z "$API_URL" ] || [ "$API_URL" = "http://localhost:3000" ]; then
+              echo "Set repository variable VITE_API_BASE_URL before pushing release images from main"
+              exit 1
+            fi
+          elif [ -z "$API_URL" ]; then
+            API_URL="http://localhost:3000"
+          fi
+          echo "api_url=$API_URL" >> "$GITHUB_OUTPUT"
+          echo "admin_url=$ADMIN_URL" >> "$GITHUB_OUTPUT"
+          echo "customer_url=$CUSTOMER_URL" >> "$GITHUB_OUTPUT"
+          echo "sentry_dsn=$SENTRY_DSN" >> "$GITHUB_OUTPUT"
+          echo "sentry_rate=${SENTRY_RATE:-0.1}" >> "$GITHUB_OUTPUT"
+      - name: Log in to GHCR
+        if: steps.meta.outputs.push == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build backend image
+        run: docker build -t "${IMAGE_PREFIX}/api:${{ steps.meta.outputs.tag }}" ./backend
+      - name: Build customer frontend image
+        run: >
+          docker build
+          --build-arg VITE_API_BASE_URL=${{ steps.vite.outputs.api_url }}
+          --build-arg VITE_ADMIN_FRONTEND_URL=${{ steps.vite.outputs.admin_url }}
+          --build-arg VITE_SENTRY_DSN=${{ steps.vite.outputs.sentry_dsn }}
+          --build-arg VITE_SENTRY_TRACES_SAMPLE_RATE=${{ steps.vite.outputs.sentry_rate }}
+          -t "${IMAGE_PREFIX}/frontend:${{ steps.meta.outputs.tag }}"
+          "./front end"
+      - name: Build admin frontend image
+        run: >
+          docker build
+          --build-arg VITE_API_BASE_URL=${{ steps.vite.outputs.api_url }}
+          --build-arg VITE_CUSTOMER_FRONTEND_URL=${{ steps.vite.outputs.customer_url }}
+          --build-arg VITE_SENTRY_DSN=${{ steps.vite.outputs.sentry_dsn }}
+          --build-arg VITE_SENTRY_TRACES_SAMPLE_RATE=${{ steps.vite.outputs.sentry_rate }}
+          -t "${IMAGE_PREFIX}/admin-frontend:${{ steps.meta.outputs.tag }}"
+          ./admin-front-end
+      - name: Push immutable SHA images (main only)
+        id: push
+        if: steps.meta.outputs.push == 'true'
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.meta.outputs.tag }}"
+          for name in api frontend admin-frontend; do
+            IMAGE="${IMAGE_PREFIX}/${name}:${TAG}"
+            docker push "$IMAGE"
+          done
+          API_DIGEST="$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE_PREFIX}/api:${TAG}")"
+          FE_DIGEST="$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE_PREFIX}/frontend:${TAG}")"
+          ADMIN_DIGEST="$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE_PREFIX}/admin-frontend:${TAG}")"
+          test -n "$API_DIGEST" && test -n "$FE_DIGEST" && test -n "$ADMIN_DIGEST"
+          echo "api_digest=$API_DIGEST" >> "$GITHUB_OUTPUT"
+          echo "frontend_digest=$FE_DIGEST" >> "$GITHUB_OUTPUT"
+          echo "admin_digest=$ADMIN_DIGEST" >> "$GITHUB_OUTPUT"
+          {
+            echo "image_tag=$TAG"
+            echo "api_digest=$API_DIGEST"
+            echo "frontend_digest=$FE_DIGEST"
+            echo "admin_digest=$ADMIN_DIGEST"
+          } > image-digests.txt
+          cat image-digests.txt
+      - name: Upload digest manifest
+        if: steps.meta.outputs.push == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-digests-${{ steps.meta.outputs.tag }}
+          path: image-digests.txt
+          if-no-files-found: error
+          retention-days: 30
+
+  ci-gate:
+    name: CI
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - backend-lint
+      - backend-unit
+      - frontend
+      - frontend-admin
+      - security-scan
+      - migration-test
+      - db-consistency
+      - integration
+      - e2e-playwright
+      - docker-build
+    steps:
+      - name: Require all checks green
+        run: |
+          results='${{ join(needs.*.result, ',') }}'
+          echo "Job results: $results"
+          echo "$results" | tr ',' '\n' | grep -qx 'success' || true
+          for r in $(echo "$results" | tr ',' ' '); do
+            if [ "$r" != "success" ]; then
+              echo "CI gate failed — not all jobs succeeded"
+              exit 1
+            fi
+          done
+          echo "✓ All required CI jobs succeeded"
