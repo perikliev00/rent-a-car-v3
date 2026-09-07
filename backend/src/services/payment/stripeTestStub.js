@@ -1,6 +1,6 @@
 /**
  * In-memory Stripe Checkout session stub for STRIPE_STUB=1 (E2E / local test servers).
- * Not used in production unless STRIPE_STUB is explicitly set.
+ * Production startup rejects STRIPE_STUB via validateEnv().
  */
 
 const sessions = new Map();

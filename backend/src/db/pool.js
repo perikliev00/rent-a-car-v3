@@ -1,20 +1,60 @@
 const { createInstrumentedPool } = require('./instrumentedPool');
+const { resolvePoolOptions, applySessionTimeouts } = require('./poolConfig');
 
 function isUsablePool(pool) {
   return Boolean(pool) && pool.ended !== true && pool.ending !== true;
 }
 
-function createPool() {
-  const isTest = process.env.NODE_ENV === 'test';
-  return createInstrumentedPool({
-    connectionString: process.env.DATABASE_URL,
-    ...(isTest
-      ? {
-          max: 5,
-          idleTimeoutMillis: 1000,
-          allowExitOnIdle: true,
+function wrapConnectWithTimeouts(pool, timeouts) {
+  const originalConnect = pool.connect.bind(pool);
+
+  pool.connect = function connectWithTimeouts(callback) {
+    if (typeof callback === 'function') {
+      return originalConnect((err, client, release) => {
+        if (err) {
+          callback(err);
+          return;
         }
-      : {}),
+        applySessionTimeouts(client, timeouts)
+          .then(() => callback(null, client, release))
+          .catch((timeoutErr) => {
+            release();
+            callback(timeoutErr);
+          });
+      });
+    }
+
+    return originalConnect().then(async (client) => {
+      try {
+        await applySessionTimeouts(client, timeouts);
+        return client;
+      } catch (timeoutErr) {
+        client.release();
+        throw timeoutErr;
+      }
+    });
+  };
+
+  return pool;
+}
+
+function createPool() {
+  const {
+    statementTimeoutMs,
+    idleInTransactionTimeoutMs,
+    lockTimeoutMs,
+    ...poolOptions
+  } = resolvePoolOptions();
+
+  const pool = createInstrumentedPool({
+    connectionString: process.env.DATABASE_URL,
+    ...poolOptions,
+  });
+
+  return wrapConnectWithTimeouts(pool, {
+    statementTimeoutMs,
+    idleInTransactionTimeoutMs,
+    lockTimeoutMs,
   });
 }
 

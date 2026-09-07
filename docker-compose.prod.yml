@@ -32,8 +32,8 @@ services:
       FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:?FRONTEND_BASE_URL is required}
       CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS is required}
       METRICS_TOKEN: ${METRICS_TOKEN:?METRICS_TOKEN is required}
-      # Extra scaled API replicas should set this to "false"
-      RUN_BACKGROUND_JOBS: "true"
+      # API replicas must not run timers; the dedicated worker service does.
+      RUN_BACKGROUND_JOBS: "false"
       # Local private uploads survive container rebuilds. Prefer PRIVATE_STORAGE_DRIVER=s3 in .env.
       PRIVATE_STORAGE_PERSISTENT: "true"
     volumes:
@@ -48,6 +48,40 @@ services:
           "node",
           "-e",
           "fetch('http://127.0.0.1:3000/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: ["node", "src/worker.js"]
+    env_file:
+      - ./backend/.env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://luxride:${POSTGRES_PASSWORD}@db:5432/luxride
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:?FRONTEND_BASE_URL is required}
+      CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS is required}
+      METRICS_TOKEN: ${METRICS_TOKEN:?METRICS_TOKEN is required}
+      RUN_BACKGROUND_JOBS: "true"
+      PRIVATE_STORAGE_PERSISTENT: "true"
+    volumes:
+      - backend_private_uploads:/app/uploads/private
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 15s
       timeout: 5s

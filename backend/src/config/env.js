@@ -10,8 +10,19 @@ const WEAK_SESSION_SECRETS = new Set([
   'secret',
   'change-me',
   'replace_with_32_plus_random_bytes',
+  'replace_me_with_32_plus_random_chars',
   'your-session-secret',
 ]);
+
+const WEAK_STRIPE_WEBHOOK_SECRETS = new Set([
+  'whsec_xxx',
+  'whsec_test',
+  'whsec_test_secret',
+  'whsec_secret',
+  'whsec_change_me',
+]);
+
+const DEV_HOST_RE = /^(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)$/i;
 
 let validatedConfig = null;
 
@@ -65,9 +76,68 @@ function assertSessionSecretStrength() {
   }
 }
 
-function validateEmailConfig() {
+function isDevelopmentHost(hostname) {
+  return DEV_HOST_RE.test(String(hostname || '').trim());
+}
+
+function assertProductionUrl(label, value, { allowPath = true } = {}) {
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error(`${label} must be a valid absolute URL in production`);
+  }
+
+  if (parsed.protocol !== 'https:') {
+    throw new Error(`${label} must use HTTPS in production`);
+  }
+
+  if (isDevelopmentHost(parsed.hostname)) {
+    throw new Error(`${label} must not use a development host in production`);
+  }
+
+  if (!allowPath && (parsed.pathname !== '/' || parsed.search || parsed.hash)) {
+    throw new Error(`${label} must be an origin (scheme + host[+port]) in production`);
+  }
+}
+
+function assertProductionDatabaseUrl(databaseUrl) {
+  let parsed;
+  try {
+    parsed = new URL(databaseUrl);
+  } catch {
+    throw new Error('DATABASE_URL must be a valid PostgreSQL URL in production');
+  }
+
+  const protocol = parsed.protocol.replace(/:$/, '');
+  if (!['postgres', 'postgresql'].includes(protocol)) {
+    throw new Error('DATABASE_URL must use the postgres(ql) scheme in production');
+  }
+
+  if (isDevelopmentHost(parsed.hostname)) {
+    throw new Error('DATABASE_URL must not point at a development host in production');
+  }
+}
+
+function assertProductionStripeWebhookSecret() {
+  const secret = process.env.STRIPE_WEBHOOK_SECRET.trim();
+
+  if (!secret.startsWith('whsec_')) {
+    throw new Error('STRIPE_WEBHOOK_SECRET must be a real Stripe webhook secret (whsec_...) in production');
+  }
+
+  if (WEAK_STRIPE_WEBHOOK_SECRETS.has(secret.toLowerCase()) || secret.length < 20) {
+    throw new Error('STRIPE_WEBHOOK_SECRET is a known weak/default value');
+  }
+}
+
+function validateEmailConfig({ requireEnabled = false } = {}) {
   const emailEnabled = isTruthy(process.env.EMAIL_ENABLED);
   const configuredSmtpVars = SMTP_VARS.filter((key) => !isEmpty(process.env[key]));
+
+  if (requireEnabled && !emailEnabled) {
+    throw new Error('EMAIL_ENABLED must be true with full SMTP configuration in production');
+  }
 
   if (emailEnabled) {
     requireEnv(SMTP_VARS);
@@ -85,15 +155,37 @@ function validateEmailConfig() {
 function validateProductionSecurity() {
   assertSessionSecretStrength();
 
+  if (isTruthy(process.env.STRIPE_STUB)) {
+    throw new Error('STRIPE_STUB must be disabled in production');
+  }
+
+  assertProductionStripeWebhookSecret();
+  assertProductionDatabaseUrl(process.env.DATABASE_URL);
+
   if (!process.env.CORS_ORIGINS || !String(process.env.CORS_ORIGINS).trim()) {
     throw new Error('CORS_ORIGINS must be set in production');
   }
 
+  const frontendBaseUrl = normalizeFrontendBaseUrl(process.env.FRONTEND_BASE_URL);
+  assertProductionUrl('FRONTEND_BASE_URL', frontendBaseUrl);
+
+  const corsOrigins = parseCorsOrigins(process.env.CORS_ORIGINS);
+  for (const origin of corsOrigins) {
+    assertProductionUrl('CORS_ORIGINS entry', origin, { allowPath: false });
+  }
+
   const sessionCookieSameSite = (process.env.SESSION_COOKIE_SAME_SITE || 'lax').toLowerCase();
-  if (sessionCookieSameSite === 'none' && !process.env.FRONTEND_BASE_URL?.startsWith('https://')) {
+  if (sessionCookieSameSite === 'none' && !frontendBaseUrl.startsWith('https://')) {
     throw new Error(
       'SESSION_COOKIE_SAME_SITE=none requires FRONTEND_BASE_URL to use HTTPS in production'
     );
+  }
+
+  if (
+    process.env.SESSION_COOKIE_SECURE !== undefined &&
+    !isTruthy(process.env.SESSION_COOKIE_SECURE)
+  ) {
+    throw new Error('SESSION_COOKIE_SECURE must not be disabled in production');
   }
 
   const stripeSecret = process.env.STRIPE_SECRET.trim();
@@ -102,11 +194,15 @@ function validateProductionSecurity() {
   }
 
   const storageDriver = (process.env.STORAGE_DRIVER || 'local').toLowerCase();
-  if (storageDriver === 's3') {
-    requireEnv(S3_VARS);
+  if (storageDriver !== 's3') {
+    throw new Error(
+      'STORAGE_DRIVER must be s3 in production (local public uploads are ephemeral without durable object storage)'
+    );
   }
+  requireEnv(S3_VARS);
 
   validatePrivateStorageConfig();
+  validateEmailConfig({ requireEnabled: true });
 }
 
 function resolvePrivateStorageDriver() {
@@ -135,10 +231,14 @@ function validatePrivateStorageConfig() {
 function buildConfig() {
   const sessionCookieSameSite = (process.env.SESSION_COOKIE_SAME_SITE || 'lax').toLowerCase();
   const allowedSameSite = new Set(['lax', 'strict', 'none']);
+  const isProd = process.env.NODE_ENV === 'production';
+  const resolvedSameSite = allowedSameSite.has(sessionCookieSameSite)
+    ? sessionCookieSameSite
+    : 'lax';
 
   return {
     nodeEnv: process.env.NODE_ENV || 'development',
-    isProd: process.env.NODE_ENV === 'production',
+    isProd,
     isTest: process.env.NODE_ENV === 'test',
     port: Number(process.env.PORT || 3000),
     databaseUrl: process.env.DATABASE_URL,
@@ -150,9 +250,8 @@ function buildConfig() {
     privateStorageDriver: resolvePrivateStorageDriver(),
     corsOrigins: parseCorsOrigins(process.env.CORS_ORIGINS),
     frontendBaseUrl: resolveFrontendBaseUrl(),
-    sessionCookieSameSite: allowedSameSite.has(sessionCookieSameSite)
-      ? sessionCookieSameSite
-      : 'lax',
+    sessionCookieSameSite: resolvedSameSite,
+    sessionCookieSecure: isProd || resolvedSameSite === 'none',
     openApiDocsEnabled: isTruthy(process.env.OPENAPI_DOCS_ENABLED),
   };
 }
@@ -172,10 +271,11 @@ function validateEnv() {
 
   requireEnv(required);
   assertSessionSecretStrength();
-  validateEmailConfig();
 
   if (isProd) {
     validateProductionSecurity();
+  } else {
+    validateEmailConfig();
   }
 
   validatedConfig = buildConfig();

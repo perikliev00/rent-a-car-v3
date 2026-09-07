@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
+    "worker": "node src/worker.js",
     "test": "jest --runInBand --forceExit",
     "test:coverage": "jest --runInBand --forceExit --coverage --testTimeout=60000 --json --outputFile=test-results/jest-results.json",
     "test:db": "node tests/runDbTests.js",

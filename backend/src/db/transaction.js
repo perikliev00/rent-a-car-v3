@@ -10,13 +10,14 @@ const ACTIVE_SESSION_HOLD_UNIQUE_INDEX = 'idx_reservations_one_active_hold_per_s
  * Two-argument advisory lock namespaces.
  * Must stay distinct from each other and from session-level hashtext('luxride_migrations').
  * CAR and SESSION are transaction-scoped (pg_advisory_xact_lock).
- * CHECKOUT is session-scoped (pg_try_advisory_lock / pg_advisory_unlock) so it can
- * span Stripe API calls without a transaction. Waiters must not use blocking pg_advisory_lock.
+ * CHECKOUT and JOB are session-scoped (pg_try_advisory_lock / pg_advisory_unlock) so they can
+ * span work outside a transaction. Waiters must not use blocking pg_advisory_lock.
  */
 const ADVISORY_LOCK_NS = Object.freeze({
   CAR: 1,
   SESSION: 2,
   CHECKOUT: 3,
+  JOB: 4,
 });
 
 /**
@@ -237,6 +238,59 @@ async function withReservationCheckoutLock(reservationId, work, options = {}) {
   throw new CheckoutLockBusyError();
 }
 
+function normalizeJobLockKey(jobKey) {
+  if (!jobKey || typeof jobKey !== 'string' || !jobKey.trim()) {
+    throw new Error('Invalid job key for advisory lock');
+  }
+  return jobKey.trim();
+}
+
+/**
+ * Non-blocking session-level lock for background jobs (one holder per job key).
+ * Uses hashtext(jobKey) under ADVISORY_LOCK_NS.JOB.
+ */
+async function tryAcquireJobLock(client, jobKey) {
+  const key = normalizeJobLockKey(jobKey);
+  const result = await client.query(
+    'SELECT pg_try_advisory_lock($1, hashtext($2)) AS acquired',
+    [ADVISORY_LOCK_NS.JOB, key]
+  );
+  return isPgBooleanTrue(result.rows[0]?.acquired);
+}
+
+async function releaseJobLock(client, jobKey) {
+  const key = normalizeJobLockKey(jobKey);
+  await client.query('SELECT pg_advisory_unlock($1, hashtext($2))', [
+    ADVISORY_LOCK_NS.JOB,
+    key,
+  ]);
+  return key;
+}
+
+/**
+ * Runs work(client) while holding the job advisory lock.
+ * If the lock is already held, returns { skipped: true } without calling work.
+ */
+async function withJobLock(jobKey, work) {
+  const key = normalizeJobLockKey(jobKey);
+  const client = await pool.connect();
+  let acquired = false;
+  try {
+    acquired = await tryAcquireJobLock(client, key);
+    if (!acquired) {
+      return { skipped: true };
+    }
+    try {
+      const result = await work(client);
+      return { skipped: false, result };
+    } finally {
+      await releaseJobLock(client, key);
+    }
+  } finally {
+    client.release();
+  }
+}
+
 module.exports = {
   PG_UNIQUE_VIOLATION,
   PG_EXCLUSION_VIOLATION,
@@ -261,4 +315,7 @@ module.exports = {
   withReservationCheckoutLock,
   CheckoutLockBusyError,
   isCheckoutLockBusyError,
+  tryAcquireJobLock,
+  releaseJobLock,
+  withJobLock,
 };

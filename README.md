@@ -81,6 +81,7 @@ npm run dev            # http://localhost:3000
 |--------|-------------|
 | `npm run dev` | Start API with nodemon |
 | `npm start` | Start API (production) |
+| `npm run worker` | Start background worker (jobs + health only) |
 | `npm test` | Run Jest tests |
 | `npm run test:coverage` | Run Jest with coverage reports and global floors |
 | `npm run test:db` | Run DB consistency tests (`RUN_DB_TESTS=1`) |
@@ -189,10 +190,44 @@ docker compose -f docker-compose.dev.yml exec -T db pg_dump -U luxride luxride >
 docker compose -f docker-compose.dev.yml exec -T db psql -U luxride luxride < backup.sql
 ```
 
+#### Managed backups and point-in-time recovery (production)
+
+`docker-compose.prod.yml` ships a local Postgres volume for demos only — **not** production DR. Use managed PostgreSQL 16 (RDS, Cloud SQL, Neon, Aiven, Azure, etc.) with:
+
+1. Automated daily snapshots (encrypted)
+2. Continuous WAL / **PITR** with retention ≥ 7–14 days
+3. Alerts on failed backups
+4. Documented RPO/RTO for the team
+
+`npm run db:backup` is a logical dump for drills and local recovery — it does **not** replace provider PITR.
+
+#### Restore drill (required before trusting backups)
+
+A backup that has never been restored is not a proven backup. Drill against a **separate** database (never overwrite production/`DATABASE_URL` you care about):
+
+```bash
+# 1) Backup source
+cd backend
+DATABASE_URL=postgres://…/luxride_source npm run db:backup -- --out=backups/drill_source.sql
+
+# 2) Create empty drill DB, then restore into it
+createdb luxride_restore_drill
+DATABASE_URL=postgres://…/luxride_restore_drill NODE_ENV=development \
+  npm run db:restore -- --file=backups/drill_source.sql --confirm
+
+# 3) Boot API against the restored DB and check readiness
+DATABASE_URL=postgres://…/luxride_restore_drill npm start
+# GET /health/ready — then spot-check reservations, users, payment_events / refunds
+```
+
+Pass criteria: restore succeeds, `/health/ready` is OK, row counts for reservations/users/payments match expectations, GiST exclusion constraints (`no_overlapping_car_blocks`, `no_overlapping_active_reservation_holds`) exist.
+
 ### Schema and migrations
 
-- **Schema** — `backend/sql/schema/` (16 files: categories, cars, users, sessions, reservations, orders, etc.)
+- **Schema** — `backend/sql/schema/` (categories, cars, users, sessions, reservations, orders, calendar, payments, etc.)
 - **Migrations** — `backend/migrations/` (tracked in `schema_migrations` table)
+- Fresh databases: always prefer `npm run db:setup` (schema + migrations). Migration `034_car_date_blocks_exclusion.sql` also installs `btree_gist` + `no_overlapping_car_blocks` for migrate-only / legacy paths.
+- Connection pool / timeouts: see `PG_POOL_*` and `PG_STATEMENT_TIMEOUT_MS` / `PG_IDLE_IN_TRANSACTION_TIMEOUT_MS` / `PG_LOCK_TIMEOUT_MS` in [`backend/.env.example`](backend/.env.example). Production defaults: pool max 20, statement 15s, idle-in-tx 30s, lock 5s.
 
 ### Demo data
 
@@ -496,11 +531,14 @@ The `app` service depends on `db`, loads env from `.env`, and exposes port 3000 
 
 | Component | Recommendation |
 |-----------|----------------|
-| API | Container from `backend/Dockerfile` (Node 22) |
-| Database | Managed PostgreSQL 16 |
+| API | 2× containers from `backend/Dockerfile` (`node src/server.js`, `RUN_BACKGROUND_JOBS=false`) |
+| Worker | 1× same image (`node src/worker.js`) for expiry / cleanup / notifications / fleet reconcile |
+| Database | Managed PostgreSQL 16 with automated backups + PITR (job locks use `pg_try_advisory_lock`; Redis not required). Compose `db` volume is not production DR. |
 | Frontend | Static build (`npm run build`) served via CDN/Nginx |
 | Images | `STORAGE_DRIVER=s3` with S3-compatible bucket + CDN URL |
 | Private documents | `PRIVATE_STORAGE_DRIVER=s3` with a private (non-CDN) bucket, or a backed-up volume at `/app/uploads/private` |
+
+`docker-compose.prod.yml` wires `backend` (API, jobs off) + `worker` (jobs on). Local `npm run dev` may still run jobs in-process when `RUN_BACKGROUND_JOBS` is unset.
 
 ### 2. Environment (production)
 
@@ -527,24 +565,31 @@ SMTP_PASS=...
 MAIL_FROM=noreply@your-domain.com
 ```
 
-Production validation (in `backend/src/config/env.js`) enforces:
+Production validation (in `backend/src/config/env.js`) refuses to start when:
 
-- `SESSION_SECRET` strength (min 32 chars, no weak defaults)
-- Live Stripe key (`sk_live_...`)
-- `FRONTEND_BASE_URL` is set
-- S3 vars when `STORAGE_DRIVER=s3` (public car images only)
-- `PRIVATE_S3_BUCKET` when `PRIVATE_STORAGE_DRIVER=s3`, or `PRIVATE_STORAGE_PERSISTENT=true` for local private storage
-- Full SMTP config when `EMAIL_ENABLED=true`
+- `STRIPE_STUB` is enabled
+- Stripe webhook secret is missing, not `whsec_...`, or a known placeholder
+- `SESSION_SECRET` is short or a known default
+- `FRONTEND_BASE_URL` / `CORS_ORIGINS` use HTTP or localhost/dev hosts
+- `DATABASE_URL` points at localhost / loopback
+- `SESSION_COOKIE_SECURE` is explicitly disabled
+- `STORAGE_DRIVER` is not `s3` (ephemeral local public uploads)
+- Private storage is local without `PRIVATE_STORAGE_PERSISTENT=true` (prefer `PRIVATE_STORAGE_DRIVER=s3`)
+- Email/SMTP is not fully configured (`EMAIL_ENABLED=true` + SMTP vars)
+- Stripe secret is not a live key (`sk_live_...`)
+
+Also enforced at runtime: CORS allowlist, `trust proxy`, CSRF on mutating `/api` routes, and `secure` / `httpOnly` / `sameSite` session cookies. Keep secrets in the environment or a secret manager — never in Git or the Docker image (`.env` is gitignored and dockerignored).
 
 ### 3. Deploy steps
 
 1. **Database** — Provision PostgreSQL, run `npm run db:setup` against production DB.
 2. **Stripe** — Register webhook endpoint `https://api.your-domain.com/webhook/stripe` for `checkout.session.completed`.
-3. **API** — Build and deploy Docker container behind a reverse proxy with `trust proxy` enabled (Express sets this in production).
-4. **Customer frontend** — `cd "front end" && npm run build`, deploy `dist/` with `VITE_API_BASE_URL` pointing to the API. Optional `VITE_ADMIN_FRONTEND_URL` for staff redirect.
-5. **Admin frontend** — `cd admin-front-end && npm run build`, deploy `dist/` on the admin hostname. Same `VITE_API_BASE_URL`.
-6. **Verify** — Health check (`GET /health/live`), readiness (`GET /health/ready`), test booking flow end-to-end with Stripe test mode first. Confirm Stripe success/cancel still land on the customer site.
-7. **Monitoring** — See [Observability](#observability) below.
+3. **API** — Deploy API replicas behind a reverse proxy with `trust proxy` enabled (`RUN_BACKGROUND_JOBS=false`). Express sets trust proxy in production.
+4. **Worker** — Deploy one worker (`npm run worker` / compose `worker` service) for periodic jobs. PostgreSQL advisory locks skip overlapping runs.
+5. **Customer frontend** — `cd "front end" && npm run build`, deploy `dist/` with `VITE_API_BASE_URL` pointing to the API. Optional `VITE_ADMIN_FRONTEND_URL` for staff redirect.
+6. **Admin frontend** — `cd admin-front-end && npm run build`, deploy `dist/` on the admin hostname. Same `VITE_API_BASE_URL`.
+7. **Verify** — Health check (`GET /health/live`), readiness (`GET /health/ready`), test booking flow end-to-end with Stripe test mode first. Confirm Stripe success/cancel still land on the customer site.
+8. **Monitoring** — See [Observability](#observability) below.
 
 ### 4. CI
 
@@ -559,6 +604,8 @@ GitHub Actions (`.github/workflows/ci.yml`) runs on push/PR:
 
 - Run `npm run reconcile:stripe` periodically or on alert for stuck `processing_payment` reservations.
 - Apply new migrations with `npm run db:migrate` on each release.
+- Confirm managed backup + PITR is enabled; run a restore drill to a separate database after first deploy and after major schema changes (see [Restore drill](#restore-drill-required-before-trusting-backups)).
+- Size `PG_POOL_MAX` so `max × (API replicas + worker) < managed max_connections − ~10`.
 
 ## Observability
 

@@ -36,26 +36,20 @@ const { handleNotFound, errorHandler } = require('./middleware/errorHandler');
 const { createShutdownGate } = require('./middleware/shutdownGate');
 const apiRoutes = require('./routes/api');
 
-const { cleanUpOutdatedDates } = require('./services/carService');
-const { cleanUpAbandonedReservations } = require('./services/reservationService');
-const { cleanupCarImages } = require('./services/storage/imageCleanupService');
 const { ensureSessionTable } = require('./services/sql/sessionSqlService');
-const { runFleetAlertChecks } = require('./services/carFleetAlertReconcileService');
-const {
-  runNotificationScheduler,
-} = require('./modules/notifications/notifications.scheduler');
-const {
-  processDueNotifications,
-} = require('./modules/notifications/notifications.worker');
 const { initRealtime, shutdownRealtime } = require('./modules/realtime');
 const { isBackgroundJobsEnabled } = require('./config/backgroundJobs');
+const {
+  startBackgroundJobs,
+  stopBackgroundJobs,
+} = require('./jobs/backgroundJobRunner');
 
 const app = express();
 const SESSION_IDLE_MS = 20 * 60 * 1000;
 const isProd = config.isProd;
 let server = null;
 let isShuttingDown = false;
-const backgroundJobs = [];
+let gaugePollerTimer = null;
 
 app.use(requestIdMiddleware);
 app.use(requestMetrics);
@@ -143,7 +137,7 @@ app.use(
     cookie: {
       httpOnly: true,
       sameSite: config.sessionCookieSameSite,
-      secure: isProd || config.sessionCookieSameSite === 'none',
+      secure: config.sessionCookieSecure,
       maxAge: SESSION_IDLE_MS,
     },
   })
@@ -175,18 +169,6 @@ mountVersionedApi('/api');
 app.use(handleNotFound);
 app.use(errorHandler);
 
-function registerBackgroundJob(job) {
-  backgroundJobs.push(job);
-  return job;
-}
-
-function stopBackgroundJobs() {
-  while (backgroundJobs.length) {
-    const job = backgroundJobs.pop();
-    clearInterval(job);
-  }
-}
-
 async function gracefulShutdown(trigger, error = null) {
   if (isShuttingDown) {
     return;
@@ -196,6 +178,10 @@ async function gracefulShutdown(trigger, error = null) {
   logger.error({ trigger, err: error }, 'Starting graceful shutdown');
 
   stopBackgroundJobs();
+  if (gaugePollerTimer) {
+    clearInterval(gaugePollerTimer);
+    gaugePollerTimer = null;
+  }
   try {
     shutdownRealtime();
   } catch (realtimeErr) {
@@ -240,33 +226,16 @@ async function gracefulShutdown(trigger, error = null) {
     initRealtime();
 
     if (isBackgroundJobsEnabled()) {
-      await cleanUpOutdatedDates();
-      await cleanUpAbandonedReservations();
-      await cleanupCarImages();
-      await runFleetAlertChecks();
-      await runNotificationScheduler();
-      await processDueNotifications({ limit: 50 });
-
-      registerBackgroundJob(setInterval(cleanUpOutdatedDates, 3 * 60 * 1000));
-      registerBackgroundJob(setInterval(cleanUpAbandonedReservations, 3 * 60 * 1000));
-      registerBackgroundJob(setInterval(cleanupCarImages, 6 * 60 * 60 * 1000));
-      registerBackgroundJob(setInterval(runFleetAlertChecks, 3 * 60 * 1000));
-      registerBackgroundJob(setInterval(runNotificationScheduler, 10 * 60 * 1000));
-      registerBackgroundJob(
-        setInterval(() => {
-          processDueNotifications({ limit: 50 }).catch((err) => {
-            logger.error({ err, context: 'processDueNotifications' }, 'Notification worker error');
-          });
-        }, 2 * 60 * 1000)
-      );
-      registerBackgroundJob(startGaugePoller(pool));
-      logger.info('Background jobs enabled');
+      await startBackgroundJobs({ pool });
     } else {
       logger.info(
         { RUN_BACKGROUND_JOBS: process.env.RUN_BACKGROUND_JOBS },
         'Background jobs disabled for this process'
       );
     }
+
+    // Gauge poller stays on the API process so /prometheus reflects this replica's pool + DB gauges.
+    gaugePollerTimer = startGaugePoller(pool);
 
     server = app.listen(config.port, () => {
       logger.info(
