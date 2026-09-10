@@ -48,6 +48,12 @@ resource "aws_iam_role_policy" "github_actions_ecr" {
         Resource = "*"
       },
       {
+        Sid      = "ECRMetadata"
+        Effect   = "Allow"
+        Action   = "ecr:DescribeRepositories"
+        Resource = "*"
+      },
+      {
         Sid    = "ECRImages"
         Effect = "Allow"
 
