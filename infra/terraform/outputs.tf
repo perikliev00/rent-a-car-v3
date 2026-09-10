@@ -20,3 +20,7 @@ output "ecr_repository_urls" {
     name => repository.repository_url
   }
 }
+output "github_actions_role_arn" {
+  description = "IAM role assumed by GitHub Actions through OIDC"
+  value       = aws_iam_role.github_actions.arn
+}
