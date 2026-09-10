@@ -10,12 +10,13 @@ concurrency:
 
 permissions:
   contents: read
-  packages: write
 
 env:
   NODE_VERSION: '22'
-  REGISTRY: ghcr.io
-  IMAGE_PREFIX: ghcr.io/${{ github.repository }}
+  AWS_REGION: eu-central-1
+  ECR_API_REPOSITORY: rentacar-api
+  ECR_CUSTOMER_REPOSITORY: rentacar-customer
+  ECR_ADMIN_REPOSITORY: rentacar-admin
 
 jobs:
   backend-lint:
@@ -26,11 +27,13 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: backend/package-lock.json
+
       - run: npm ci
       - run: npm run lint
 
@@ -42,13 +45,16 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: backend/package-lock.json
+
       - run: npm ci
       - run: npm run test:coverage
+
       - uses: actions/upload-artifact@v4
         with:
           name: backend-unit-coverage
@@ -58,6 +64,7 @@ jobs:
             backend/coverage/lcov-report
           if-no-files-found: error
           retention-days: 14
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -74,15 +81,18 @@ jobs:
         working-directory: front end
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: front end/package-lock.json
+
       - run: npm ci
       - run: npm run check
       - run: npm run test:coverage
       - run: npm run build
+
       - uses: actions/upload-artifact@v4
         with:
           name: frontend-unit-coverage
@@ -91,6 +101,7 @@ jobs:
             front end/coverage/lcov.info
           if-no-files-found: error
           retention-days: 14
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -107,15 +118,18 @@ jobs:
         working-directory: admin-front-end
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: admin-front-end/package-lock.json
+
       - run: npm ci
       - run: npm run check
       - run: npm run test:coverage
       - run: npm run build
+
       - uses: actions/upload-artifact@v4
         with:
           name: admin-frontend-unit-coverage
@@ -124,6 +138,7 @@ jobs:
             admin-front-end/coverage/lcov.info
           if-no-files-found: error
           retention-days: 14
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -137,6 +152,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -146,12 +162,14 @@ jobs:
             front end/package-lock.json
             admin-front-end/package-lock.json
             e2e/package-lock.json
+
       - name: Install dependencies
         run: |
           npm --prefix backend ci
           npm --prefix "front end" ci
           npm --prefix admin-front-end ci
           npm --prefix e2e ci
+
       - name: npm audit (high+)
         run: |
           npm --prefix backend audit --audit-level=high
@@ -162,6 +180,7 @@ jobs:
   migration-test:
     name: migration-test
     runs-on: ubuntu-latest
+
     services:
       postgres:
         image: postgres:16-alpine
@@ -176,29 +195,38 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+
     env:
       DATABASE_URL: postgres://luxride:luxride@localhost:5432/luxride_migrate
+
     defaults:
       run:
         working-directory: backend
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: backend/package-lock.json
+
       - run: npm ci
+
       - name: Apply schema + migrations
         run: npm run db:setup
+
       - name: Assert all migrations recorded
         run: npm run db:assert-migrations
+
       - name: Re-run migrate (idempotent no-op)
         run: npm run db:migrate
 
   db-consistency:
     name: db-consistency
     runs-on: ubuntu-latest
+
     services:
       postgres:
         image: postgres:16-alpine
@@ -213,20 +241,25 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+
     env:
       DATABASE_URL: postgres://luxride:luxride@localhost:5432/luxride_test
       RUN_DB_TESTS: 'true'
       SESSION_SECRET: test-session-secret-32-chars-minimum!!
+
     defaults:
       run:
         working-directory: backend
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: backend/package-lock.json
+
       - run: npm ci
       - run: npm run db:setup
       - run: npm run test:db
@@ -234,6 +267,7 @@ jobs:
   integration:
     name: integration
     runs-on: ubuntu-latest
+
     services:
       postgres:
         image: postgres:16-alpine
@@ -248,6 +282,7 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+
     env:
       DATABASE_URL: postgres://luxride:luxride@localhost:5432/luxride_test
       RUN_INTEGRATION_TESTS: '1'
@@ -258,19 +293,24 @@ jobs:
       SESSION_SECRET: test-session-secret-32-chars-minimum!!
       FRONTEND_BASE_URL: http://localhost:5173
       CORS_ORIGINS: http://localhost:5173,http://localhost:5174
+
     defaults:
       run:
         working-directory: backend
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: backend/package-lock.json
+
       - run: npm ci
       - run: npm run db:setup
       - run: npm run test:integration
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -282,6 +322,7 @@ jobs:
   e2e-playwright:
     name: e2e-playwright
     runs-on: ubuntu-latest
+
     services:
       postgres:
         image: postgres:16-alpine
@@ -296,6 +337,7 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+
     env:
       DATABASE_URL: postgres://luxride:luxride@localhost:5432/luxride_test
       STRIPE_STUB: '1'
@@ -306,8 +348,10 @@ jobs:
       FRONTEND_BASE_URL: http://localhost:5173
       CORS_ORIGINS: http://localhost:5173,http://localhost:5174
       CI: 'true'
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -317,20 +361,25 @@ jobs:
             front end/package-lock.json
             admin-front-end/package-lock.json
             e2e/package-lock.json
+
       - name: Setup test database
         working-directory: backend
         run: npm ci && npm run db:setup
+
       - name: Install app + E2E dependencies
         run: |
           npm --prefix "front end" ci
           npm --prefix admin-front-end ci
           npm --prefix e2e ci
           npm run e2e:install
+
       - name: Run Playwright E2E tests
         run: npm run e2e
+
       - name: Fail on Playwright retries (flake signal)
         if: always()
         run: npm run e2e:check-flakes
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -338,6 +387,7 @@ jobs:
           path: e2e/test-results/results.json
           if-no-files-found: warn
           retention-days: 14
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -349,24 +399,34 @@ jobs:
   docker-build:
     name: docker-build
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
     outputs:
       image_tag: ${{ steps.meta.outputs.tag }}
       api_digest: ${{ steps.push.outputs.api_digest }}
       frontend_digest: ${{ steps.push.outputs.frontend_digest }}
       admin_digest: ${{ steps.push.outputs.admin_digest }}
       pushed: ${{ steps.meta.outputs.push }}
+
     steps:
       - uses: actions/checkout@v4
+
       - name: Set image tag / push policy
         id: meta
         run: |
           echo "tag=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
-          # Push immutable release artifacts only from main; deploy never rebuilds.
+
+          # Immutable release artifacts are pushed only from main.
+          # Pull requests still build the images, but never push them.
           if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
             echo "push=true" >> "$GITHUB_OUTPUT"
           else
             echo "push=false" >> "$GITHUB_OUTPUT"
           fi
+
       - name: Resolve frontend build args
         id: vite
         run: |
@@ -375,6 +435,7 @@ jobs:
           CUSTOMER_URL="${{ vars.VITE_CUSTOMER_FRONTEND_URL }}"
           SENTRY_DSN="${{ vars.VITE_SENTRY_DSN }}"
           SENTRY_RATE="${{ vars.VITE_SENTRY_TRACES_SAMPLE_RATE }}"
+
           if [ "${{ steps.meta.outputs.push }}" = "true" ]; then
             if [ -z "$API_URL" ] || [ "$API_URL" = "http://localhost:3000" ]; then
               echo "Set repository variable VITE_API_BASE_URL before pushing release images from main"
@@ -383,20 +444,31 @@ jobs:
           elif [ -z "$API_URL" ]; then
             API_URL="http://localhost:3000"
           fi
+
           echo "api_url=$API_URL" >> "$GITHUB_OUTPUT"
           echo "admin_url=$ADMIN_URL" >> "$GITHUB_OUTPUT"
           echo "customer_url=$CUSTOMER_URL" >> "$GITHUB_OUTPUT"
           echo "sentry_dsn=$SENTRY_DSN" >> "$GITHUB_OUTPUT"
           echo "sentry_rate=${SENTRY_RATE:-0.1}" >> "$GITHUB_OUTPUT"
-      - name: Log in to GHCR
+
+      - name: Configure AWS credentials
         if: steps.meta.outputs.push == 'true'
-        uses: docker/login-action@v3
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          role-to-assume: ${{ vars.AWS_GITHUB_ACTIONS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        if: steps.meta.outputs.push == 'true'
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
       - name: Build backend image
-        run: docker build -t "${IMAGE_PREFIX}/api:${{ steps.meta.outputs.tag }}" ./backend
+        run: |
+          docker build \
+            -t "rentacar-api:${{ steps.meta.outputs.tag }}" \
+            ./backend
+
       - name: Build customer frontend image
         run: >
           docker build
@@ -404,8 +476,9 @@ jobs:
           --build-arg VITE_ADMIN_FRONTEND_URL=${{ steps.vite.outputs.admin_url }}
           --build-arg VITE_SENTRY_DSN=${{ steps.vite.outputs.sentry_dsn }}
           --build-arg VITE_SENTRY_TRACES_SAMPLE_RATE=${{ steps.vite.outputs.sentry_rate }}
-          -t "${IMAGE_PREFIX}/frontend:${{ steps.meta.outputs.tag }}"
+          -t "rentacar-customer:${{ steps.meta.outputs.tag }}"
           "./front end"
+
       - name: Build admin frontend image
         run: >
           docker build
@@ -413,32 +486,79 @@ jobs:
           --build-arg VITE_CUSTOMER_FRONTEND_URL=${{ steps.vite.outputs.customer_url }}
           --build-arg VITE_SENTRY_DSN=${{ steps.vite.outputs.sentry_dsn }}
           --build-arg VITE_SENTRY_TRACES_SAMPLE_RATE=${{ steps.vite.outputs.sentry_rate }}
-          -t "${IMAGE_PREFIX}/admin-frontend:${{ steps.meta.outputs.tag }}"
+          -t "rentacar-admin:${{ steps.meta.outputs.tag }}"
           ./admin-front-end
-      - name: Push immutable SHA images (main only)
+
+      - name: Push immutable SHA images to ECR
         id: push
         if: steps.meta.outputs.push == 'true'
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
           set -euo pipefail
+
           TAG="${{ steps.meta.outputs.tag }}"
-          for name in api frontend admin-frontend; do
-            IMAGE="${IMAGE_PREFIX}/${name}:${TAG}"
-            docker push "$IMAGE"
-          done
-          API_DIGEST="$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE_PREFIX}/api:${TAG}")"
-          FE_DIGEST="$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE_PREFIX}/frontend:${TAG}")"
-          ADMIN_DIGEST="$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE_PREFIX}/admin-frontend:${TAG}")"
-          test -n "$API_DIGEST" && test -n "$FE_DIGEST" && test -n "$ADMIN_DIGEST"
-          echo "api_digest=$API_DIGEST" >> "$GITHUB_OUTPUT"
-          echo "frontend_digest=$FE_DIGEST" >> "$GITHUB_OUTPUT"
-          echo "admin_digest=$ADMIN_DIGEST" >> "$GITHUB_OUTPUT"
+
+          API_IMAGE="$ECR_REGISTRY/$ECR_API_REPOSITORY:$TAG"
+          CUSTOMER_IMAGE="$ECR_REGISTRY/$ECR_CUSTOMER_REPOSITORY:$TAG"
+          ADMIN_IMAGE="$ECR_REGISTRY/$ECR_ADMIN_REPOSITORY:$TAG"
+
+          echo "Publishing immutable images:"
+          echo "  $API_IMAGE"
+          echo "  $CUSTOMER_IMAGE"
+          echo "  $ADMIN_IMAGE"
+
+          docker tag "rentacar-api:$TAG" "$API_IMAGE"
+          docker tag "rentacar-customer:$TAG" "$CUSTOMER_IMAGE"
+          docker tag "rentacar-admin:$TAG" "$ADMIN_IMAGE"
+
+          docker push "$API_IMAGE"
+          docker push "$CUSTOMER_IMAGE"
+          docker push "$ADMIN_IMAGE"
+
+          API_DIGEST="$(aws ecr batch-get-image \
+            --repository-name "$ECR_API_REPOSITORY" \
+            --image-ids imageTag="$TAG" \
+            --query 'images[0].imageId.imageDigest' \
+            --output text)"
+
+          CUSTOMER_DIGEST="$(aws ecr batch-get-image \
+            --repository-name "$ECR_CUSTOMER_REPOSITORY" \
+            --image-ids imageTag="$TAG" \
+            --query 'images[0].imageId.imageDigest' \
+            --output text)"
+
+          ADMIN_DIGEST="$(aws ecr batch-get-image \
+            --repository-name "$ECR_ADMIN_REPOSITORY" \
+            --image-ids imageTag="$TAG" \
+            --query 'images[0].imageId.imageDigest' \
+            --output text)"
+
+          test -n "$API_DIGEST"
+          test -n "$CUSTOMER_DIGEST"
+          test -n "$ADMIN_DIGEST"
+
+          test "$API_DIGEST" != "None"
+          test "$CUSTOMER_DIGEST" != "None"
+          test "$ADMIN_DIGEST" != "None"
+
+          API_REF="$ECR_REGISTRY/$ECR_API_REPOSITORY@$API_DIGEST"
+          CUSTOMER_REF="$ECR_REGISTRY/$ECR_CUSTOMER_REPOSITORY@$CUSTOMER_DIGEST"
+          ADMIN_REF="$ECR_REGISTRY/$ECR_ADMIN_REPOSITORY@$ADMIN_DIGEST"
+
+          echo "api_digest=$API_REF" >> "$GITHUB_OUTPUT"
+          echo "frontend_digest=$CUSTOMER_REF" >> "$GITHUB_OUTPUT"
+          echo "admin_digest=$ADMIN_REF" >> "$GITHUB_OUTPUT"
+
           {
             echo "image_tag=$TAG"
-            echo "api_digest=$API_DIGEST"
-            echo "frontend_digest=$FE_DIGEST"
-            echo "admin_digest=$ADMIN_DIGEST"
+            echo "api_digest=$API_REF"
+            echo "frontend_digest=$CUSTOMER_REF"
+            echo "admin_digest=$ADMIN_REF"
           } > image-digests.txt
+
           cat image-digests.txt
+
       - name: Upload digest manifest
         if: steps.meta.outputs.push == 'true'
         uses: actions/upload-artifact@v4
@@ -452,6 +572,7 @@ jobs:
     name: CI
     runs-on: ubuntu-latest
     if: always()
+
     needs:
       - backend-lint
       - backend-unit
@@ -463,16 +584,19 @@ jobs:
       - integration
       - e2e-playwright
       - docker-build
+
     steps:
       - name: Require all checks green
         run: |
           results='${{ join(needs.*.result, ',') }}'
+
           echo "Job results: $results"
-          echo "$results" | tr ',' '\n' | grep -qx 'success' || true
+
           for r in $(echo "$results" | tr ',' ' '); do
             if [ "$r" != "success" ]; then
-              echo "CI gate failed — not all jobs succeeded"
+              echo "CI gate failed - not all jobs succeeded"
               exit 1
             fi
           done
-          echo "✓ All required CI jobs succeeded"
+
+          echo "All required CI jobs succeeded"

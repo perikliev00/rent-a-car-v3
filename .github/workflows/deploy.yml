@@ -1,53 +1,57 @@
 name: Deploy
 
-# Promote the exact images CI already pushed (tag = commit SHA).
-# Never rebuild here — staging and production must pull the same digests.
-
 on:
   workflow_run:
-    workflows: ['CI']
-    types: [completed]
-    branches: [main]
+    workflows:
+      - CI
+    types:
+      - completed
+    branches:
+      - main
+
   workflow_dispatch:
     inputs:
       image_tag:
-        description: 'Commit SHA image tag to promote (must already exist in GHCR from green CI)'
+        description: Commit SHA image tag to deploy
         required: true
         type: string
-      environment:
-        description: 'Target environment'
-        required: true
-        type: choice
-        options:
-          - staging
-          - production
 
 permissions:
   contents: read
-  packages: read
   actions: read
+  id-token: write
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_PREFIX: ghcr.io/${{ github.repository }}
+  AWS_REGION: eu-central-1
+  ECR_API_REPOSITORY: rentacar-api
+  ECR_CUSTOMER_REPOSITORY: rentacar-customer
+  ECR_ADMIN_REPOSITORY: rentacar-admin
 
 jobs:
-  gate:
-    name: require-green-ci-and-images
+  release-gate:
+    name: Verify production artifacts
     runs-on: ubuntu-latest
-    if: >
+
+    if: >-
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'workflow_run' &&
-       github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.head_branch == 'main' &&
-       github.event.workflow_run.event == 'push')
+      (
+        github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.event == 'push'
+      )
+
     outputs:
       image_tag: ${{ steps.resolve.outputs.image_tag }}
-      api_digest: ${{ steps.resolve.outputs.api_digest }}
-      frontend_digest: ${{ steps.resolve.outputs.frontend_digest }}
-      admin_digest: ${{ steps.resolve.outputs.admin_digest }}
+      api_digest: ${{ steps.verify.outputs.api_digest }}
+      customer_digest: ${{ steps.verify.outputs.customer_digest }}
+      admin_digest: ${{ steps.verify.outputs.admin_digest }}
+      api_image: ${{ steps.verify.outputs.api_image }}
+      customer_image: ${{ steps.verify.outputs.customer_image }}
+      admin_image: ${{ steps.verify.outputs.admin_image }}
+
     steps:
-      - name: Resolve tag and verify green CI + registry digests
+      - name: Resolve immutable image tag
         id: resolve
         env:
           GH_TOKEN: ${{ github.token }}
@@ -61,127 +65,148 @@ jobs:
           fi
 
           if [ -z "$TAG" ]; then
-            echo "Missing image tag / commit SHA"
+            echo "Missing commit SHA"
             exit 1
           fi
 
-          echo "Using immutable image tag: $TAG"
+          if ! echo "$TAG" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "Image tag must be a full 40-character Git commit SHA"
+            exit 1
+          fi
 
-          # Manual promote must reference a commit that already had a green CI on main.
+          echo "Resolved immutable release SHA:"
+          echo "$TAG"
+
+          # Manual deployments must also reference a commit that had
+          # a successful CI run on main.
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "Verifying successful CI run for $TAG on main..."
-            OK="$(gh api "repos/${{ github.repository }}/actions/runs?head_sha=${TAG}&per_page=30" \
-              --jq '[.workflow_runs[] | select(.name=="CI" and .conclusion=="success" and .head_branch=="main")] | length')"
-            if [ "${OK:-0}" -lt 1 ]; then
-              echo "No successful CI workflow on main for commit $TAG — refuse promote"
+            echo "Verifying successful CI for $TAG..."
+
+            SUCCESS_COUNT="$(
+              gh api \
+                "repos/${{ github.repository }}/actions/runs?head_sha=${TAG}&per_page=50" \
+                --jq '[.workflow_runs[] |
+                  select(
+                    .name == "CI" and
+                    .conclusion == "success" and
+                    .head_branch == "main"
+                  )
+                ] | length'
+            )"
+
+            if [ "${SUCCESS_COUNT:-0}" -lt 1 ]; then
+              echo "No successful CI run on main for $TAG"
               exit 1
             fi
-            echo "✓ Green CI confirmed for $TAG"
-          fi
 
-          echo "${{ github.token }}" | docker login "$REGISTRY" -u "${{ github.actor }}" --password-stdin
-
-          for name in api frontend admin-frontend; do
-            IMAGE="${IMAGE_PREFIX}/${name}:${TAG}"
-            echo "Pulling $IMAGE"
-            docker pull "$IMAGE"
-          done
-
-          API_DIGEST="$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE_PREFIX}/api:${TAG}")"
-          FE_DIGEST="$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE_PREFIX}/frontend:${TAG}")"
-          ADMIN_DIGEST="$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE_PREFIX}/admin-frontend:${TAG}")"
-
-          if [ -z "$API_DIGEST" ] || [ -z "$FE_DIGEST" ] || [ -z "$ADMIN_DIGEST" ]; then
-            echo "Missing RepoDigest after pull — images must be pushed by CI on main"
-            exit 1
+            echo "Successful CI confirmed."
           fi
 
           echo "image_tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "api_digest=$API_DIGEST" >> "$GITHUB_OUTPUT"
-          echo "frontend_digest=$FE_DIGEST" >> "$GITHUB_OUTPUT"
-          echo "admin_digest=$ADMIN_DIGEST" >> "$GITHUB_OUTPUT"
 
-          echo "Resolved digests (immutable):"
-          echo "  $API_DIGEST"
-          echo "  $FE_DIGEST"
-          echo "  $ADMIN_DIGEST"
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_GITHUB_ACTIONS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
-  deploy-staging:
-    name: deploy-staging
-    needs: gate
-    runs-on: ubuntu-latest
-    environment: staging
-    outputs:
-      api_digest: ${{ steps.deploy.outputs.api_digest }}
-      frontend_digest: ${{ steps.deploy.outputs.frontend_digest }}
-      admin_digest: ${{ steps.deploy.outputs.admin_digest }}
-    steps:
-      - name: Deploy CI digests to staging (no rebuild)
-        id: deploy
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Verify immutable ECR images
+        id: verify
         env:
-          TAG: ${{ needs.gate.outputs.image_tag }}
-          API_DIGEST: ${{ needs.gate.outputs.api_digest }}
-          FE_DIGEST: ${{ needs.gate.outputs.frontend_digest }}
-          ADMIN_DIGEST: ${{ needs.gate.outputs.admin_digest }}
-        run: |
-          set -euo pipefail
-          echo "Deploying immutable digests to staging:"
-          echo "  tag=$TAG"
-          echo "  $API_DIGEST"
-          echo "  $FE_DIGEST"
-          echo "  $ADMIN_DIGEST"
-          echo ""
-          echo "Host command (pull by digest — do not docker build):"
-          echo "  IMAGE_PREFIX=$IMAGE_PREFIX IMAGE_TAG=$TAG \\"
-          echo "    docker compose -f docker-compose.prod.yml pull"
-          echo "  IMAGE_PREFIX=$IMAGE_PREFIX IMAGE_TAG=$TAG \\"
-          echo "    docker compose -f docker-compose.prod.yml up -d"
-          echo ""
-          echo "Prefer pinning digests on the host when possible:"
-          echo "  docker pull $API_DIGEST"
-          echo "  docker pull $FE_DIGEST"
-          echo "  docker pull $ADMIN_DIGEST"
-          # Wire real transport here (SSH/ECS/etc). Must use TAG/digests above — never rebuild.
-          echo "api_digest=$API_DIGEST" >> "$GITHUB_OUTPUT"
-          echo "frontend_digest=$FE_DIGEST" >> "$GITHUB_OUTPUT"
-          echo "admin_digest=$ADMIN_DIGEST" >> "$GITHUB_OUTPUT"
-
-  deploy-production:
-    name: deploy-production
-    needs: [gate, deploy-staging]
-    if: >
-      always() &&
-      needs.gate.result == 'success' &&
-      needs.deploy-staging.result == 'success' &&
-      (github.event_name == 'workflow_run' || inputs.environment == 'production')
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - name: Promote THE SAME digests to production
-        env:
-          TAG: ${{ needs.gate.outputs.image_tag }}
-          API_DIGEST: ${{ needs.gate.outputs.api_digest }}
-          FE_DIGEST: ${{ needs.gate.outputs.frontend_digest }}
-          ADMIN_DIGEST: ${{ needs.gate.outputs.admin_digest }}
-          STAGING_API: ${{ needs.deploy-staging.outputs.api_digest }}
-          STAGING_FE: ${{ needs.deploy-staging.outputs.frontend_digest }}
-          STAGING_ADMIN: ${{ needs.deploy-staging.outputs.admin_digest }}
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          TAG: ${{ steps.resolve.outputs.image_tag }}
         run: |
           set -euo pipefail
 
-          if [ "$API_DIGEST" != "$STAGING_API" ] || [ "$FE_DIGEST" != "$STAGING_FE" ] || [ "$ADMIN_DIGEST" != "$STAGING_ADMIN" ]; then
-            echo "Digest mismatch between gate and staging — refuse production promote"
-            echo "gate api=$API_DIGEST staging=$STAGING_API"
-            echo "gate fe=$FE_DIGEST staging=$STAGING_FE"
-            echo "gate admin=$ADMIN_DIGEST staging=$STAGING_ADMIN"
+          API_IMAGE="$ECR_REGISTRY/$ECR_API_REPOSITORY:$TAG"
+          CUSTOMER_IMAGE="$ECR_REGISTRY/$ECR_CUSTOMER_REPOSITORY:$TAG"
+          ADMIN_IMAGE="$ECR_REGISTRY/$ECR_ADMIN_REPOSITORY:$TAG"
+
+          echo "Verifying release images:"
+          echo "  $API_IMAGE"
+          echo "  $CUSTOMER_IMAGE"
+          echo "  $ADMIN_IMAGE"
+
+          docker pull "$API_IMAGE"
+          docker pull "$CUSTOMER_IMAGE"
+          docker pull "$ADMIN_IMAGE"
+
+          API_DIGEST="$(
+            aws ecr batch-get-image \
+              --repository-name "$ECR_API_REPOSITORY" \
+              --image-ids imageTag="$TAG" \
+              --query 'images[0].imageId.imageDigest' \
+              --output text
+          )"
+
+          CUSTOMER_DIGEST="$(
+            aws ecr batch-get-image \
+              --repository-name "$ECR_CUSTOMER_REPOSITORY" \
+              --image-ids imageTag="$TAG" \
+              --query 'images[0].imageId.imageDigest' \
+              --output text
+          )"
+
+          ADMIN_DIGEST="$(
+            aws ecr batch-get-image \
+              --repository-name "$ECR_ADMIN_REPOSITORY" \
+              --image-ids imageTag="$TAG" \
+              --query 'images[0].imageId.imageDigest' \
+              --output text
+          )"
+
+          if [ -z "$API_DIGEST" ] || [ "$API_DIGEST" = "None" ]; then
+            echo "API digest not found"
             exit 1
           fi
 
-          echo "Promoting THE SAME immutable digests to production (no rebuild):"
-          echo "  tag=$TAG"
-          echo "  $API_DIGEST"
-          echo "  $FE_DIGEST"
-          echo "  $ADMIN_DIGEST"
-          echo ""
-          echo "Host command must use the same IMAGE_TAG=$TAG / digests as staging."
-          # Wire real transport here. Must equal staging digests — never rebuild.
+          if [ -z "$CUSTOMER_DIGEST" ] || [ "$CUSTOMER_DIGEST" = "None" ]; then
+            echo "Customer digest not found"
+            exit 1
+          fi
+
+          if [ -z "$ADMIN_DIGEST" ] || [ "$ADMIN_DIGEST" = "None" ]; then
+            echo "Admin digest not found"
+            exit 1
+          fi
+
+          API_REF="$ECR_REGISTRY/$ECR_API_REPOSITORY@$API_DIGEST"
+          CUSTOMER_REF="$ECR_REGISTRY/$ECR_CUSTOMER_REPOSITORY@$CUSTOMER_DIGEST"
+          ADMIN_REF="$ECR_REGISTRY/$ECR_ADMIN_REPOSITORY@$ADMIN_DIGEST"
+
+          echo "Verified immutable digests:"
+          echo "  API:      $API_REF"
+          echo "  Customer: $CUSTOMER_REF"
+          echo "  Admin:    $ADMIN_REF"
+
+          echo "api_digest=$API_DIGEST" >> "$GITHUB_OUTPUT"
+          echo "customer_digest=$CUSTOMER_DIGEST" >> "$GITHUB_OUTPUT"
+          echo "admin_digest=$ADMIN_DIGEST" >> "$GITHUB_OUTPUT"
+
+          echo "api_image=$API_REF" >> "$GITHUB_OUTPUT"
+          echo "customer_image=$CUSTOMER_REF" >> "$GITHUB_OUTPUT"
+          echo "admin_image=$ADMIN_REF" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "image_tag=$TAG"
+            echo "api_image=$API_REF"
+            echo "customer_image=$CUSTOMER_REF"
+            echo "admin_image=$ADMIN_REF"
+          } > verified-release.txt
+
+      - name: Upload verified release manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: verified-release-${{ steps.resolve.outputs.image_tag }}
+          path: verified-release.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Release gate passed
+        run: |
+          echo "Release artifacts verified successfully."
+          echo "Ready for Lightsail deployment transport."
