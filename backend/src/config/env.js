@@ -1,3 +1,5 @@
+const { URL } = require('node:url');
+
 const SMTP_VARS = ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS', 'MAIL_FROM'];
 const S3_VARS = ['S3_BUCKET', 'STORAGE_PUBLIC_BASE_URL'];
 const PRIVATE_S3_VARS = ['PRIVATE_S3_BUCKET'];

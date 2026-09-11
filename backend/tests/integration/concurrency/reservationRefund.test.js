@@ -1,3 +1,4 @@
+const { URLSearchParams } = require('node:url');
 const { createIntegrationTestApp } = require('../helpers/integrationTestApp');
 const {
   createSessionAgent,
