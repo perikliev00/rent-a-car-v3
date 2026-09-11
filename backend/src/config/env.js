@@ -191,8 +191,18 @@ function validateProductionSecurity() {
   }
 
   const stripeSecret = process.env.STRIPE_SECRET.trim();
-  if (!stripeSecret.startsWith('sk_live_')) {
-    throw new Error('STRIPE_SECRET must be a live key (sk_live_...) in production');
+  const allowStripeTestModeInProduction = isTruthy(
+    process.env.ALLOW_STRIPE_TEST_MODE_IN_PRODUCTION
+  );
+
+  const isLiveStripeKey = stripeSecret.startsWith('sk_live_');
+  const isAllowedTestStripeKey =
+    allowStripeTestModeInProduction && stripeSecret.startsWith('sk_test_');
+
+  if (!isLiveStripeKey && !isAllowedTestStripeKey) {
+    throw new Error(
+      'STRIPE_SECRET must be a live key (sk_live_...) in production, unless ALLOW_STRIPE_TEST_MODE_IN_PRODUCTION=true'
+    );
   }
 
   const storageDriver = (process.env.STORAGE_DRIVER || 'local').toLowerCase();
