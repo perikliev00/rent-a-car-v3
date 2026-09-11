@@ -117,3 +117,20 @@ resource "aws_ecr_lifecycle_policy" "app" {
     ]
   })
 }
+data "aws_caller_identity" "current" {}
+
+resource "aws_lightsail_bucket" "storage" {
+  name      = "rentacar-v3-prod-storage-${data.aws_caller_identity.current.account_id}"
+  bundle_id = "small_1_0"
+
+  force_delete = false
+
+  tags = {
+    Role = "application-storage"
+  }
+}
+
+resource "aws_lightsail_bucket_resource_access" "storage" {
+  bucket_name   = aws_lightsail_bucket.storage.id
+  resource_name = aws_lightsail_instance.rentacar.id
+}

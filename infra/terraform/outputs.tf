@@ -24,3 +24,12 @@ output "github_actions_role_arn" {
   description = "IAM role assumed by GitHub Actions through OIDC"
   value       = aws_iam_role.github_actions.arn
 }
+output "lightsail_storage_bucket_name" {
+  description = "Lightsail object storage bucket name"
+  value       = aws_lightsail_bucket.storage.name
+}
+
+output "lightsail_storage_bucket_url" {
+  description = "Lightsail object storage bucket URL"
+  value       = aws_lightsail_bucket.storage.url
+}
