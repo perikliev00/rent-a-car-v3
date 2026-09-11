@@ -115,6 +115,7 @@ async function processUploadedFile({ tempPath, tempFilename }) {
       Body: body,
       ContentType: 'image/jpeg',
       CacheControl: 'public, max-age=31536000',
+      ACL: 'public-read',
     })
   );
 

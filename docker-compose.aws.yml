@@ -1,0 +1,79 @@
+name: rentacar-prod
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: luxride
+      POSTGRES_USER: luxride
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U luxride -d luxride"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  backend:
+    image: ${API_IMAGE:?API_IMAGE is required}
+    pull_policy: always
+    env_file:
+      - ${BACKEND_ENV_FILE:-/opt/rentacar/config/backend.env}
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      DATABASE_URL: postgres://luxride:${POSTGRES_PASSWORD}@db:5432/luxride
+      RUN_BACKGROUND_JOBS: "false"
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+  worker:
+    image: ${API_IMAGE:?API_IMAGE is required}
+    pull_policy: always
+    command: ["node", "src/worker.js"]
+    env_file:
+      - ${BACKEND_ENV_FILE:-/opt/rentacar/config/backend.env}
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://luxride:${POSTGRES_PASSWORD}@db:5432/luxride
+      RUN_BACKGROUND_JOBS: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  customer:
+    image: ${CUSTOMER_IMAGE:?CUSTOMER_IMAGE is required}
+    pull_policy: always
+    ports:
+      - "127.0.0.1:8081:80"
+    restart: unless-stopped
+
+  admin:
+    image: ${ADMIN_IMAGE:?ADMIN_IMAGE is required}
+    pull_policy: always
+    ports:
+      - "127.0.0.1:8082:80"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

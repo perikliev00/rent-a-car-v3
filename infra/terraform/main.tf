@@ -55,6 +55,7 @@ resource "aws_lightsail_instance_public_ports" "rentacar" {
     ]
   }
 }
+
 locals {
   ecr_repositories = toset([
     "rentacar-api",
@@ -117,6 +118,7 @@ resource "aws_ecr_lifecycle_policy" "app" {
     ]
   })
 }
+
 data "aws_caller_identity" "current" {}
 
 resource "aws_lightsail_bucket" "storage" {

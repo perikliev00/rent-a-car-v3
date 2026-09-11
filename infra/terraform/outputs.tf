@@ -12,6 +12,7 @@ output "lightsail_username" {
   description = "Default SSH username"
   value       = aws_lightsail_instance.rentacar.username
 }
+
 output "ecr_repository_urls" {
   description = "ECR repository URLs"
 
@@ -20,10 +21,12 @@ output "ecr_repository_urls" {
     name => repository.repository_url
   }
 }
+
 output "github_actions_role_arn" {
   description = "IAM role assumed by GitHub Actions through OIDC"
   value       = aws_iam_role.github_actions.arn
 }
+
 output "lightsail_storage_bucket_name" {
   description = "Lightsail object storage bucket name"
   value       = aws_lightsail_bucket.storage.name
