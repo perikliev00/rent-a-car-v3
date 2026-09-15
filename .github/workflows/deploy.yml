@@ -209,4 +209,148 @@ jobs:
       - name: Release gate passed
         run: |
           echo "Release artifacts verified successfully."
-          echo "Ready for Lightsail deployment transport."
+
+  deploy-production:
+    name: Deploy to Lightsail
+    needs: release-gate
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: rentacar-production
+      cancel-in-progress: false
+
+    steps:
+      - name: Check out deployment code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_GITHUB_ACTIONS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Validate Lightsail SSH configuration
+        env:
+          LIGHTSAIL_HOST: ${{ secrets.LIGHTSAIL_HOST }}
+          LIGHTSAIL_USER: ${{ secrets.LIGHTSAIL_USER }}
+          LIGHTSAIL_SSH_PRIVATE_KEY: ${{ secrets.LIGHTSAIL_SSH_PRIVATE_KEY }}
+          LIGHTSAIL_SSH_KNOWN_HOSTS: ${{ secrets.LIGHTSAIL_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+
+          for name in LIGHTSAIL_HOST LIGHTSAIL_USER LIGHTSAIL_SSH_PRIVATE_KEY LIGHTSAIL_SSH_KNOWN_HOSTS; do
+            if [ -z "${!name:-}" ]; then
+              echo "Missing required GitHub Actions secret: $name"
+              exit 1
+            fi
+          done
+
+      - name: Configure SSH
+        env:
+          LIGHTSAIL_SSH_PRIVATE_KEY: ${{ secrets.LIGHTSAIL_SSH_PRIVATE_KEY }}
+          LIGHTSAIL_SSH_KNOWN_HOSTS: ${{ secrets.LIGHTSAIL_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$LIGHTSAIL_SSH_PRIVATE_KEY" > "$HOME/.ssh/lightsail_deploy"
+          chmod 600 "$HOME/.ssh/lightsail_deploy"
+          printf '%s\n' "$LIGHTSAIL_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Build verified release file
+        env:
+          IMAGE_TAG: ${{ needs.release-gate.outputs.image_tag }}
+          API_IMAGE: ${{ needs.release-gate.outputs.api_image }}
+          CUSTOMER_IMAGE: ${{ needs.release-gate.outputs.customer_image }}
+          ADMIN_IMAGE: ${{ needs.release-gate.outputs.admin_image }}
+        run: |
+          set -euo pipefail
+
+          {
+            echo "IMAGE_TAG=$IMAGE_TAG"
+            echo "API_IMAGE=$API_IMAGE"
+            echo "CUSTOMER_IMAGE=$CUSTOMER_IMAGE"
+            echo "ADMIN_IMAGE=$ADMIN_IMAGE"
+          } > verified-release.env
+
+      - name: Authenticate Lightsail host to ECR
+        env:
+          LIGHTSAIL_HOST: ${{ secrets.LIGHTSAIL_HOST }}
+          LIGHTSAIL_USER: ${{ secrets.LIGHTSAIL_USER }}
+          API_IMAGE: ${{ needs.release-gate.outputs.api_image }}
+        run: |
+          set -euo pipefail
+
+          ECR_REGISTRY="${API_IMAGE%%/*}"
+          ECR_PASSWORD="$(aws ecr get-login-password --region "$AWS_REGION")"
+          echo "::add-mask::$ECR_PASSWORD"
+
+          printf '%s' "$ECR_PASSWORD" | ssh \
+            -i "$HOME/.ssh/lightsail_deploy" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "$LIGHTSAIL_USER@$LIGHTSAIL_HOST" \
+            "docker login --username AWS --password-stdin '$ECR_REGISTRY' >/dev/null"
+
+      - name: Copy deployment payload
+        env:
+          LIGHTSAIL_HOST: ${{ secrets.LIGHTSAIL_HOST }}
+          LIGHTSAIL_USER: ${{ secrets.LIGHTSAIL_USER }}
+          IMAGE_TAG: ${{ needs.release-gate.outputs.image_tag }}
+        run: |
+          set -euo pipefail
+
+          REMOTE_DIR="/tmp/rentacar-deploy-$IMAGE_TAG"
+
+          ssh \
+            -i "$HOME/.ssh/lightsail_deploy" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "$LIGHTSAIL_USER@$LIGHTSAIL_HOST" \
+            "rm -rf '$REMOTE_DIR' && mkdir -m 700 '$REMOTE_DIR'"
+
+          scp \
+            -i "$HOME/.ssh/lightsail_deploy" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            ops/deploy-production.sh verified-release.env \
+            "$LIGHTSAIL_USER@$LIGHTSAIL_HOST:$REMOTE_DIR/"
+
+      - name: Deploy verified release
+        env:
+          LIGHTSAIL_HOST: ${{ secrets.LIGHTSAIL_HOST }}
+          LIGHTSAIL_USER: ${{ secrets.LIGHTSAIL_USER }}
+          IMAGE_TAG: ${{ needs.release-gate.outputs.image_tag }}
+        run: |
+          set -euo pipefail
+
+          REMOTE_DIR="/tmp/rentacar-deploy-$IMAGE_TAG"
+
+          ssh \
+            -i "$HOME/.ssh/lightsail_deploy" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "$LIGHTSAIL_USER@$LIGHTSAIL_HOST" \
+            "chmod 700 '$REMOTE_DIR/deploy-production.sh' && '$REMOTE_DIR/deploy-production.sh' '$REMOTE_DIR/verified-release.env'"
+
+      - name: Remove remote deployment payload
+        if: always()
+        env:
+          LIGHTSAIL_HOST: ${{ secrets.LIGHTSAIL_HOST }}
+          LIGHTSAIL_USER: ${{ secrets.LIGHTSAIL_USER }}
+          IMAGE_TAG: ${{ needs.release-gate.outputs.image_tag }}
+        run: |
+          set +e
+          REMOTE_DIR="/tmp/rentacar-deploy-$IMAGE_TAG"
+          ssh \
+            -i "$HOME/.ssh/lightsail_deploy" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "$LIGHTSAIL_USER@$LIGHTSAIL_HOST" \
+            "rm -rf '$REMOTE_DIR'"
