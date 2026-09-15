@@ -57,11 +57,6 @@ export const reviews = [
   },
 ] as const;
 
-export const stockCarImages = [
-  'https://images.unsplash.com/photo-1494976388531-d1058494cdd8?auto=format&fit=crop&w=800&q=80',
-  'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=800&q=80',
-] as const;
-
 export const advantageImage =
   'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=1400&q=80';
 

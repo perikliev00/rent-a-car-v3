@@ -19,9 +19,7 @@ import {
   heroImage,
   heroImageAlt,
   partnerMarks,
-  stockCarImages,
 } from '../../data/marketingAssets';
-import { imageUrl } from '../../utils/format';
 import { defaultSearchParams, searchParamsToQuery } from '../../utils/searchParams';
 import type { SearchParams } from '../../types/api';
 
@@ -52,15 +50,6 @@ export function HomePage() {
     navigate(`/search?${params.toString()}`);
   };
 
-  const showcaseCars = [
-    imageUrl(data?.cars[0]?.image) !== '/placeholder-car.svg'
-      ? imageUrl(data?.cars[0]?.image)
-      : stockCarImages[0],
-    imageUrl(data?.cars[1]?.image) !== '/placeholder-car.svg'
-      ? imageUrl(data?.cars[1]?.image)
-      : stockCarImages[1],
-  ];
-
   return (
     <div className="min-w-0 overflow-x-clip">
       <section className="relative overflow-x-clip text-white">
@@ -74,7 +63,7 @@ export function HomePage() {
           <div className="hero-photo-overlay absolute inset-0" />
         </div>
 
-        <div className="relative mx-auto max-w-7xl px-4 pb-28 pt-16 sm:px-6 sm:pb-32 sm:pt-20 lg:pt-24">
+        <div className="relative mx-auto max-w-7xl px-4 pb-16 pt-16 sm:px-6 sm:pb-20 sm:pt-20 lg:pt-24">
           <div className="mx-auto max-w-3xl text-center animate-lux-rise">
             <p className="font-display text-sm font-bold uppercase tracking-[0.28em] text-[var(--color-accent)]">
               LuxRide
@@ -114,25 +103,6 @@ export function HomePage() {
                 {mark}
               </span>
             ))}
-          </div>
-
-          <div className="pointer-events-none absolute -top-16 right-4 hidden h-40 w-[min(42%,22rem)] md:block lg:right-8">
-            <img
-              src={showcaseCars[0]}
-              alt=""
-              className="absolute bottom-0 right-16 h-36 w-auto max-w-[55%] object-contain drop-shadow-xl"
-              onError={(e) => {
-                e.currentTarget.src = stockCarImages[0];
-              }}
-            />
-            <img
-              src={showcaseCars[1]}
-              alt=""
-              className="absolute bottom-0 right-0 h-40 w-auto max-w-[58%] object-contain drop-shadow-xl"
-              onError={(e) => {
-                e.currentTarget.src = stockCarImages[1];
-              }}
-            />
           </div>
         </div>
       </section>
