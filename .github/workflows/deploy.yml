@@ -233,12 +233,12 @@ jobs:
         env:
           LIGHTSAIL_HOST: ${{ secrets.LIGHTSAIL_HOST }}
           LIGHTSAIL_USER: ${{ secrets.LIGHTSAIL_USER }}
-          LIGHTSAIL_SSH_PRIVATE_KEY: ${{ secrets.LIGHTSAIL_SSH_PRIVATE_KEY }}
+          LIGHTSAIL_SSH_PRIVATE_KEY_B64: ${{ secrets.LIGHTSAIL_SSH_PRIVATE_KEY_B64 }}
           LIGHTSAIL_SSH_KNOWN_HOSTS: ${{ secrets.LIGHTSAIL_SSH_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
 
-          for name in LIGHTSAIL_HOST LIGHTSAIL_USER LIGHTSAIL_SSH_PRIVATE_KEY LIGHTSAIL_SSH_KNOWN_HOSTS; do
+          for name in LIGHTSAIL_HOST LIGHTSAIL_USER LIGHTSAIL_SSH_PRIVATE_KEY_B64 LIGHTSAIL_SSH_KNOWN_HOSTS; do
             if [ -z "${!name:-}" ]; then
               echo "Missing required GitHub Actions secret: $name"
               exit 1
@@ -247,16 +247,22 @@ jobs:
 
       - name: Configure SSH
         env:
-          LIGHTSAIL_SSH_PRIVATE_KEY: ${{ secrets.LIGHTSAIL_SSH_PRIVATE_KEY }}
+          LIGHTSAIL_SSH_PRIVATE_KEY_B64: ${{ secrets.LIGHTSAIL_SSH_PRIVATE_KEY_B64 }}
           LIGHTSAIL_SSH_KNOWN_HOSTS: ${{ secrets.LIGHTSAIL_SSH_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
 
           install -d -m 700 "$HOME/.ssh"
-          printf '%s\n' "$LIGHTSAIL_SSH_PRIVATE_KEY" > "$HOME/.ssh/lightsail_deploy"
+
+          printf '%s' "$LIGHTSAIL_SSH_PRIVATE_KEY_B64" | base64 --decode > "$HOME/.ssh/lightsail_deploy"
           chmod 600 "$HOME/.ssh/lightsail_deploy"
+
           printf '%s\n' "$LIGHTSAIL_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/known_hosts"
+
+          ssh-keygen -y -f "$HOME/.ssh/lightsail_deploy" >/dev/null
+
+          echo "SSH private key decoded and validated"
 
       - name: Build verified release file
         env:
