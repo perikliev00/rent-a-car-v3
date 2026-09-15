@@ -37,7 +37,7 @@ export function DiscountsSection({ rules }: { rules: PricingDiscountRule[] }) {
     >
       <div className="space-y-4">
         {rules.map((rule) => (
-          <div key={rule.id} className="grid gap-3 rounded-lg border border-[var(--color-line)] p-3 sm:grid-cols-5">
+          <div key={rule.id} className="grid min-w-0 grid-cols-1 gap-3 rounded-lg border border-[var(--color-line)] p-3 sm:grid-cols-2 lg:grid-cols-5">
             <div>
               <p className="text-xs text-[var(--color-muted)]">Kind</p>
               <p className="font-medium">{rule.kind}</p>

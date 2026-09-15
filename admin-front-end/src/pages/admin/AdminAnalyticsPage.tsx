@@ -44,9 +44,9 @@ function Kpi({
   value: string;
 }) {
   return (
-    <div className="rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] p-5 shadow-[var(--shadow-soft)]">
+    <div className="min-w-0 rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] p-5 shadow-[var(--shadow-soft)]">
       <p className="text-xs font-medium tracking-wide text-[var(--color-muted)] uppercase">{label}</p>
-      <p className="font-display mt-2 text-2xl font-bold tracking-tight text-[var(--color-ink)]">
+      <p className="font-display mt-2 break-words text-2xl font-bold tracking-tight text-[var(--color-ink)]">
         {value}
       </p>
     </div>
@@ -93,21 +93,21 @@ export function AdminAnalyticsPage() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="font-display text-3xl font-bold tracking-tight text-[var(--color-ink)]">
+      <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--color-ink)] sm:text-3xl">
             Analytics
           </h1>
           <p className="mt-1 text-[var(--color-muted)]">Business KPIs and fleet performance</p>
         </div>
-        <div className="flex flex-wrap items-end gap-3">
-          <div>
+        <div className="grid w-full min-w-0 grid-cols-1 gap-3 sm:w-auto sm:grid-cols-2">
+          <div className="min-w-0">
             <label className="block text-xs text-[var(--color-muted)]">From</label>
-            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+            <Input type="date" className="min-w-0" value={from} onChange={(e) => setFrom(e.target.value)} />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="block text-xs text-[var(--color-muted)]">To</label>
-            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+            <Input type="date" className="min-w-0" value={to} onChange={(e) => setTo(e.target.value)} />
           </div>
         </div>
       </div>
@@ -118,7 +118,7 @@ export function AdminAnalyticsPage() {
         </p>
       )}
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-8 grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Kpi
           label="Revenue"
           value={canMoney && kpis?.monthlyRevenue != null ? formatPrice(kpis.monthlyRevenue) : '—'}
@@ -143,16 +143,17 @@ export function AdminAnalyticsPage() {
       <Card className="mt-8">
         <CardBody>
           <h2 className="font-semibold">Revenue & bookings</h2>
-          <div className="mt-4 h-72 w-full">
+          <div className="mt-4 h-72 w-full min-w-0">
             {chartData.length === 0 ? (
               <p className="text-sm text-[var(--color-muted)]">No series data for this range</p>
             ) : (
+              <div className="h-full w-full min-w-0">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-line)" />
                   <XAxis dataKey="day" tick={{ fontSize: 11 }} />
-                  <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
-                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
+                  <YAxis yAxisId="left" tick={{ fontSize: 11 }} width={40} />
+                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} width={32} />
                   <Tooltip />
                   {canMoney && (
                     <Line
@@ -174,6 +175,7 @@ export function AdminAnalyticsPage() {
                   />
                 </LineChart>
               </ResponsiveContainer>
+              </div>
             )}
           </div>
         </CardBody>

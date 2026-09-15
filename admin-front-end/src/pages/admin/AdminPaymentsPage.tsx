@@ -232,10 +232,10 @@ export function AdminPaymentsPage() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="font-display text-3xl font-bold tracking-tight text-[var(--color-ink)]">Payments</h1>
-          <p className="mt-1 text-[var(--color-muted)]">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--color-ink)] sm:text-3xl">Payments</h1>
+          <p className="mt-1 break-words text-[var(--color-muted)]">
             {data?.unresolvedFailureCount ?? 0} unresolved failure(s)
           </p>
         </div>
@@ -261,9 +261,9 @@ export function AdminPaymentsPage() {
           <Card className="mt-8">
             <CardBody>
               <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-                <div>
+                <div className="min-w-0">
                   <h2 className="font-semibold">Refundable bookings</h2>
-                  <p className="text-sm text-[var(--color-muted)]">
+                  <p className="break-words text-sm text-[var(--color-muted)]">
                     Paid / confirmed / prepared / manual review · search by reservation or order id
                   </p>
                 </div>
@@ -271,7 +271,7 @@ export function AdminPaymentsPage() {
                   Refresh
                 </Button>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+              <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                 <Input
                   label="Search"
                   placeholder="Reservation or order #"

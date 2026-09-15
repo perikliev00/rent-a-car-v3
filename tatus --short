@@ -1,0 +1,16 @@
+warning: in the working copy of 'backend/package-lock.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/sql/dbCliUtils.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/sql/schema/011_reservations_active_holds_exclusion.sql', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/sql/schema/014_admin_audit_logs.sql', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/config/reservationTiming.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/controllers/api/admin/contactController.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/services/admin/adminAuditService.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/services/admin/order/orderDeleteService.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/services/payment/checkout/checkoutCompensationService.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/services/sql/adminAuditSqlService.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/utils/date/timezone.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/utils/reservationHelpers.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/tests/integration/concurrency/reservationRefund.test.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/tests/reservationTiming.test.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/tests/services/payment/checkout/checkoutCompensationService.test.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'e2e/package-lock.json', LF will be replaced by CRLF the next time Git touches it

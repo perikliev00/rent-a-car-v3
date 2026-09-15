@@ -151,13 +151,13 @@ export function AdminCarsPage() {
   if (isLoading) return <PageLoader />;
 
   return (
-    <div>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-display text-3xl font-bold tracking-tight text-[var(--color-ink)]">Cars</h1>
+    <div className="min-w-0">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--color-ink)] sm:text-3xl">Cars</h1>
           <p className="mt-1 text-[var(--color-muted)]">Manage your fleet</p>
         </div>
-        <Button onClick={() => { resetForm(); setShowForm(true); }}>
+        <Button className="shrink-0" onClick={() => { resetForm(); setShowForm(true); }}>
           Add car
         </Button>
       </div>
@@ -167,7 +167,7 @@ export function AdminCarsPage() {
           <CardBody>
             <h2 className="font-semibold">{editing ? 'Edit car' : 'New car'}</h2>
             <form
-              className="mt-4 grid gap-4 sm:grid-cols-2"
+              className="mt-4 grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2"
               onSubmit={(e) => {
                 e.preventDefault();
                 saveMutation.mutate();
@@ -221,7 +221,7 @@ export function AdminCarsPage() {
         </Card>
       )}
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-8 grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {data?.cars.map((car) => {
           const insuranceOverdue = isOverdue(car.insuranceExpiry);
           const inspectionOverdue = isOverdue(car.technicalInspectionExpiry);
@@ -229,8 +229,8 @@ export function AdminCarsPage() {
             <Card key={car.id} className="overflow-hidden">
               <img src={imageUrl(car.image)} alt={car.name} className="aspect-video w-full object-cover" />
               <CardBody>
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <h3 className="font-semibold">{car.name}</h3>
+                <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+                  <h3 className="min-w-0 break-words font-semibold">{car.name}</h3>
                   <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${statusChipClass(car.status)}`}>
                     {car.status || 'available'}
                   </span>

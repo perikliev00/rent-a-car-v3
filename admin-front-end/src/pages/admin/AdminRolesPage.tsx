@@ -65,13 +65,13 @@ export function AdminRolesPage() {
   if (isLoading) return <PageLoader />;
 
   return (
-    <div>
-      <h1 className="font-display text-3xl font-bold tracking-tight text-[var(--color-ink)]">Roles</h1>
+    <div className="min-w-0">
+      <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--color-ink)] sm:text-3xl">Roles</h1>
       <p className="mt-1 text-[var(--color-muted)]">
         Configure the permission matrix for each staff role
       </p>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-[220px_1fr]">
+      <div className="mt-8 grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[220px_1fr]">
         <Card>
           <CardBody className="space-y-1">
             {roles.map((role) => (
@@ -93,12 +93,12 @@ export function AdminRolesPage() {
 
         <Card>
           <CardBody>
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
+            <div className="flex min-w-0 flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0">
                 <h2 className="font-display text-xl font-semibold text-[var(--color-ink)]">
                   {selectedRole?.name || 'Select a role'}
                 </h2>
-                <p className="mt-1 text-sm text-[var(--color-muted)]">
+                <p className="mt-1 break-words text-sm text-[var(--color-muted)]">
                   {isOwner
                     ? 'Owner always has all permissions and cannot be edited.'
                     : selectedRole?.description || 'Toggle permissions below, then save.'}
@@ -121,7 +121,7 @@ export function AdminRolesPage() {
                   <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-muted)]">
                     {category}
                   </h3>
-                  <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2">
                     {perms.map((perm) => (
                       <label
                         key={perm.id}

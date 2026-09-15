@@ -162,7 +162,7 @@ export function BlockFormModal({
             { value: 'other', label: 'Other' },
           ]}
         />
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <DateSelect label="Start date" value={startDate} onChange={setStartDate} />
           <TimeSelect label="Start time" value={startTime} onChange={setStartTime} />
           <DateSelect label="End date" value={endDate} onChange={setEndDate} />

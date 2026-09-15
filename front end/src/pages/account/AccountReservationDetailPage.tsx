@@ -102,20 +102,20 @@ export function AccountReservationDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+    <div className="mx-auto min-w-0 max-w-3xl overflow-x-clip px-4 py-10 sm:px-6">
       <Link to="/account/reservations" className="text-sm text-[var(--color-muted)] hover:underline">
         ← My reservations
       </Link>
-      <h1 className="mt-3 font-display text-3xl font-bold text-[var(--color-ink)]">
+      <h1 className="mt-3 break-words font-display text-3xl font-bold text-[var(--color-ink)]">
         Reservation #{reservation.id}
       </h1>
-      <p className="mt-2 text-[var(--color-muted)]">
+      <p className="mt-2 break-words text-[var(--color-muted)]">
         {reservation.carName || 'Vehicle'} · {reservation.status} · Payment:{' '}
         {reservation.paymentStatus}
       </p>
 
       <Card className="mt-8">
-        <CardBody className="space-y-2 text-sm">
+        <CardBody className="min-w-0 space-y-2 break-words text-sm">
           <p>
             <span className="font-medium">Pickup:</span>{' '}
             {formatWhen(reservation.pickupDate, reservation.pickupTime)} —{' '}
@@ -133,27 +133,27 @@ export function AccountReservationDetailPage() {
         </CardBody>
       </Card>
 
-      <section className="mt-8">
+      <section className="mt-8 min-w-0">
         <h2 className="font-display text-lg font-semibold">Pickup instructions</h2>
         <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-[var(--color-muted)]">
           {(reservation.pickupInstructions || []).map((line) => (
-            <li key={line}>{line}</li>
+            <li key={line} className="break-words">{line}</li>
           ))}
         </ul>
       </section>
 
-      <section className="mt-8">
+      <section className="mt-8 min-w-0">
         <h2 className="font-display text-lg font-semibold">Return instructions</h2>
         <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-[var(--color-muted)]">
           {(reservation.returnInstructions || []).map((line) => (
-            <li key={line}>{line}</li>
+            <li key={line} className="break-words">{line}</li>
           ))}
         </ul>
       </section>
 
-      <section className="mt-8">
+      <section className="mt-8 min-w-0">
         <h2 className="font-display text-lg font-semibold">Documents (PDF)</h2>
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 flex min-w-0 flex-wrap gap-2">
           {(reservation.availablePdfs || []).map((kind) => (
             <Button
               key={kind}
@@ -174,7 +174,7 @@ export function AccountReservationDetailPage() {
       </section>
 
       <Card className="mt-8">
-        <CardBody className="space-y-4">
+        <CardBody className="min-w-0 space-y-4">
           <h2 className="font-display text-lg font-semibold">Travel details</h2>
           <Input
             label="Flight number"
@@ -198,6 +198,7 @@ export function AccountReservationDetailPage() {
           />
           <Button
             size="sm"
+            className="w-full sm:w-auto"
             loading={travelMutation.isPending}
             onClick={() => travelMutation.mutate()}
           >
@@ -208,7 +209,7 @@ export function AccountReservationDetailPage() {
 
       {reservation.canRequestCancellation && (
         <Card className="mt-8">
-          <CardBody className="space-y-4">
+          <CardBody className="min-w-0 space-y-4">
             <h2 className="font-display text-lg font-semibold">Cancellation</h2>
             {reservation.cancellationRequest?.status === 'pending' ? (
               <p className="text-sm text-[var(--color-muted)]">
@@ -224,6 +225,7 @@ export function AccountReservationDetailPage() {
                 <Button
                   variant="outline"
                   size="sm"
+                  className="w-full sm:w-auto"
                   loading={cancelMutation.isPending}
                   onClick={() => cancelMutation.mutate()}
                 >

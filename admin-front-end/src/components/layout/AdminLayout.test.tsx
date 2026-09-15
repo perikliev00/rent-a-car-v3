@@ -66,6 +66,7 @@ describe('AdminLayout', () => {
     expect(screen.getByText('Admin page content')).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: 'Dashboard' }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('link', { name: 'Audit logs' }).length).toBeGreaterThan(0);
+    expect(screen.getByTestId('admin-mobile-menu')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Log out' })).toBeInTheDocument();
     expect((await screen.findAllByText(/Fleet alerts/)).length).toBeGreaterThan(0);
     expect(screen.getAllByText('Live').length).toBeGreaterThan(0);

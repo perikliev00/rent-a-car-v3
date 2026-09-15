@@ -17,7 +17,7 @@ export function AuthPageShell({
   sideDescription = 'Premium car rental with transparent pricing and instant online booking.',
 }: AuthPageShellProps) {
   return (
-    <div className="mx-auto grid min-h-[calc(100vh-8rem)] max-w-6xl items-stretch gap-0 px-4 py-10 sm:px-6 lg:grid-cols-2 lg:py-14">
+    <div className="mx-auto grid min-h-[calc(100vh-8rem)] max-w-6xl min-w-0 items-stretch gap-0 px-4 py-10 sm:px-6 lg:grid-cols-2 lg:py-14">
       <aside className="relative hidden overflow-hidden text-white lg:flex lg:flex-col lg:justify-end">
         <img src={authAsideImage} alt="" className="absolute inset-0 h-full w-full object-cover" />
         <div className="hero-photo-overlay absolute inset-0" />
@@ -32,13 +32,13 @@ export function AuthPageShell({
         </div>
       </aside>
 
-      <div className="flex items-center border border-[var(--color-line)] bg-[var(--color-surface-elevated)] px-6 py-10 shadow-[var(--shadow-soft)] sm:px-10 lg:border-l-0">
-        <div className="w-full animate-lux-rise">
-          <h1 className="font-display text-2xl font-extrabold tracking-tight text-[var(--color-navy)] sm:text-3xl">
+      <div className="flex min-w-0 items-center border border-[var(--color-line)] bg-[var(--color-surface-elevated)] px-4 py-8 shadow-[var(--shadow-soft)] sm:px-8 sm:py-10 lg:border-l-0 lg:px-10">
+        <div className="w-full min-w-0 animate-lux-rise">
+          <h1 className="break-words font-display text-2xl font-extrabold tracking-tight text-[var(--color-navy)] sm:text-3xl">
             {title}
           </h1>
           <p className="mt-2 text-sm text-[var(--color-muted)]">{subtitle}</p>
-          <div className="mt-8">{children}</div>
+          <div className="mt-8 min-w-0">{children}</div>
         </div>
       </div>
     </div>

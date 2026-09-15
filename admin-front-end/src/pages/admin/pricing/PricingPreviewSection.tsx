@@ -47,7 +47,7 @@ export function PricingPreviewSection({ extras }: { extras: PricingExtra[] }) {
 
   return (
     <PricingSection title="Pricing preview" hint="Uses the same engine as checkout.">
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <label className="block text-sm">
           <span className="mb-1 block text-[var(--color-muted)]">Car</span>
           <select

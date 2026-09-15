@@ -70,18 +70,18 @@ export function BookingAddOns({ extras, hotelDelivery, onChange, disabled }: Boo
               const insuranceGroup = isInsuranceCode(extra.code);
               const checked = extras.includes(extra.code);
               return (
-                <label key={extra.code} className="flex items-start gap-3 text-sm">
+                <label key={extra.code} className="flex min-w-0 items-start gap-3 text-sm">
                   <input
                     type={insuranceGroup ? 'radio' : 'checkbox'}
                     name={insuranceGroup ? 'insurance-package' : undefined}
-                    className="mt-1"
+                    className="mt-1 shrink-0"
                     disabled={disabled}
                     checked={checked}
                     onChange={(e) => toggleExtra(extra.code, e.target.checked)}
                   />
-                  <span>
+                  <span className="min-w-0 break-words">
                     <span className="font-medium text-[var(--color-ink)]">{extra.label}</span>
-                    <span className="ml-2 text-[var(--color-muted)]">
+                    <span className="ml-2 inline-block text-[var(--color-muted)]">
                       {formatPrice(extra.amount)}
                       {extra.mode === 'per_day' ? '/day' : ''}
                     </span>
@@ -108,10 +108,10 @@ export function BookingAddOns({ extras, hotelDelivery, onChange, disabled }: Boo
         )}
 
         {hotelFee && (
-          <label className="flex items-start gap-3 border-t border-[var(--color-line)] pt-4 text-sm">
+          <label className="flex min-w-0 items-start gap-3 border-t border-[var(--color-line)] pt-4 text-sm">
             <input
               type="checkbox"
-              className="mt-1"
+              className="mt-1 shrink-0"
               disabled={disabled}
               checked={hotelDelivery}
               onChange={(e) =>
@@ -121,11 +121,11 @@ export function BookingAddOns({ extras, hotelDelivery, onChange, disabled }: Boo
                 })
               }
             />
-            <span>
+            <span className="min-w-0 break-words">
               <span className="font-medium text-[var(--color-ink)]">
                 {hotelFee.label || 'Hotel delivery'}
               </span>
-              <span className="ml-2 text-[var(--color-muted)]">
+              <span className="ml-2 inline-block text-[var(--color-muted)]">
                 {formatPrice(hotelFee.amount)}
                 {hotelFee.mode === 'per_day' ? '/day' : ''}
               </span>

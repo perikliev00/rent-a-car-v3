@@ -44,11 +44,11 @@ export function AdminReservationOpsPage() {
 
   if (isError) {
     return (
-      <div>
-        <h1 className="font-display text-3xl font-bold tracking-tight text-[var(--color-ink)]">
+      <div className="min-w-0">
+        <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--color-ink)] sm:text-3xl">
           Reservation Ops
         </h1>
-        <p className="mt-2 text-[var(--color-danger)]">
+        <p className="mt-2 break-words text-[var(--color-danger)]">
           {(error as Error).message || 'Error loading ops dashboard'}
         </p>
       </div>
@@ -58,13 +58,13 @@ export function AdminReservationOpsPage() {
   const widgets = data?.widgets ?? emptyWidgets();
 
   return (
-    <div>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="font-display text-3xl font-bold tracking-tight text-[var(--color-ink)]">
+    <div className="min-w-0">
+      <div className="flex min-w-0 flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--color-ink)] sm:text-3xl">
             Reservation Ops
           </h1>
-          <p className="mt-1 text-[var(--color-muted)]">
+          <p className="mt-1 break-words text-[var(--color-muted)]">
             Pickup, return, and payment lifecycle · Sofia day {data?.today}
           </p>
         </div>

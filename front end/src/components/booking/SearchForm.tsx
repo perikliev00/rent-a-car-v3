@@ -48,9 +48,10 @@ export function SearchForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className={`grid gap-4 ${compact ? 'sm:grid-cols-2 lg:grid-cols-3' : 'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6'}`}
+      className={`grid w-full min-w-0 gap-4 ${compact ? 'sm:grid-cols-2 lg:grid-cols-3' : 'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6'}`}
     >
       <DateSelect
+        className="min-w-0"
         label="Pickup date"
         value={values.pickupDate}
         min={new Date().toISOString().split('T')[0]}
@@ -65,6 +66,7 @@ export function SearchForm({
         tone={tone}
       />
       <DateSelect
+        className="min-w-0"
         label="Return date"
         value={values.returnDate}
         min={values.pickupDate}
@@ -73,18 +75,21 @@ export function SearchForm({
         tone={tone}
       />
       <TimeSelect
+        className="min-w-0"
         label="Pickup time"
         value={values.pickupTime}
         onChange={(next) => set('pickupTime', next)}
         tone={tone}
       />
       <TimeSelect
+        className="min-w-0"
         label="Return time"
         value={values.returnTime}
         onChange={(next) => set('returnTime', next)}
         tone={tone}
       />
       <DropdownSelect
+        className="min-w-0"
         label="Pickup location"
         value={values.pickupLocation}
         onChange={(next) => set('pickupLocation', next as LocationId)}
@@ -92,6 +97,7 @@ export function SearchForm({
         tone={tone}
       />
       <DropdownSelect
+        className="min-w-0"
         label="Return location"
         value={values.returnLocation}
         onChange={(next) => set('returnLocation', next as LocationId)}
@@ -99,9 +105,9 @@ export function SearchForm({
         tone={tone}
       />
       <div
-        className={
+        className={`min-w-0 ${
           compact ? 'sm:col-span-2 lg:col-span-3' : 'sm:col-span-2 lg:col-span-6 xl:col-span-6'
-        }
+        }`}
       >
         <Button
           type="submit"

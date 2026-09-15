@@ -24,7 +24,7 @@ export function WeekendSection({ rule }: { rule: PricingWeekendRule | undefined 
   return (
     <PricingSection title="Weekend pricing">
       {weekend && (
-        <div className="grid gap-3 sm:grid-cols-4">
+        <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Input
             label="Name"
             defaultValue={weekend.name}

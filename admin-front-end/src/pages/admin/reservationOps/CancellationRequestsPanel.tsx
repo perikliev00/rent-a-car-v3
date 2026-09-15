@@ -64,11 +64,11 @@ export function CancellationRequestsPanel({ onChanged }: { onChanged: () => void
                   key={req.id}
                   className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-line)]/60 pb-3 last:border-0"
                 >
-                  <div className="text-sm">
-                    <p className="font-medium text-[var(--color-ink)]">
+                  <div className="min-w-0 text-sm">
+                    <p className="break-words font-medium text-[var(--color-ink)]">
                       Reservation #{req.reservationId} · {req.customerName || req.customerEmail}
                     </p>
-                    <p className="text-[var(--color-muted)]">{req.reason || 'No reason provided'}</p>
+                    <p className="break-words text-[var(--color-muted)]">{req.reason || 'No reason provided'}</p>
                   </div>
                   <div className="flex gap-2">
                     <Button

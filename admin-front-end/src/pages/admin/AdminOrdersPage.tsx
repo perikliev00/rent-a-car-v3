@@ -81,13 +81,13 @@ export function AdminOrdersPage() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="font-display text-3xl font-bold tracking-tight text-[var(--color-ink)]">Orders</h1>
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--color-ink)] sm:text-3xl">Orders</h1>
           <p className="mt-1 text-[var(--color-muted)]">Manage bookings and reservations</p>
         </div>
-        <Link to="/admin/orders/new">
-          <Button>Create order</Button>
+        <Link to="/admin/orders/new" className="shrink-0">
+          <Button className="min-h-11 w-full sm:w-auto">Create order</Button>
         </Link>
       </div>
 
@@ -102,7 +102,7 @@ export function AdminOrdersPage() {
       {tab === 'active' && (
         <Card className="mt-4">
           <CardBody>
-            <div className="grid gap-4 sm:grid-cols-4">
+            <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <Select
                 label="Status"
                 value={filters.status}
@@ -115,8 +115,8 @@ export function AdminOrdersPage() {
                   { value: 'cancelled', label: 'Cancelled' },
                 ]}
               />
-              <Input label="From" type="date" value={filters.startDate} onChange={(e) => setFilters({ ...filters, startDate: e.target.value })} />
-              <Input label="To" type="date" value={filters.endDate} onChange={(e) => setFilters({ ...filters, endDate: e.target.value })} />
+              <Input label="From" type="date" className="min-w-0" value={filters.startDate} onChange={(e) => setFilters({ ...filters, startDate: e.target.value })} />
+              <Input label="To" type="date" className="min-w-0" value={filters.endDate} onChange={(e) => setFilters({ ...filters, endDate: e.target.value })} />
               <Input label="Search" value={filters.search} onChange={(e) => setFilters({ ...filters, search: e.target.value })} placeholder="Name, email, phone..." />
             </div>
           </CardBody>

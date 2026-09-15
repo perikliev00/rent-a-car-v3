@@ -34,8 +34,8 @@ export function DeliveryFeesSection({ fees }: { fees: PricingDeliveryFee[] }) {
       title="Delivery fees"
       hint="Pickup and return location fees (EUR). Airport locations are included."
     >
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
+      <div className="min-w-0 overflow-x-auto overscroll-x-contain">
+        <table className="w-full min-w-[20rem] text-left text-sm">
           <thead>
             <tr className="border-b text-[var(--color-muted)]">
               <th className="pb-2 pr-3">Location</th>

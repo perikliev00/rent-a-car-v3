@@ -123,7 +123,7 @@ export function CheckoutPage() {
   }
 
   return (
-    <div>
+    <div className="min-w-0 overflow-x-clip">
       <section className="bg-navy text-white">
         <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6">
           <p className="font-display text-sm font-bold uppercase tracking-[0.22em] text-[var(--color-accent)]">
@@ -138,9 +138,9 @@ export function CheckoutPage() {
         </div>
       </section>
 
-      <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
-        <div className="grid gap-8 lg:grid-cols-2">
-          <div className="space-y-6">
+      <div className="mx-auto min-w-0 max-w-4xl px-4 py-10 sm:px-6">
+        <div className="grid min-w-0 gap-8 lg:grid-cols-2">
+          <div className="min-w-0 space-y-6">
             <BookingAddOns
               extras={extras}
               hotelDelivery={hotelDelivery}
@@ -149,7 +149,7 @@ export function CheckoutPage() {
             />
 
             <form
-              className="space-y-4 rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] p-6 shadow-[var(--shadow-soft)] sm:p-8"
+              className="min-w-0 space-y-4 rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] p-4 shadow-[var(--shadow-soft)] sm:p-6 lg:p-8"
               onSubmit={(e) => {
                 e.preventDefault();
                 setError('');
@@ -196,7 +196,9 @@ export function CheckoutPage() {
             </form>
           </div>
 
-          <OrderSummary order={orderData} />
+          <div className="min-w-0">
+            <OrderSummary order={orderData} />
+          </div>
         </div>
       </div>
     </div>

@@ -4,7 +4,9 @@ import type { CalendarEvent } from '../calendar.types';
 export const ROW_H = 80;
 export const LANE_H = 28;
 export const LANE_GAP = 4;
+/** Desktop car label column; mobile uses CSS --cal-car-col override. */
 export const CAR_COL = 180;
+export const CAR_COL_NARROW = 96;
 
 export type TimelineGhost = {
   carId: string;

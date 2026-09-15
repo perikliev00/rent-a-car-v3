@@ -79,8 +79,8 @@ function RoleTasksPage({ role }: { role: RoleView }) {
   const tasks = tasksQuery.data?.tasks || [];
 
   return (
-    <div>
-      <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--color-ink)]">
+    <div className="min-w-0">
+      <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--color-ink)] sm:text-3xl">
         {cfg.title}
       </h1>
       <p className="mt-1 text-[var(--color-muted)]">{cfg.subtitle}</p>

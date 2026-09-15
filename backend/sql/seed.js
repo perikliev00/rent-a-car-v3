@@ -62,6 +62,9 @@ async function seed({ endPool = true } = {}) {
     await client.query(sql);
     console.log('✓ Demo data seeded');
 
+    const { seedRealisticFleet } = require('./seedRealisticFleet');
+    await seedRealisticFleet({ endPool: false });
+
     await seedUser({
       email: config.adminEmail,
       password: config.adminPassword,

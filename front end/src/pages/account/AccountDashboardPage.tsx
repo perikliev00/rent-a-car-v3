@@ -35,13 +35,13 @@ export function AccountDashboardPage() {
   const { counts, upcoming, recent } = query.data;
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
+    <div className="mx-auto min-w-0 max-w-5xl overflow-x-clip px-4 py-10 sm:px-6">
+      <div className="flex min-w-0 flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
           <p className="font-display text-sm font-bold uppercase tracking-[0.12em] text-[var(--color-accent-ink)]">My account</p>
           <h1 className="font-display text-3xl font-extrabold uppercase tracking-tight text-[var(--color-navy)]">Dashboard</h1>
         </div>
-        <div className="flex gap-2">
+        <div className="flex min-w-0 flex-wrap gap-2">
           <Link to="/account/reservations">
             <Button variant="outline" size="sm">
               My reservations
@@ -55,7 +55,7 @@ export function AccountDashboardPage() {
 
       <EmailUnverifiedBanner />
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-3">
+      <div className="mt-8 grid min-w-0 gap-4 sm:grid-cols-3">
         {[
           { label: 'Total bookings', value: counts.total },
           { label: 'Active', value: counts.active },
@@ -74,9 +74,9 @@ export function AccountDashboardPage() {
 
       {upcoming && (
         <Card className="mt-8">
-          <CardBody>
+          <CardBody className="min-w-0">
             <h2 className="font-display text-lg font-semibold">Upcoming</h2>
-            <p className="mt-2 text-[var(--color-ink)]">
+            <p className="mt-2 break-words text-[var(--color-ink)]">
               {upcoming.carName || 'Vehicle'} · {formatWhen(upcoming.pickupDate, upcoming.pickupTime)}
             </p>
             <p className="mt-1 text-sm text-[var(--color-muted)]">Status: {upcoming.status}</p>
@@ -87,24 +87,24 @@ export function AccountDashboardPage() {
         </Card>
       )}
 
-      <section className="mt-10">
+      <section className="mt-10 min-w-0">
         <h2 className="font-display text-lg font-semibold">Recent reservations</h2>
         {!recent.length ? (
           <p className="mt-3 text-sm text-[var(--color-muted)]">No reservations yet.</p>
         ) : (
           <ul className="mt-4 divide-y divide-[var(--color-line)] border-y border-[var(--color-line)]">
             {recent.map((r) => (
-              <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 py-4">
-                <div>
-                  <p className="font-medium text-[var(--color-ink)]">
+              <li key={r.id} className="flex min-w-0 flex-col gap-3 py-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="break-words font-medium text-[var(--color-ink)]">
                     {r.carName || 'Vehicle'} · #{r.id}
                   </p>
                   <p className="text-sm text-[var(--color-muted)]">
                     {formatWhen(r.pickupDate, r.pickupTime)} · {r.status}
                   </p>
                 </div>
-                <Link to={`/account/reservations/${r.id}`}>
-                  <Button variant="ghost" size="sm">
+                <Link to={`/account/reservations/${r.id}`} className="shrink-0">
+                  <Button variant="ghost" size="sm" className="w-full sm:w-auto">
                     Open
                   </Button>
                 </Link>

@@ -33,22 +33,22 @@ export function AdminContactsPage() {
   if (isLoading) return <PageLoader />;
 
   return (
-    <div>
-      <h1 className="font-display text-3xl font-bold tracking-tight text-[var(--color-ink)]">Contacts</h1>
+    <div className="min-w-0">
+      <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--color-ink)] sm:text-3xl">Contacts</h1>
       <p className="mt-1 text-[var(--color-muted)]">Customer messages inbox</p>
 
       <div className="mt-8 space-y-4">
         {data?.contacts.map((contact) => (
           <Card key={contact.id}>
             <CardBody>
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <h3 className="font-semibold">{contact.subject}</h3>
-                  <p className="text-sm text-[var(--color-muted)]">
+              <div className="flex min-w-0 flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <h3 className="break-words font-semibold">{contact.subject}</h3>
+                  <p className="break-words text-sm text-[var(--color-muted)]">
                     {contact.name} · {contact.email}
                     {contact.phone && ` · ${contact.phone}`}
                   </p>
-                  <p className="mt-2 text-sm text-[var(--color-ink)]">{contact.message}</p>
+                  <p className="mt-2 break-words text-sm text-[var(--color-ink)]">{contact.message}</p>
                   <p className="mt-2 text-xs text-[var(--color-muted)]">
                     {new Date(contact.createdAt).toLocaleString()}
                   </p>

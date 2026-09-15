@@ -33,11 +33,11 @@ export function EmailUnverifiedBanner() {
   };
 
   return (
-    <div className="mt-6 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-3 text-sm">
+    <div className="mt-6 min-w-0 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-3 text-sm">
       <p className="font-medium text-[var(--color-ink)]">Verify your email to link guest bookings</p>
-      <p className="mt-1 text-[var(--color-muted)]">
+      <p className="mt-1 break-words text-[var(--color-muted)]">
         Reservations made as a guest will not appear until you confirm{' '}
-        <span className="font-medium text-[var(--color-ink)]">{user.email}</span>.{' '}
+        <span className="break-all font-medium text-[var(--color-ink)]">{user.email}</span>.{' '}
         <Link to="/verify-email" className="font-medium text-[var(--color-accent-ink)] hover:underline">
           Open verification
         </Link>

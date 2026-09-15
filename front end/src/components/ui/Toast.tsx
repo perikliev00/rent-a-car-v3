@@ -15,11 +15,11 @@ export function ToastContainer() {
   };
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+    <div className="pointer-events-none fixed inset-x-4 bottom-4 z-50 flex max-w-[calc(100vw-2rem)] flex-col gap-2 sm:inset-x-auto sm:right-4 sm:left-auto sm:max-w-sm">
       {items.map((t) => (
         <div
           key={t.id}
-          className={`animate-lux-rise rounded-xl px-4 py-3 text-sm text-white shadow-[var(--shadow-lift)] ${colors[t.type]}`}
+          className={`pointer-events-auto animate-lux-rise break-words rounded-xl px-4 py-3 text-sm text-white shadow-[var(--shadow-lift)] ${colors[t.type]}`}
         >
           {t.message}
         </div>

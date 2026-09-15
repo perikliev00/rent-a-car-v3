@@ -88,7 +88,8 @@ npm run dev            # http://localhost:3000
 | `npm run test:integration` | Run concurrency + webhook integration tests (`RUN_INTEGRATION_TESTS=1`) |
 | `npm run db:schema` | Apply initial SQL schema |
 | `npm run db:migrate` | Apply versioned migrations |
-| `npm run db:seed` | Seed demo data and dev users |
+| `npm run db:seed` | Seed demo data, realistic 20-car fleet, and dev users |
+| `npm run db:seed:cars` | Seed only the 20-car realistic fleet (idempotent; no bookings) |
 | `npm run db:reset` | Drop schema, re-apply setup + seed (dev only) |
 | `npm run db:backup` | Create SQL backup in `backend/backups/` |
 | `npm run db:restore` | Restore from backup (dev only) |
@@ -153,7 +154,8 @@ Create a database and set `DATABASE_URL` in `backend/.env`.
 |---------|-------------|
 | `npm run db:setup` | Apply schema + migrations (first-time setup) |
 | `npm run db:migrate` | Apply pending migrations only |
-| `npm run db:seed` | Insert demo data + admin/demo users |
+| `npm run db:seed` | Insert demo data, realistic 20-car fleet, and admin/demo users |
+| `npm run db:seed:cars` | Insert/skip the 20-car realistic fleet only (safe to re-run; no fake bookings) |
 | `npm run db:reset` | Wipe DB and re-run setup + seed (development only) |
 | `npm run db:backup` | Export plain SQL dump to `backend/backups/` |
 | `npm run db:restore` | Restore from a backup file (development only) |
@@ -231,7 +233,17 @@ Pass criteria: restore succeeds, `/health/ready` is OK, row counts for reservati
 
 ### Demo data
 
-`npm run db:seed` inserts categories, cars, sample contacts, demo orders, and two users:
+`npm run db:seed` inserts categories, the original 5 demo cars, a **20-car realistic fleet**, sample contacts, demo orders, and two users.
+
+The realistic fleet (`backend/sql/seed/realisticFleetData.js`) is also available on its own:
+
+```bash
+npm run db:seed:cars
+```
+
+That command is idempotent: it inserts a car only when its fictional registration number and VIN are not already present. It does not update existing cars, create bookings/payments, or add calendar blocks. Registration plates (`C 1001 XX` … `C 1020 XX`) and VINs (`ZZ1RACV3SEED00001` …) are fictional test/demo identifiers.
+
+Prices are stored as EUR `NUMERIC(10,2)` (the pricing engine / Stripe currency). Suggested Bulgarian day rates are used as the 1–3 day tier; 7–31 and 31+ tiers follow the existing demo discount shape.
 
 | Role | Default email | Default password |
 |------|---------------|------------------|

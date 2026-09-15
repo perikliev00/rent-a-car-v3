@@ -72,7 +72,19 @@ function CalendarIcon({ className = '' }: { className?: string }) {
 }
 
 const triggerClass =
-  'flex w-full items-center justify-between gap-3 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] px-3.5 py-2.5 text-left text-sm text-[var(--color-ink)] shadow-sm transition-[border-color,box-shadow] focus:border-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/25';
+  'flex min-h-11 w-full min-w-0 items-center justify-between gap-3 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] px-3.5 py-2.5 text-left text-sm text-[var(--color-ink)] shadow-sm transition-[border-color,box-shadow] focus:border-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/25';
+
+function computePickerPos(anchor: DOMRect, pickerHeight: number) {
+  const width = Math.min(19 * 16, Math.max(0, window.innerWidth - 16));
+  const left = Math.min(Math.max(8, anchor.left), Math.max(8, window.innerWidth - width - 8));
+  const spaceBelow = window.innerHeight - anchor.bottom - 8;
+  const spaceAbove = anchor.top - 8;
+  const placeAbove = spaceBelow < pickerHeight && spaceAbove > spaceBelow;
+  const top = placeAbove
+    ? Math.max(8, anchor.top - pickerHeight - 6)
+    : Math.min(anchor.bottom + 6, Math.max(8, window.innerHeight - pickerHeight - 8));
+  return { top, left, width };
+}
 
 export function DateSelect({
   label,
@@ -89,7 +101,9 @@ export function DateSelect({
   const rootRef = useRef<HTMLDivElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
-  const [pickerPos, setPickerPos] = useState<{ top: number; left: number } | null>(null);
+  const [pickerPos, setPickerPos] = useState<{ top: number; left: number; width: number } | null>(
+    null
+  );
 
   const selected = parseISODate(value);
   const minDate = min ? parseISODate(min) : null;
@@ -110,11 +124,30 @@ export function DateSelect({
       setPickerPos(null);
       return;
     }
-    const rect = rootRef.current.getBoundingClientRect();
-    const width = Math.min(19 * 16, Math.max(0, window.innerWidth - 16));
-    const left = Math.min(Math.max(8, rect.left), Math.max(8, window.innerWidth - width - 8));
-    setPickerPos({ top: rect.bottom + 6, left });
-  }, [open]);
+
+    const update = () => {
+      if (!rootRef.current) return;
+      const rect = rootRef.current.getBoundingClientRect();
+      const pickerHeight = pickerRef.current?.offsetHeight || 320;
+      if (rect.bottom < 0 || rect.top > window.innerHeight) {
+        setOpen(false);
+        return;
+      }
+      setPickerPos(computePickerPos(rect, pickerHeight));
+    };
+
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    window.visualViewport?.addEventListener('resize', update);
+    window.visualViewport?.addEventListener('scroll', update);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
+      window.visualViewport?.removeEventListener('resize', update);
+      window.visualViewport?.removeEventListener('scroll', update);
+    };
+  }, [open, viewYear, viewMonth]);
 
   useEffect(() => {
     if (!open) return;
@@ -144,7 +177,7 @@ export function DateSelect({
 
   const days = useMemo(() => {
     const first = new Date(viewYear, viewMonth, 1);
-    const startOffset = (first.getDay() + 6) % 7; // Monday-first
+    const startOffset = (first.getDay() + 6) % 7;
     const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
     const cells: Array<{ date: Date; inMonth: boolean } | null> = [];
 
@@ -194,7 +227,7 @@ export function DateSelect({
   const todayISO = toISODate(new Date());
 
   return (
-    <div ref={rootRef} className={`relative space-y-1.5 ${className}`}>
+    <div ref={rootRef} className={`relative min-w-0 space-y-1.5 ${className}`}>
       {label && (
         <label
           id={`${selectId}-label`}
@@ -215,96 +248,95 @@ export function DateSelect({
         aria-labelledby={label ? `${selectId}-label` : undefined}
         onClick={() => setOpen((v) => !v)}
       >
-        <span className="flex items-center gap-2.5">
-          <CalendarIcon className="h-4 w-4 text-[var(--color-accent-ink)]" />
-          <span>{formatDisplay(value)}</span>
+        <span className="flex min-w-0 items-center gap-2.5">
+          <CalendarIcon className="h-4 w-4 shrink-0 text-[var(--color-accent-ink)]" />
+          <span className="truncate">{formatDisplay(value)}</span>
         </span>
-        <span className="text-[var(--color-muted)]" aria-hidden>
+        <span className="shrink-0 text-[var(--color-muted)]" aria-hidden>
           ▾
         </span>
       </button>
 
-      {/* Hidden native input keeps form semantics / tests that query by label value via id */}
       <input type="hidden" name={selectId} value={value} readOnly />
 
       {open &&
         pickerPos &&
         createPortal(
-        <div
-          ref={pickerRef}
-          role="dialog"
-          aria-label={label ? `${label} picker` : 'Date picker'}
-          style={{ top: pickerPos.top, left: pickerPos.left }}
-          className="fixed z-[80] w-[min(19rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] text-[var(--color-ink)] shadow-[var(--shadow-lift)]"
-        >
-          <div className="flex items-center justify-between border-b border-[var(--color-line)] bg-[var(--color-surface)] px-2 py-2.5 sm:px-3 sm:py-3">
-            <button
-              type="button"
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--color-muted)] transition-colors hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-ink)] disabled:opacity-30"
-              onClick={goPrev}
-              disabled={!canGoPrev}
-              aria-label="Previous month"
-            >
-              ‹
-            </button>
-            <p className="font-display text-sm font-semibold tracking-tight">
-              {MONTHS[viewMonth]} {viewYear}
-            </p>
-            <button
-              type="button"
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--color-muted)] transition-colors hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-ink)]"
-              onClick={goNext}
-              aria-label="Next month"
-            >
-              ›
-            </button>
-          </div>
+          <div
+            ref={pickerRef}
+            role="dialog"
+            aria-label={label ? `${label} picker` : 'Date picker'}
+            style={{ top: pickerPos.top, left: pickerPos.left, width: pickerPos.width }}
+            className="fixed z-[80] overflow-hidden rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] text-[var(--color-ink)] shadow-[var(--shadow-lift)]"
+          >
+            <div className="flex items-center justify-between border-b border-[var(--color-line)] bg-[var(--color-surface)] px-2 py-2.5 sm:px-3 sm:py-3">
+              <button
+                type="button"
+                className="flex h-11 w-11 items-center justify-center rounded-lg text-[var(--color-muted)] transition-colors hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-ink)] disabled:opacity-30"
+                onClick={goPrev}
+                disabled={!canGoPrev}
+                aria-label="Previous month"
+              >
+                ‹
+              </button>
+              <p className="font-display text-sm font-semibold tracking-tight">
+                {MONTHS[viewMonth]} {viewYear}
+              </p>
+              <button
+                type="button"
+                className="flex h-11 w-11 items-center justify-center rounded-lg text-[var(--color-muted)] transition-colors hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-ink)]"
+                onClick={goNext}
+                aria-label="Next month"
+              >
+                ›
+              </button>
+            </div>
 
-          <div className="grid grid-cols-7 gap-0.5 px-2 pt-2 text-center text-[0.6rem] font-semibold uppercase tracking-wide text-[var(--color-muted)] sm:gap-1 sm:px-3 sm:pt-3 sm:text-[0.65rem]">
-            {WEEKDAYS.map((day) => (
-              <span key={day} className="py-1">
-                {day}
-              </span>
-            ))}
-          </div>
+            <div className="grid grid-cols-7 gap-0.5 px-2 pt-2 text-center text-[0.6rem] font-semibold uppercase tracking-wide text-[var(--color-muted)] sm:gap-1 sm:px-3 sm:pt-3 sm:text-[0.65rem]">
+              {WEEKDAYS.map((day) => (
+                <span key={day} className="py-1">
+                  {day}
+                </span>
+              ))}
+            </div>
 
-          <div className="grid grid-cols-7 gap-0.5 px-2 pb-2 pt-1 sm:gap-1 sm:px-3 sm:pb-3">
-            {days.map((cell, index) => {
-              if (!cell) {
-                return <span key={`empty-${index}`} className="h-8 sm:h-9" />;
-              }
+            <div className="grid grid-cols-7 gap-0.5 px-2 pb-2 pt-1 sm:gap-1 sm:px-3 sm:pb-3">
+              {days.map((cell, index) => {
+                if (!cell) {
+                  return <span key={`empty-${index}`} className="h-8 sm:h-9" />;
+                }
 
-              const iso = toISODate(cell.date);
-              const disabled = Boolean(minDate && startOfDay(cell.date) < startOfDay(minDate));
-              const isSelected = value === iso;
-              const isToday = iso === todayISO;
+                const iso = toISODate(cell.date);
+                const disabled = Boolean(minDate && startOfDay(cell.date) < startOfDay(minDate));
+                const isSelected = value === iso;
+                const isToday = iso === todayISO;
 
-              return (
-                <button
-                  key={iso}
-                  type="button"
-                  disabled={disabled}
-                  aria-label={iso}
-                  aria-pressed={isSelected}
-                  onClick={() => pickDate(cell.date)}
-                  className={`h-8 rounded-lg text-sm transition-colors sm:h-9 ${
-                    isSelected
-                      ? 'bg-[var(--color-accent)] font-semibold text-[var(--color-ink)]'
-                      : isToday
-                        ? 'bg-[var(--color-accent-muted)] font-medium text-[var(--color-ink)] hover:bg-[var(--color-accent)]/40'
-                        : 'text-[var(--color-ink)] hover:bg-[var(--color-surface)]'
-                  } disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent`}
-                >
-                  {cell.date.getDate()}
-                </button>
-              );
-            })}
-          </div>
-        </div>,
-        document.body
-      )}
+                return (
+                  <button
+                    key={iso}
+                    type="button"
+                    disabled={disabled}
+                    aria-label={iso}
+                    aria-pressed={isSelected}
+                    onClick={() => pickDate(cell.date)}
+                    className={`h-9 rounded-lg text-sm transition-colors sm:h-10 ${
+                      isSelected
+                        ? 'bg-[var(--color-accent)] font-semibold text-[var(--color-ink)]'
+                        : isToday
+                          ? 'bg-[var(--color-accent-muted)] font-medium text-[var(--color-ink)] hover:bg-[var(--color-accent)]/40'
+                          : 'text-[var(--color-ink)] hover:bg-[var(--color-surface)]'
+                    } disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent`}
+                  >
+                    {cell.date.getDate()}
+                  </button>
+                );
+              })}
+            </div>
+          </div>,
+          document.body
+        )}
 
-      {error && <p className="text-sm text-[var(--color-danger)]">{error}</p>}
+      {error && <p className="break-words text-sm text-[var(--color-danger)]">{error}</p>}
     </div>
   );
 }

@@ -25,11 +25,11 @@ export function AdminCarDetailPage() {
   if (carQuery.isLoading) return <PageLoader />;
   if (carQuery.isError || !car) {
     return (
-      <div>
+      <div className="min-w-0">
         <Link to="/admin/cars" className="text-sm text-[var(--color-muted)] hover:underline">
           ← Cars
         </Link>
-        <p className="mt-4 text-[var(--color-danger)]">
+        <p className="mt-4 break-words text-[var(--color-danger)]">
           {(carQuery.error as Error)?.message || 'Car not found'}
         </p>
       </div>
@@ -46,13 +46,13 @@ export function AdminCarDetailPage() {
   ];
 
   return (
-    <div>
+    <div className="min-w-0">
       <Link to="/admin/cars" className="text-sm text-[var(--color-muted)] hover:underline">
         ← Cars
       </Link>
-      <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="font-display text-3xl font-bold tracking-tight text-[var(--color-ink)]">
+      <div className="mt-4 flex min-w-0 flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--color-ink)] sm:text-3xl">
             {car.name}
           </h1>
           <p className="mt-1 text-[var(--color-muted)]">

@@ -62,8 +62,8 @@ export function AdminUsersPage() {
   if (usersLoading || catalogLoading) return <PageLoader />;
 
   return (
-    <div>
-      <h1 className="font-display text-3xl font-bold tracking-tight text-[var(--color-ink)]">Users</h1>
+    <div className="min-w-0">
+      <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--color-ink)] sm:text-3xl">Users</h1>
       <p className="mt-1 text-[var(--color-muted)]">Create staff accounts and assign roles</p>
 
       <div className="mt-8">
@@ -73,7 +73,7 @@ export function AdminUsersPage() {
               Create staff user
             </h2>
             <form
-              className="mt-4 grid gap-4 md:grid-cols-2"
+              className="mt-4 grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2"
               onSubmit={(e) => {
                 e.preventDefault();
                 createMutation.mutate({ email, password, roleIds: createRoleIds });
@@ -128,10 +128,10 @@ export function AdminUsersPage() {
         {usersData?.users.map((user) => (
           <Card key={user.id}>
             <CardBody>
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <h3 className="font-semibold text-[var(--color-ink)]">{user.email}</h3>
-                  <p className="text-sm text-[var(--color-muted)]">
+              <div className="flex min-w-0 flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <h3 className="break-words font-semibold text-[var(--color-ink)]">{user.email}</h3>
+                  <p className="break-words text-sm text-[var(--color-muted)]">
                     Account role: {user.role} · Staff roles:{' '}
                     {user.roles.length > 0 ? user.roles.map((r) => r.name).join(', ') : 'none'}
                   </p>

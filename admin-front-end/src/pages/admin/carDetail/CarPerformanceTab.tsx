@@ -52,9 +52,9 @@ export function CarPerformanceTab({
           {perfLoading ? (
             <p className="mt-4 text-sm text-[var(--color-muted)]">Loading…</p>
           ) : perfError ? (
-            <p className="mt-4 text-sm text-[var(--color-danger)]">{perfError.message}</p>
+            <p className="mt-4 break-words text-sm text-[var(--color-danger)]">{perfError.message}</p>
           ) : perfCar ? (
-            <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <dl className="mt-4 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {[
                 {
                   label: 'Revenue',

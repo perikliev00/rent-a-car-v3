@@ -74,17 +74,17 @@ export function MonthFleetGrid({
 
   return (
     <div
-      className="overflow-auto rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] shadow-[var(--shadow-soft)]"
+      className="max-w-full min-w-0 overflow-x-auto overflow-y-auto overscroll-x-contain rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] shadow-[var(--shadow-soft)]"
       data-testid="month-fleet-grid"
     >
-      <div className="min-w-[720px]">
+      <div className="min-w-[560px] sm:min-w-[720px]">
         <div
           className="sticky top-0 z-30 grid border-b border-[var(--color-line)] bg-[var(--color-surface)]"
           style={{
-            gridTemplateColumns: `160px repeat(${days.length}, minmax(36px, 1fr))`,
+            gridTemplateColumns: `minmax(72px, 160px) repeat(${days.length}, minmax(36px, 1fr))`,
           }}
         >
-          <div className="sticky left-0 z-40 border-r border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">
+          <div className="sticky left-0 z-40 border-r border-[var(--color-line)] bg-[var(--color-surface)] px-2 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)] sm:px-3">
             Car
           </div>
           {days.map((d) => (
@@ -107,10 +107,10 @@ export function MonthFleetGrid({
             key={car.id}
             className="grid border-b border-[var(--color-line)] last:border-b-0"
             style={{
-              gridTemplateColumns: `160px repeat(${days.length}, minmax(36px, 1fr))`,
+              gridTemplateColumns: `minmax(72px, 160px) repeat(${days.length}, minmax(36px, 1fr))`,
             }}
           >
-            <div className="sticky left-0 z-20 border-r border-[var(--color-line)] bg-[var(--color-surface-elevated)] px-3 py-2">
+            <div className="sticky left-0 z-20 min-w-0 border-r border-[var(--color-line)] bg-[var(--color-surface-elevated)] px-2 py-2 sm:px-3">
               <div className="truncate text-sm font-semibold text-[var(--color-ink)]">{car.name}</div>
               <div className="truncate text-[10px] text-[var(--color-muted)]">{car.status}</div>
             </div>

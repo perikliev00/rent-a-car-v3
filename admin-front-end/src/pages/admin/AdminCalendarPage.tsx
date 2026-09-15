@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { formatISO } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/useAuth';
@@ -9,6 +9,7 @@ import { CalendarFilters, type CalendarPreset } from './calendar/CalendarFilters
 import { EventLegend } from './calendar/EventLegend';
 import { FleetTimelineCalendar } from './calendar/FleetTimelineCalendar';
 import { MonthFleetGrid } from './calendar/MonthFleetGrid';
+import { DayAgendaList } from './calendar/DayAgendaList';
 import { DayOperationsModal } from './calendar/DayOperationsModal';
 import { EventDetailsDrawer } from './calendar/EventDetailsDrawer';
 import { TaskFormModal } from './calendar/TaskFormModal';
@@ -27,9 +28,27 @@ import {
 import { opsReservationUrl } from './calendar/reservationDeepLink';
 import type { CalendarEvent } from './calendar/calendar.types';
 
+function usePreferAgendaDefault() {
+  const [preferAgenda, setPreferAgenda] = useState(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+    return window.matchMedia('(max-width: 767px)').matches;
+  });
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return;
+    const mq = window.matchMedia('(max-width: 767px)');
+    const onChange = () => {
+      if (mq.matches) setPreferAgenda(true);
+    };
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return [preferAgenda, setPreferAgenda] as const;
+}
+
 export function AdminCalendarPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [preferAgenda, setPreferAgenda] = usePreferAgendaDefault();
   const {
     view,
     anchor,
@@ -83,6 +102,8 @@ export function AdminCalendarPage() {
     setParams(next);
   }
 
+  const showAgenda = preferAgenda && view !== 'month';
+
   if (!canView) {
     return (
       <div className="py-20 text-center">
@@ -93,10 +114,10 @@ export function AdminCalendarPage() {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="font-display text-3xl font-bold tracking-tight text-[var(--color-ink)]">
+    <div className="min-w-0 space-y-5">
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--color-ink)] sm:text-3xl">
             Fleet calendar
           </h1>
           <p className="mt-1 text-[var(--color-muted)]">
@@ -107,12 +128,12 @@ export function AdminCalendarPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           {canCreateBlocks ? (
-            <Button size="sm" variant="outline" onClick={() => modals.openCreateBlock(null)}>
+            <Button size="sm" variant="outline" className="min-h-11" onClick={() => modals.openCreateBlock(null)}>
               Block car
             </Button>
           ) : null}
           {canCreateTasks ? (
-            <Button size="sm" onClick={() => modals.openCreateTask(null)}>
+            <Button size="sm" className="min-h-11" onClick={() => modals.openCreateTask(null)}>
               Create task
             </Button>
           ) : null}
@@ -129,6 +150,8 @@ export function AdminCalendarPage() {
         onNext={() => shiftByView(1)}
         onToday={() => setAnchor(formatISO(new Date(), { representation: 'date' }))}
         onAnchorChange={setAnchor}
+        preferAgenda={preferAgenda}
+        onPreferAgendaChange={setPreferAgenda}
       />
 
       <EventLegend />
@@ -145,7 +168,20 @@ export function AdminCalendarPage() {
 
       {isLoading && !data ? <PageLoader /> : null}
 
-      {data && view === 'month' ? (
+      {data && showAgenda ? (
+        <DayAgendaList
+          cars={data.cars}
+          events={data.events}
+          day={range.from}
+          onEventClick={(ev: CalendarEvent) => modals.setEventId(ev.id)}
+          onCarClick={(carId) => {
+            modals.setDayDate(formatISO(range.from, { representation: 'date' }));
+            if (canCreateTasks) modals.setTaskDefaults({ carId });
+          }}
+        />
+      ) : null}
+
+      {data && view === 'month' && !showAgenda ? (
         <MonthFleetGrid
           cars={data.cars}
           events={data.events}
@@ -156,7 +192,7 @@ export function AdminCalendarPage() {
         />
       ) : null}
 
-      {data && view !== 'month' ? (
+      {data && view !== 'month' && !showAgenda ? (
         <FleetTimelineCalendar
           cars={data.cars}
           events={data.events}

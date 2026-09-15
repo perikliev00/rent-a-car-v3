@@ -52,12 +52,12 @@ export function AdminOrderEditPage() {
   const locationOptions = locations?.locations.map((l) => ({ value: l.id, label: l.label })) ?? [];
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <h1 className="font-display text-3xl font-bold tracking-tight text-[var(--color-ink)]">Edit order #{id}</h1>
+    <div className="mx-auto min-w-0 max-w-2xl">
+      <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--color-ink)] sm:text-3xl">Edit order #{id}</h1>
       <Card className="mt-6">
         <CardBody>
           <form
-            className="grid gap-4 sm:grid-cols-2"
+            className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2"
             onSubmit={(e) => {
               e.preventDefault();
               updateMutation.mutate();

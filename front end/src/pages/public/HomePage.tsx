@@ -62,8 +62,8 @@ export function HomePage() {
   ];
 
   return (
-    <div>
-      <section className="relative overflow-visible text-white">
+    <div className="min-w-0 overflow-x-clip">
+      <section className="relative overflow-x-clip text-white">
         <div className="absolute inset-0">
           <img
             src={heroImage}
@@ -88,7 +88,7 @@ export function HomePage() {
             </p>
           </div>
 
-          <div className="relative z-20 animate-lux-rise-delay mx-auto mt-10 max-w-5xl bg-[var(--color-navy)] px-4 py-6 shadow-[var(--shadow-lift)] sm:px-7 sm:py-8">
+          <div className="relative z-20 mx-auto mt-10 min-w-0 max-w-5xl animate-lux-rise-delay bg-[var(--color-navy)] px-3 py-5 shadow-[var(--shadow-lift)] sm:px-7 sm:py-8">
             <p className="mb-5 font-display text-sm font-bold uppercase tracking-[0.14em] text-white sm:text-base">
               Search and compare car rental rates
             </p>
@@ -103,7 +103,7 @@ export function HomePage() {
         </div>
       </section>
 
-      <section className="relative z-10 border-b border-[var(--color-line)] bg-[var(--color-surface-elevated)]">
+      <section className="relative z-10 min-w-0 overflow-x-clip border-b border-[var(--color-line)] bg-[var(--color-surface-elevated)]">
         <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6">
           <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-4 md:justify-start">
             {partnerMarks.map((mark) => (
@@ -141,8 +141,8 @@ export function HomePage() {
       <AdvantageSplit />
       <DealsSection />
 
-      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
-        <div className="mb-10 space-y-6">
+      <section className="mx-auto min-w-0 max-w-7xl px-4 py-16 sm:px-6">
+        <div className="mb-10 min-w-0 space-y-6">
           <div>
             <h2 className="font-display text-3xl font-extrabold uppercase tracking-tight text-[var(--color-navy)]">
               Our fleet
@@ -159,13 +159,13 @@ export function HomePage() {
         </div>
 
         {isLoading ? (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid min-w-0 gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 6 }).map((_, i) => (
               <Skeleton key={i} className="h-72" />
             ))}
           </div>
         ) : (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid min-w-0 gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {data?.cars.map((car) => (
               <CarCard key={car.id} car={car} showPricing detailUrl={`/cars/${car.id}`} />
             ))}
@@ -177,7 +177,7 @@ export function HomePage() {
         )}
 
         {!isLoading && data && data.pagination.totalPages > 1 && (
-          <div className="mt-10 flex justify-center gap-2">
+          <div className="mt-10 flex flex-wrap justify-center gap-2">
             <Button
               variant="outline"
               size="sm"

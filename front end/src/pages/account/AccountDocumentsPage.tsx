@@ -65,9 +65,9 @@ export function AccountDocumentsPage() {
   const documents = query.data?.documents ?? [];
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
+    <div className="mx-auto min-w-0 max-w-3xl overflow-x-clip px-4 py-10 sm:px-6">
+      <div className="flex min-w-0 flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
           <p className="font-display text-sm font-bold uppercase tracking-[0.12em] text-[var(--color-accent-ink)]">My account</p>
           <h1 className="font-display text-3xl font-extrabold uppercase tracking-tight text-[var(--color-navy)]">Documents</h1>
           <p className="mt-2 text-sm text-[var(--color-muted)]">
@@ -82,7 +82,7 @@ export function AccountDocumentsPage() {
       </div>
 
       <Card className="mt-8">
-        <CardBody className="space-y-4">
+        <CardBody className="min-w-0 space-y-4">
           <Select
             label="Document type"
             value={docType}
@@ -93,7 +93,7 @@ export function AccountDocumentsPage() {
               { value: 'other', label: 'Other' },
             ]}
           />
-          <div>
+          <div className="min-w-0">
             <label className="mb-1.5 block text-sm font-medium text-[var(--color-ink)]">
               File (JPG, PNG, WEBP, or PDF, max 5MB)
             </label>
@@ -101,11 +101,12 @@ export function AccountDocumentsPage() {
               type="file"
               accept=".jpg,.jpeg,.png,.webp,.pdf,image/*,application/pdf"
               onChange={(e) => setFile(e.target.files?.[0] || null)}
-              className="block w-full text-sm text-[var(--color-muted)]"
+              className="block w-full max-w-full min-w-0 text-sm text-[var(--color-muted)]"
             />
           </div>
           <Button
             size="sm"
+            className="w-full sm:w-auto"
             loading={uploadMutation.isPending}
             disabled={!file}
             onClick={() => uploadMutation.mutate()}
@@ -115,21 +116,21 @@ export function AccountDocumentsPage() {
         </CardBody>
       </Card>
 
-      <section className="mt-10">
+      <section className="mt-10 min-w-0">
         <h2 className="font-display text-lg font-semibold">Uploaded documents</h2>
         {!documents.length ? (
           <p className="mt-3 text-sm text-[var(--color-muted)]">No documents uploaded yet.</p>
         ) : (
           <ul className="mt-4 divide-y divide-[var(--color-line)] border-y border-[var(--color-line)]">
             {documents.map((doc) => (
-              <li key={doc.id} className="flex flex-wrap items-center justify-between gap-3 py-4">
-                <div>
+              <li key={doc.id} className="flex min-w-0 flex-col gap-3 py-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                <div className="min-w-0">
                   <p className="font-medium text-[var(--color-ink)]">
                     {DOC_LABELS[doc.docType] || doc.docType}
                   </p>
-                  <p className="text-sm text-[var(--color-muted)]">{doc.originalFilename}</p>
+                  <p className="break-all text-sm text-[var(--color-muted)]">{doc.originalFilename}</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex min-w-0 flex-wrap gap-2">
                   <Button
                     variant="outline"
                     size="sm"

@@ -63,9 +63,9 @@ export function CarFleetFilters({ categories, value, onChange }: CarFleetFilters
   };
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
       {categories.length > 0 ? (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex min-w-0 flex-wrap gap-2">
           <button
             type="button"
             onClick={() => patch({ categoryId: undefined })}
@@ -86,7 +86,7 @@ export function CarFleetFilters({ categories, value, onChange }: CarFleetFilters
         </div>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <Select
           label="Transmission"
           value={value.transmission ?? ''}

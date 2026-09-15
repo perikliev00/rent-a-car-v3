@@ -71,7 +71,7 @@ export function CarOverviewTab({
         <CardBody className="px-5 py-4">
           <h2 className="font-display font-semibold">Fleet details</h2>
           <form
-            className="mt-4 grid gap-4 sm:grid-cols-2"
+            className="mt-4 grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2"
             onSubmit={(e) => {
               e.preventDefault();
               onSaveOverview();

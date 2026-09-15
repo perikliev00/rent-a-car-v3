@@ -163,7 +163,7 @@ export function TaskFormModal({
           onChange={(e) => setCarId(e.target.value)}
           options={[{ value: '', label: 'No car' }, ...cars.map((c) => ({ value: c.id, label: c.name }))]}
         />
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <DateSelect label="Starts date" value={startDate} onChange={setStartDate} />
           <TimeSelect label="Starts time" value={startTime} onChange={setStartTime} />
           <DateSelect label="Due date" value={dueDate} onChange={setDueDate} />

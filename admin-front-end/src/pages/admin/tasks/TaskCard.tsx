@@ -69,11 +69,11 @@ export function TaskCard({
     <div
       data-task-id={task.id}
       data-testid={`task-card-${task.id}`}
-      className="rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] p-4 shadow-[var(--shadow-soft)]"
+      className="min-w-0 rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] p-4 shadow-[var(--shadow-soft)]"
     >
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <p className="font-display text-lg font-semibold text-[var(--color-ink)]">{task.title}</p>
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-display break-words text-lg font-semibold text-[var(--color-ink)]">{task.title}</p>
           <p className="mt-1 text-sm text-[var(--color-muted)]">
             {TASK_TYPE_LABELS[task.taskType as TaskType] || task.taskType}
             {' · '}
@@ -81,33 +81,33 @@ export function TaskCard({
           </p>
         </div>
         {onEdit ? (
-          <Button size="sm" variant="outline" onClick={() => onEdit(task)}>
+          <Button size="sm" variant="outline" className="shrink-0" onClick={() => onEdit(task)}>
             Edit
           </Button>
         ) : null}
       </div>
 
-      <dl className="mt-3 grid gap-1 text-sm text-[var(--color-ink)] sm:grid-cols-2">
-        <div>
+      <dl className="mt-3 grid min-w-0 grid-cols-1 gap-1 text-sm text-[var(--color-ink)] sm:grid-cols-2">
+        <div className="min-w-0">
           <dt className="text-[var(--color-muted)]">Car</dt>
-          <dd>{task.carName || task.carId || '—'}</dd>
+          <dd className="break-words">{task.carName || task.carId || '—'}</dd>
         </div>
-        <div>
+        <div className="min-w-0">
           <dt className="text-[var(--color-muted)]">Due</dt>
           <dd>{fmt(task.dueAt || task.startsAt)}</dd>
         </div>
-        <div>
+        <div className="min-w-0">
           <dt className="text-[var(--color-muted)]">Location</dt>
-          <dd>{task.locationText || '—'}</dd>
+          <dd className="break-words">{task.locationText || '—'}</dd>
         </div>
-        <div>
+        <div className="min-w-0">
           <dt className="text-[var(--color-muted)]">Reservation</dt>
-          <dd>{task.reservationId || '—'}</dd>
+          <dd className="break-words">{task.reservationId || '—'}</dd>
         </div>
       </dl>
 
       {task.notes ? (
-        <p className="mt-2 text-sm text-[var(--color-muted)]">{task.notes}</p>
+        <p className="mt-2 break-words text-sm text-[var(--color-muted)]">{task.notes}</p>
       ) : null}
 
       <div className="mt-4 flex flex-wrap gap-2">

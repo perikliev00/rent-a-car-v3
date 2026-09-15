@@ -79,18 +79,19 @@ export function ManagerTasksPage() {
   }));
 
   return (
-    <div>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--color-ink)]">
+    <div className="min-w-0">
+      <div className="flex min-w-0 flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--color-ink)] sm:text-3xl">
             Task board
           </h1>
-          <p className="mt-1 text-[var(--color-muted)]">
+          <p className="mt-1 break-words text-[var(--color-muted)]">
             Assign and track staff tasks ({formatISO(new Date(), { representation: 'date' })} + 14 days)
           </p>
         </div>
         {canCreate ? (
           <Button
+            className="shrink-0"
             onClick={() => {
               setEditTask(null);
               setTaskOpen(true);
@@ -101,7 +102,7 @@ export function ManagerTasksPage() {
         ) : null}
       </div>
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="mt-6 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Select
           label="Type"
           value={type}

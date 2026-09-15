@@ -19,7 +19,7 @@ interface DropdownSelectProps {
 }
 
 const triggerClass =
-  'flex w-full items-center justify-between rounded-xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] px-3.5 py-2.5 text-left text-sm text-[var(--color-ink)] shadow-sm transition-[border-color,box-shadow] focus:border-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/25';
+  'flex min-h-11 w-full min-w-0 items-center justify-between gap-3 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] px-3.5 py-2.5 text-left text-sm text-[var(--color-ink)] shadow-sm transition-[border-color,box-shadow] focus:border-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/25';
 
 export function DropdownSelect({
   label,
@@ -104,7 +104,7 @@ export function DropdownSelect({
   };
 
   return (
-    <div ref={rootRef} className={`relative space-y-1.5 ${className}`}>
+    <div ref={rootRef} className={`relative min-w-0 space-y-1.5 ${className}`}>
       {label && (
         <label
           id={`${selectId}-label`}
@@ -128,8 +128,8 @@ export function DropdownSelect({
         onClick={() => setOpen((v) => !v)}
         onKeyDown={onTriggerKeyDown}
       >
-        <span>{selected?.label ?? 'Select…'}</span>
-        <span className="text-[var(--color-muted)]" aria-hidden>
+        <span className="min-w-0 truncate">{selected?.label ?? 'Select…'}</span>
+        <span className="shrink-0 text-[var(--color-muted)]" aria-hidden>
           ▾
         </span>
       </button>

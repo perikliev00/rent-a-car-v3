@@ -31,62 +31,62 @@ export function AdminOrderDetailPage() {
     : null;
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto min-w-0 max-w-2xl">
       <Link to="/admin/orders" className="text-sm text-[var(--color-accent-ink)] hover:underline">
         ← Back to orders
       </Link>
-      <h1 className="mt-4 font-display text-3xl font-bold tracking-tight text-[var(--color-ink)]">
+      <h1 className="mt-4 font-display text-2xl font-bold tracking-tight text-[var(--color-ink)] sm:text-3xl">
         Order #{order.id}
       </h1>
       <Card className="mt-6">
         <CardBody className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
+          <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="min-w-0">
               <p className="text-sm text-[var(--color-muted)]">Customer</p>
-              <p className="font-medium">{order.fullName}</p>
+              <p className="break-words font-medium">{order.fullName}</p>
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-sm text-[var(--color-muted)]">Status</p>
               <p className="font-medium capitalize">{order.status}</p>
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-sm text-[var(--color-muted)]">Email</p>
-              <p>{order.email}</p>
+              <p className="break-words">{order.email}</p>
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-sm text-[var(--color-muted)]">Phone</p>
-              <p>{order.phoneNumber}</p>
+              <p className="break-words">{order.phoneNumber}</p>
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-sm text-[var(--color-muted)]">Car</p>
-              <p>{car?.name ?? '—'}</p>
+              <p className="break-words">{car?.name ?? '—'}</p>
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-sm text-[var(--color-muted)]">Total</p>
               <p className="font-bold text-[var(--color-accent-ink)]">
                 {formatPrice(order.totalPrice)}
               </p>
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-sm text-[var(--color-muted)]">Pickup</p>
-              <p>
+              <p className="break-words">
                 {String(order.pickupDate).slice(0, 10)} {order.pickupTime} · {order.pickupLocation}
               </p>
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-sm text-[var(--color-muted)]">Return</p>
-              <p>
+              <p className="break-words">
                 {String(order.returnDate).slice(0, 10)} {order.returnTime} · {order.returnLocation}
               </p>
             </div>
-            <div className="sm:col-span-2">
+            <div className="min-w-0 sm:col-span-2">
               <p className="text-sm text-[var(--color-muted)]">Address</p>
-              <p>{order.address}</p>
+              <p className="break-words">{order.address}</p>
             </div>
             {order.hotelName && (
-              <div className="sm:col-span-2">
+              <div className="min-w-0 sm:col-span-2">
                 <p className="text-sm text-[var(--color-muted)]">Hotel</p>
-                <p>{order.hotelName}</p>
+                <p className="break-words">{order.hotelName}</p>
               </div>
             )}
           </div>

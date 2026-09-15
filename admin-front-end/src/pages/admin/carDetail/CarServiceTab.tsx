@@ -37,7 +37,7 @@ export function CarServiceTab({
         <CardBody className="px-5 py-4">
           <h2 className="font-display font-semibold">Add service record</h2>
           <form
-            className="mt-4 grid gap-3 sm:grid-cols-2"
+            className="mt-4 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2"
             onSubmit={(e) => {
               e.preventDefault();
               onAddService();
@@ -99,8 +99,8 @@ export function CarServiceTab({
           ) : !records?.length ? (
             <p className="mt-2 text-sm text-[var(--color-muted)]">No service records</p>
           ) : (
-            <div className="mt-3 overflow-x-auto">
-              <table className="w-full text-left text-xs">
+            <div className="mt-3 min-w-0 overflow-x-auto overscroll-x-contain">
+              <table className="w-full min-w-[32rem] text-left text-xs">
                 <thead>
                   <tr className="border-b text-[var(--color-muted)]">
                     <th className="pb-2 pr-3">Date</th>

@@ -31,10 +31,10 @@ export function StatusHistoryPanel({
   return (
     <Card className="shadow-none">
       <CardBody className="px-5 py-4">
-        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-          <div>
+        <div className="mb-3 flex min-w-0 flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
             <h2 className="font-display font-semibold text-[var(--color-ink)]">Status History</h2>
-            <p className="text-sm text-[var(--color-muted)]">
+            <p className="break-words text-sm text-[var(--color-muted)]">
               Reservation #{reservationId}
               {carLabel ? ` · ${carLabel}` : ''}
               {reservation?.status ? ` · ${String(reservation.status)}` : ''}
@@ -48,14 +48,14 @@ export function StatusHistoryPanel({
         {isLoading ? (
           <p className="text-sm text-[var(--color-muted)]">Loading history…</p>
         ) : isError ? (
-          <p className="text-sm text-[var(--color-danger)]">
+          <p className="break-words text-sm text-[var(--color-danger)]">
             {(error as Error).message || 'Failed to load history'}
           </p>
         ) : !history.length ? (
           <p className="text-sm text-[var(--color-muted)]">No status changes recorded</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+          <div className="min-w-0 overflow-x-auto overscroll-x-contain">
+            <table className="w-full min-w-[36rem] text-left text-xs">
               <thead>
                 <tr className="border-b border-[var(--color-line)] text-[var(--color-muted)]">
                   <th className="pb-2 pr-3 font-medium">When</th>

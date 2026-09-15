@@ -119,15 +119,15 @@ export function AdminAuditLogsPage() {
   if (isLoading) return <PageLoader />;
 
   return (
-    <div>
-      <div>
-        <h1 className="font-display text-3xl font-bold tracking-tight text-[var(--color-ink)]">Audit logs</h1>
+    <div className="min-w-0">
+      <div className="min-w-0">
+        <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--color-ink)] sm:text-3xl">Audit logs</h1>
         <p className="mt-1 text-[var(--color-muted)]">Admin and system action history</p>
       </div>
 
       <Card className="mt-6">
         <CardBody>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Input
               label="From"
               type="date"
@@ -191,15 +191,15 @@ export function AdminAuditLogsPage() {
       </Card>
 
       {isError && (
-        <p className="mt-4 text-sm text-red-600">
+        <p className="mt-4 break-words text-sm text-red-600">
           {(error as Error)?.message || 'Failed to load audit logs.'}
         </p>
       )}
 
       <Card className="mt-6">
         <CardBody>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
+          <div className="min-w-0 overflow-x-auto overscroll-x-contain">
+            <table className="w-full min-w-[40rem] text-left text-sm">
               <thead>
                 <tr className="border-b text-[var(--color-muted)]">
                   <th className="pb-2 pr-3 font-medium">Time</th>
@@ -229,7 +229,7 @@ export function AdminAuditLogsPage() {
                         <td className="py-3 pr-3 whitespace-nowrap text-[var(--color-ink)]">
                           {formatTime(log.createdAt)}
                         </td>
-                        <td className="py-3 pr-3 text-[var(--color-ink)]">{formatActor(log)}</td>
+                        <td className="py-3 pr-3 break-words text-[var(--color-ink)]">{formatActor(log)}</td>
                         <td className="py-3 pr-3 text-[var(--color-ink)]">{formatActionLabel(log.action)}</td>
                         <td className="py-3 pr-3 text-[var(--color-ink)]">{formatEntity(log)}</td>
                         <td className="py-3 pr-3 max-w-xs truncate text-[var(--color-muted)]">
@@ -240,7 +240,7 @@ export function AdminAuditLogsPage() {
                       {expandedId === log.id && (
                         <tr className="border-b border-[var(--color-line)] bg-[var(--color-surface)]">
                           <td colSpan={6} className="px-3 py-3">
-                            <pre className="overflow-x-auto rounded bg-white p-3 text-xs text-[var(--color-ink)]">
+                            <pre className="min-w-0 overflow-x-auto overscroll-x-contain rounded bg-white p-3 text-xs break-words whitespace-pre-wrap text-[var(--color-ink)]">
                               {JSON.stringify(log.metadata ?? {}, null, 2)}
                             </pre>
                           </td>

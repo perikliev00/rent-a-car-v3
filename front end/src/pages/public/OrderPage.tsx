@@ -116,9 +116,10 @@ export function OrderPage() {
     return (
       <div className="mx-auto max-w-lg px-4 py-12">
         <ErrorAlert message={conflictError}>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-3 flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap">
             <Button
               size="sm"
+              className="w-full sm:w-auto"
               loading={releaseMutation.isPending}
               onClick={() => releaseMutation.mutate()}
             >
@@ -127,13 +128,14 @@ export function OrderPage() {
             <Button
               variant="outline"
               size="sm"
+              className="w-full sm:w-auto"
               loading={reholdMutation.isPending}
               onClick={() => reholdMutation.mutate()}
             >
               Release & rehold this car
             </Button>
-            <Link to={`/search?${bookingQueryString(search)}`}>
-              <Button variant="ghost" size="sm">
+            <Link to={`/search?${bookingQueryString(search)}`} className="w-full sm:w-auto">
+              <Button variant="ghost" size="sm" className="w-full sm:w-auto">
                 Choose another car
               </Button>
             </Link>
@@ -158,7 +160,7 @@ export function OrderPage() {
   if (!orderData) return <PageLoader />;
 
   return (
-    <div>
+    <div className="min-w-0 overflow-x-clip">
       <section className="bg-navy text-white">
         <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
           <p className="font-display text-sm font-bold uppercase tracking-[0.22em] text-[var(--color-accent)]">
@@ -174,7 +176,7 @@ export function OrderPage() {
         </div>
       </section>
 
-      <div className="mx-auto max-w-3xl space-y-6 px-4 py-10 sm:px-6">
+      <div className="mx-auto min-w-0 max-w-3xl space-y-6 px-4 py-10 sm:px-6">
         <BookingAddOns
           extras={extras}
           hotelDelivery={hotelDelivery}
@@ -184,15 +186,16 @@ export function OrderPage() {
 
         <OrderSummary order={orderData} />
 
-        <div className="flex flex-wrap gap-3">
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap">
           <Button
             size="lg"
+            className="w-full sm:w-auto"
             onClick={() => navigate(`/checkout/${carId}?${bookingQueryString(search)}`)}
           >
             Continue to checkout
           </Button>
-          <Link to={`/cars/${carId}?${bookingQueryString(search)}`}>
-            <Button variant="outline" size="lg">
+          <Link to={`/cars/${carId}?${bookingQueryString(search)}`} className="w-full sm:w-auto">
+            <Button variant="outline" size="lg" className="w-full sm:w-auto">
               Back
             </Button>
           </Link>

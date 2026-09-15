@@ -4,7 +4,6 @@ import { TimelineEventBar } from './TimelineEventBar';
 import {
   assignLanes,
   atFromClientX,
-  CAR_COL,
   leftPct,
   trackHeight,
   type TimelineGhost,
@@ -27,6 +26,7 @@ export function TimelineCarRow({
   canDragTasks,
   canResize,
   selectedEventId,
+  carCol,
   onEventClick,
   onEmptySlot,
   onCarLabelClick,
@@ -53,6 +53,7 @@ export function TimelineCarRow({
   canDragTasks: boolean;
   canResize: boolean;
   selectedEventId?: string | null;
+  carCol: number;
   onEventClick: (event: CalendarEvent) => void;
   onEmptySlot: (payload: { carId: string; at: Date; clientX: number; clientY: number }) => void;
   onCarLabelClick?: (carId: string) => void;
@@ -82,16 +83,16 @@ export function TimelineCarRow({
       className={`grid border-b border-[var(--color-line)] last:border-b-0 ${
         isTarget ? 'bg-[var(--color-accent-muted)]/40' : ''
       }`}
-      style={{ gridTemplateColumns: `${CAR_COL}px 1fr` }}
+      style={{ gridTemplateColumns: `${carCol}px 1fr` }}
     >
       <button
         type="button"
-        className="sticky left-0 z-20 border-r border-[var(--color-line)] bg-[var(--color-surface-elevated)] px-3 py-3 text-left hover:bg-[var(--color-surface)]"
+        className="sticky left-0 z-20 min-w-0 border-r border-[var(--color-line)] bg-[var(--color-surface-elevated)] px-2 py-3 text-left hover:bg-[var(--color-surface)] sm:px-3"
         style={{ minHeight: trackH }}
         onClick={() => onCarLabelClick?.(car.id)}
       >
-        <div className="text-sm font-semibold text-[var(--color-ink)]">{car.name}</div>
-        <div className="text-[11px] text-[var(--color-muted)]">
+        <div className="truncate text-sm font-semibold text-[var(--color-ink)]">{car.name}</div>
+        <div className="truncate text-[11px] text-[var(--color-muted)]">
           {car.status}
           {car.currentLocation ? ` · ${car.currentLocation}` : ''}
         </div>

@@ -79,7 +79,7 @@ function SeasonRow({
 }) {
   const [draft, setDraft] = useState(season);
   return (
-    <div className="grid gap-3 rounded-lg border border-[var(--color-line)] p-3 sm:grid-cols-6">
+    <div className="grid min-w-0 grid-cols-1 gap-3 rounded-lg border border-[var(--color-line)] p-3 sm:grid-cols-2 lg:grid-cols-6">
       <Input
         label="Name"
         value={draft.name}
@@ -115,7 +115,7 @@ function SeasonRow({
         value={draft.adjValue}
         onChange={(e) => setDraft({ ...draft, adjValue: Number(e.target.value) })}
       />
-      <label className="flex items-center gap-2 text-sm sm:col-span-2">
+      <label className="flex items-center gap-2 text-sm sm:col-span-2 lg:col-span-2">
         <input
           type="checkbox"
           checked={draft.active}
@@ -123,7 +123,7 @@ function SeasonRow({
         />
         Active ({draft.adjType})
       </label>
-      <div className="flex gap-2 sm:col-span-4">
+      <div className="flex gap-2 sm:col-span-2 lg:col-span-4">
         <Button
           variant="outline"
           onClick={() =>

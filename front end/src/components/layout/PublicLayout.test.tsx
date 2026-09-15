@@ -33,6 +33,7 @@ describe('PublicLayout', () => {
     expect(screen.getByRole('link', { name: /LuxRide/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Log in' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign up' })).toBeInTheDocument();
+    expect(screen.getByTestId('public-mobile-menu')).toBeInTheDocument();
     expect(screen.getByText('Page content')).toBeInTheDocument();
   });
 

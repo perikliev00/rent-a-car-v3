@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import { CAR_COL, leftPct } from './timelineLayout';
+import { leftPct } from './timelineLayout';
 
 export function TimelineHeader({
   hours,
@@ -7,19 +7,21 @@ export function TimelineHeader({
   isDayView,
   from,
   totalMinutes,
+  carCol,
 }: {
   hours: Date[];
   labelStep: number;
   isDayView: boolean;
   from: Date;
   totalMinutes: number;
+  carCol: number;
 }) {
   return (
     <div
       className="sticky top-0 z-30 grid border-b border-[var(--color-line)] bg-[var(--color-surface)]"
-      style={{ gridTemplateColumns: `${CAR_COL}px 1fr` }}
+      style={{ gridTemplateColumns: `${carCol}px 1fr` }}
     >
-      <div className="sticky left-0 z-40 border-r border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">
+      <div className="sticky left-0 z-40 border-r border-[var(--color-line)] bg-[var(--color-surface)] px-2 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)] sm:px-3">
         Car
       </div>
       <div className="relative h-10">

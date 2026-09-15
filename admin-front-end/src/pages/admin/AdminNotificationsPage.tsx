@@ -28,16 +28,16 @@ export function AdminNotificationsPage() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="font-display text-3xl font-bold tracking-tight text-[var(--color-ink)]">
+      <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--color-ink)] sm:text-3xl">
             Notifications
           </h1>
           <p className="mt-1 text-[var(--color-muted)]">
             {data?.total ?? 0} notification(s) in log
           </p>
         </div>
-        <div className="w-48">
+        <div className="w-full min-w-0 sm:w-48">
           <Select
             label="Status"
             value={status}
@@ -60,8 +60,8 @@ export function AdminNotificationsPage() {
 
       <Card className="mt-8">
         <CardBody>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+          <div className="min-w-0 max-w-full overflow-x-auto overscroll-x-contain">
+            <table className="w-full min-w-[36rem] text-left text-xs">
               <thead>
                 <tr className="border-b text-[var(--color-muted)]">
                   <th className="pb-2 pr-3">Type</th>

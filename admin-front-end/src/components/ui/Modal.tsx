@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { useEffect, useId } from 'react';
+import { useEffect, useId, useRef } from 'react';
+import { useOverlayLock } from './useOverlayLock';
 
 export function Modal({
   open,
@@ -15,6 +16,8 @@ export function Modal({
   wide?: boolean;
 }) {
   const titleId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+  useOverlayLock(open, panelRef);
 
   useEffect(() => {
     if (!open) return;
@@ -36,25 +39,27 @@ export function Modal({
         onClick={onClose}
       />
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
-        className={`relative z-10 max-h-[90vh] w-full overflow-y-auto rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] shadow-xl ${
+        tabIndex={-1}
+        className={`relative z-10 max-h-[min(90vh,100dvh)] w-full overflow-y-auto overscroll-contain rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] shadow-xl outline-none ${
           wide ? 'max-w-4xl' : 'max-w-lg'
         }`}
       >
         {title ? (
-          <div className="flex items-center justify-between border-b border-[var(--color-line)] px-5 py-4">
+          <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--color-line)] bg-[var(--color-surface-elevated)] px-5 py-4">
             <h2
               id={titleId}
-              className="font-display text-lg font-semibold text-[var(--color-ink)]"
+              className="min-w-0 pr-2 font-display text-lg font-semibold text-[var(--color-ink)]"
             >
               {title}
             </h2>
             <button
               type="button"
               onClick={onClose}
-              className="text-sm text-[var(--color-muted)] hover:text-[var(--color-ink)]"
+              className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-sm text-[var(--color-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-ink)]"
             >
               Close
             </button>

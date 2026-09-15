@@ -63,10 +63,10 @@ function GlobalFeeRow({
   const [amount, setAmount] = useState(String(fee.amount));
   const [active, setActive] = useState(fee.active);
   return (
-    <div className="flex flex-wrap items-end gap-3 rounded-lg border border-[var(--color-line)] p-3">
-      <div className="min-w-[10rem]">
+    <div className="flex min-w-0 flex-wrap items-end gap-3 rounded-lg border border-[var(--color-line)] p-3">
+      <div className="min-w-0 sm:min-w-[10rem]">
         <p className="text-xs text-[var(--color-muted)]">Fee</p>
-        <p className="font-medium">{fee.label}</p>
+        <p className="break-words font-medium">{fee.label}</p>
         <p className="font-mono text-xs text-[var(--color-muted)]">{fee.feeKey}</p>
       </div>
       <Input label="Amount (€)" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />

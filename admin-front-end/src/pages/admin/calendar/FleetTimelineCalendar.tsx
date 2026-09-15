@@ -10,6 +10,7 @@ import { TimelineCarRow } from './timeline/TimelineCarRow';
 import { TimelineHeader } from './timeline/TimelineHeader';
 import { TimelineSkeleton } from './timeline/TimelineSkeleton';
 import { nowInSofia } from './timeline/timelineLayout';
+import { useCarColWidth } from './timeline/useCarColWidth';
 import { useTimelineDrag } from './timeline/useTimelineDrag';
 
 export function FleetTimelineCalendar({
@@ -47,6 +48,7 @@ export function FleetTimelineCalendar({
   onMoveRequest?: (event: CalendarEvent, start: Date, end: Date, carId: string) => void;
   onResizeRequest?: (event: CalendarEvent, start: Date, end: Date) => void;
 }) {
+  const carCol = useCarColWidth();
   const totalMinutes = Math.max(1, differenceInMinutes(to, from));
   const rangeMs = Math.max(1, to.getTime() - from.getTime());
   const isDayView = isSameDay(from, to) || differenceInMinutes(to, from) <= 24 * 60;
@@ -104,14 +106,18 @@ export function FleetTimelineCalendar({
   }
 
   return (
-    <div className="overflow-auto rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] shadow-[var(--shadow-soft)]">
-      <div className="min-w-[900px]">
+    <div
+      className="max-w-full min-w-0 overflow-x-auto overflow-y-auto overscroll-x-contain rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] shadow-[var(--shadow-soft)]"
+      data-testid="fleet-timeline-scroll"
+    >
+      <div className="min-w-[640px] sm:min-w-[900px]">
         <TimelineHeader
           hours={hours}
           labelStep={labelStep}
           isDayView={isDayView}
           from={from}
           totalMinutes={totalMinutes}
+          carCol={carCol}
         />
 
         {cars.map((car) => (
@@ -133,6 +139,7 @@ export function FleetTimelineCalendar({
             canDragTasks={canDragTasks}
             canResize={canResize}
             selectedEventId={selectedEventId}
+            carCol={carCol}
             onEventClick={onEventClick}
             onEmptySlot={onEmptySlot}
             onCarLabelClick={onCarLabelClick}

@@ -38,11 +38,11 @@ export function AdminFleetAlertsPage() {
 
   if (isError) {
     return (
-      <div>
-        <h1 className="font-display text-3xl font-bold tracking-tight text-[var(--color-ink)]">
+      <div className="min-w-0">
+        <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--color-ink)] sm:text-3xl">
           Fleet alerts
         </h1>
-        <p className="mt-2 text-[var(--color-danger)]">
+        <p className="mt-2 break-words text-[var(--color-danger)]">
           {(error as Error).message || 'Failed to load alerts'}
         </p>
       </div>
@@ -52,10 +52,10 @@ export function AdminFleetAlertsPage() {
   const summary = data?.summary ?? { total: 0, critical: 0, warning: 0, info: 0 };
 
   return (
-    <div>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="font-display text-3xl font-bold tracking-tight text-[var(--color-ink)]">
+    <div className="min-w-0">
+      <div className="flex min-w-0 flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--color-ink)] sm:text-3xl">
             Fleet alerts
           </h1>
           <p className="mt-1 text-[var(--color-muted)]">
@@ -111,7 +111,7 @@ export function AdminFleetAlertsPage() {
                       </span>
                       <span className="text-xs text-[var(--color-muted)]">{alert.type}</span>
                     </div>
-                    <p className="mt-1 text-sm text-[var(--color-ink)]">{alert.message}</p>
+                    <p className="mt-1 break-words text-sm text-[var(--color-ink)]">{alert.message}</p>
                     <p className="mt-0.5 text-xs text-[var(--color-muted)]">{alert.carName}</p>
                   </div>
                   <Link to={`/admin/cars/${alert.carId}`}>

@@ -91,8 +91,8 @@ export function SearchResultsPage() {
   }
 
   return (
-    <div>
-      <section className="relative overflow-visible bg-navy text-white">
+    <div className="min-w-0 overflow-x-clip">
+      <section className="relative overflow-x-clip bg-navy text-white">
         <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-14">
           <div className="animate-lux-rise">
             <p className="font-display text-sm font-bold uppercase tracking-[0.22em] text-[var(--color-accent)]">
@@ -113,7 +113,7 @@ export function SearchResultsPage() {
             )}
           </div>
 
-          <div className="relative z-20 overflow-visible animate-lux-rise-delay mt-8 bg-[var(--color-navy-deep)] px-4 py-5 shadow-[var(--shadow-lift)] sm:px-6">
+          <div className="relative z-20 mt-8 min-w-0 animate-lux-rise-delay bg-[var(--color-navy-deep)] px-3 py-5 shadow-[var(--shadow-lift)] sm:px-6">
             <SearchForm
               values={search}
               onChange={handleSearch}
@@ -126,8 +126,8 @@ export function SearchResultsPage() {
         </div>
       </section>
 
-      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
-      <div className="mb-8">
+      <div className="mx-auto min-w-0 max-w-7xl px-4 py-10 sm:px-6">
+      <div className="mb-8 min-w-0">
         <CarFleetFilters
           categories={categoriesData?.categories ?? []}
           value={filters}
@@ -158,7 +158,7 @@ export function SearchResultsPage() {
               </p>
             </div>
           ) : (
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid min-w-0 gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {data.cars.map((car) => {
                 const qs = searchParamsToQuery(search);
                 const detailParams = new URLSearchParams(qs);
@@ -170,7 +170,7 @@ export function SearchResultsPage() {
           )}
 
           {data.pagination.totalPages > 1 && (
-            <div className="mt-8 flex justify-center gap-2">
+            <div className="mt-8 flex flex-wrap justify-center gap-2">
               <Button
                 variant="outline"
                 size="sm"

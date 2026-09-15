@@ -13,6 +13,7 @@
     "db:schema": "node sql/applySchema.js",
     "db:migrate": "node sql/migrate.js",
     "db:seed": "node sql/seed.js",
+    "db:seed:cars": "node sql/seedRealisticFleet.js",
     "db:seed:ops": "node sql/seedOpsLifecycle.js",
     "db:seed:fleet": "node sql/seedFleetAlerts.js",
     "db:seed:portal": "node sql/seedCustomerPortal.js",

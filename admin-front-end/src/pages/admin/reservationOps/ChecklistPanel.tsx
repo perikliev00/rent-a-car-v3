@@ -99,7 +99,7 @@ export function ChecklistPanel({
         {checklistsQuery.data?.returnChecklist ? (
           <p className="text-xs text-[var(--color-success)]">Return checklist on file</p>
         ) : null}
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
           <Select
             label="Fuel level"
             value={fuelLevel}
@@ -148,8 +148,8 @@ export function ChecklistPanel({
             className="block w-full text-sm"
           />
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
+        <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="min-w-0">
             <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.06em] text-[var(--color-muted)]">
               Customer signature
             </label>

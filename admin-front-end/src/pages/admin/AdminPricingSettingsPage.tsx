@@ -22,13 +22,13 @@ export function AdminPricingSettingsPage() {
   if (isLoading || !pricing) return <PageLoader />;
 
   return (
-    <div>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="font-display text-3xl font-bold tracking-tight text-[var(--color-ink)]">
+    <div className="min-w-0">
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--color-ink)] sm:text-3xl">
             Pricing
           </h1>
-          <p className="mt-1 text-[var(--color-muted)]">
+          <p className="mt-1 break-words text-[var(--color-muted)]">
             Configure fees, seasons, discounts, deposit, and extras. Vehicle day rates stay on{' '}
             <Link to="/admin/cars" className="text-[var(--color-accent-ink)] hover:underline">
               Cars

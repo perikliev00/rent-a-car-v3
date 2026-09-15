@@ -23,8 +23,8 @@ export function OpsTable({
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-xs">
+    <div className="min-w-0 overflow-x-auto overscroll-x-contain">
+      <table className="w-full min-w-[40rem] text-left text-xs">
         <thead>
           <tr className="border-b border-[var(--color-line)] text-[var(--color-muted)]">
             <th className="pb-2 pr-3 font-medium">ID</th>
@@ -64,7 +64,7 @@ export function OpsTable({
                 <td className="py-1.5 pr-3 text-[var(--color-ink)]">{row.carName || '—'}</td>
                 <td className="py-1.5 pr-3">
                   <div className="text-[var(--color-ink)]">{row.fullName || '—'}</div>
-                  <div className="text-[var(--color-muted)]">{row.email || ''}</div>
+                  <div className="break-words text-[var(--color-muted)]">{row.email || ''}</div>
                 </td>
                 <td className="py-1.5 pr-3 text-[var(--color-ink)]">
                   {formatWhen(row.pickupDate, row.pickupTime)}

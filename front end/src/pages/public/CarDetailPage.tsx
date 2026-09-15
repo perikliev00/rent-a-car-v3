@@ -144,9 +144,9 @@ export function CarDetailPage() {
     car.priceTier_31_plus ?? car.priceTier_7_31 ?? car.priceTier_1_3 ?? car.pricePerDay ?? car.price;
 
   return (
-    <div>
+    <div className="min-w-0 overflow-x-clip">
       <section className="border-b border-[var(--color-line)] bg-[var(--color-surface-elevated)]">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-5 sm:px-6">
+        <div className="mx-auto flex max-w-7xl min-w-0 flex-wrap items-center justify-between gap-3 px-4 py-5 sm:px-6">
           <Link
             to={search ? `/search?${searchParams.toString()}` : '/'}
             className="text-sm font-medium text-[var(--color-accent-ink)] hover:underline"
@@ -165,9 +165,9 @@ export function CarDetailPage() {
         </div>
       </section>
 
-      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
-        <div className="grid gap-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:items-start">
-          <div className="space-y-6">
+      <div className="mx-auto min-w-0 max-w-7xl px-4 py-10 sm:px-6">
+        <div className="grid min-w-0 gap-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:items-start">
+          <div className="min-w-0 space-y-6">
             <div className="overflow-hidden rounded-2xl bg-[var(--color-ink-soft)] shadow-[var(--shadow-lift)]">
               <img
                 key={car.image}
@@ -178,18 +178,18 @@ export function CarDetailPage() {
               />
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid min-w-0 gap-3 sm:grid-cols-2">
               {specs.map((spec) => (
                 <div
                   key={spec.label}
-                  className="flex items-center gap-3 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] px-4 py-3"
+                  className="flex min-w-0 items-center gap-3 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] px-3 py-3 sm:px-4"
                 >
                   <SpecIcon kind={spec.kind} />
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-[var(--color-muted)]">
                       {spec.label}
                     </p>
-                    <p className="font-display text-sm font-semibold text-[var(--color-ink)]">
+                    <p className="break-words font-display text-sm font-semibold text-[var(--color-ink)]">
                       {spec.value}
                     </p>
                   </div>
@@ -198,12 +198,12 @@ export function CarDetailPage() {
             </div>
           </div>
 
-          <div className="animate-lux-rise space-y-6 lg:sticky lg:top-24">
-            <div>
+          <div className="min-w-0 animate-lux-rise space-y-6 lg:sticky lg:top-24">
+            <div className="min-w-0">
               <p className="font-display text-sm font-semibold uppercase tracking-[0.18em] text-[var(--color-accent-ink)]">
                 Vehicle details
               </p>
-              <h1 className="mt-2 font-display text-3xl font-extrabold tracking-tight text-[var(--color-navy)] sm:text-4xl">
+              <h1 className="mt-2 break-words font-display text-3xl font-extrabold tracking-tight text-[var(--color-navy)] sm:text-4xl">
                 {car.name}
               </h1>
               <p className="mt-3 text-[var(--color-muted)] leading-relaxed">
@@ -213,23 +213,23 @@ export function CarDetailPage() {
             </div>
 
             {search && (
-              <div className="rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface)] px-5 py-4">
+              <div className="min-w-0 rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-4 sm:px-5">
                 <p className="font-display text-sm font-semibold text-[var(--color-ink)]">Your trip</p>
                 <dl className="mt-3 space-y-2 text-sm">
-                  <div className="flex justify-between gap-4">
-                    <dt className="text-[var(--color-muted)]">Pickup</dt>
-                    <dd className="text-right font-medium text-[var(--color-ink)]">
+                  <div className="flex min-w-0 justify-between gap-3">
+                    <dt className="shrink-0 text-[var(--color-muted)]">Pickup</dt>
+                    <dd className="min-w-0 text-right font-medium text-[var(--color-ink)]">
                       {formatTripDate(search.pickupDate)} · {search.pickupTime}
-                      <span className="mt-0.5 block text-xs font-normal text-[var(--color-muted)]">
+                      <span className="mt-0.5 block break-words text-xs font-normal text-[var(--color-muted)]">
                         {search.pickupLocation}
                       </span>
                     </dd>
                   </div>
-                  <div className="flex justify-between gap-4">
-                    <dt className="text-[var(--color-muted)]">Return</dt>
-                    <dd className="text-right font-medium text-[var(--color-ink)]">
+                  <div className="flex min-w-0 justify-between gap-3">
+                    <dt className="shrink-0 text-[var(--color-muted)]">Return</dt>
+                    <dd className="min-w-0 text-right font-medium text-[var(--color-ink)]">
                       {formatTripDate(search.returnDate)} · {search.returnTime}
-                      <span className="mt-0.5 block text-xs font-normal text-[var(--color-muted)]">
+                      <span className="mt-0.5 block break-words text-xs font-normal text-[var(--color-muted)]">
                         {search.returnLocation}
                       </span>
                     </dd>
@@ -238,7 +238,7 @@ export function CarDetailPage() {
               </div>
             )}
 
-            <div className="rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] p-5 shadow-[var(--shadow-soft)] sm:p-6">
+            <div className="min-w-0 rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] p-4 shadow-[var(--shadow-soft)] sm:p-6">
               <h2 className="font-display text-lg font-semibold text-[var(--color-ink)]">
                 Pricing tiers
               </h2>
@@ -249,17 +249,17 @@ export function CarDetailPage() {
                 {tiers.map((tier, index) => (
                   <div
                     key={tier.label}
-                    className={`flex items-center justify-between rounded-xl px-3.5 py-3 ${
+                    className={`flex min-w-0 items-center justify-between gap-3 rounded-xl px-3 py-3 sm:px-3.5 ${
                       index === 1
                         ? 'border border-[var(--color-accent)]/40 bg-[var(--color-accent-muted)]/40'
                         : 'bg-[var(--color-surface)]'
                     }`}
                   >
-                    <div>
+                    <div className="min-w-0">
                       <p className="font-medium text-[var(--color-ink)]">{tier.label}</p>
                       <p className="text-xs text-[var(--color-muted)]">{tier.hint}</p>
                     </div>
-                    <p className="font-display text-base font-semibold text-[var(--color-ink)]">
+                    <p className="shrink-0 font-display text-base font-semibold text-[var(--color-ink)]">
                       {formatPrice(tier.price!)}
                       <span className="text-sm font-normal text-[var(--color-muted)]">/day</span>
                     </p>
@@ -273,7 +273,7 @@ export function CarDetailPage() {
                 Book this car
               </Button>
             ) : (
-              <div className="rounded-2xl border border-dashed border-[var(--color-line)] bg-[var(--color-surface)] px-5 py-5 text-center">
+              <div className="rounded-2xl border border-dashed border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-5 text-center sm:px-5">
                 <p className="text-sm text-[var(--color-muted)]">
                   Choose pickup and return dates to unlock live pricing and book this vehicle.
                 </p>

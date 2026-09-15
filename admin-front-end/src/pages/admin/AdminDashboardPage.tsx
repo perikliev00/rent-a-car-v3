@@ -64,15 +64,15 @@ export function AdminDashboardPage() {
     .slice(0, 5);
 
   return (
-    <div>
-      <div>
-        <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--color-ink)]">
+    <div className="min-w-0">
+      <div className="min-w-0">
+        <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--color-ink)] sm:text-3xl">
           Dashboard
         </h1>
         <p className="mt-1 text-[var(--color-muted)]">Overview of your rental business</p>
       </div>
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-8 grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] p-5 shadow-[var(--shadow-soft)]">
           <p className="text-xs font-medium tracking-wide text-[var(--color-muted)] uppercase">
             Total orders
@@ -121,7 +121,7 @@ export function AdminDashboardPage() {
 
       <Card className="mt-8">
         <CardBody>
-          <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
             <h2 className="font-display font-semibold text-[var(--color-ink)]">Fleet alerts</h2>
             <Link to="/admin/fleet-alerts">
               <Button size="sm" variant="ghost">
@@ -142,7 +142,7 @@ export function AdminDashboardPage() {
                       >
                         {alert.severity}
                       </span>
-                      <span className="truncate text-sm text-[var(--color-ink)]">{alert.message}</span>
+                      <span className="break-words text-sm text-[var(--color-ink)]">{alert.message}</span>
                     </div>
                     <p className="mt-0.5 text-xs text-[var(--color-muted)]">{alert.carName}</p>
                   </div>
@@ -162,8 +162,8 @@ export function AdminDashboardPage() {
       <Card className="mt-8">
         <CardBody>
           <h2 className="font-display font-semibold text-[var(--color-ink)]">Recent orders</h2>
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full text-left text-sm">
+          <div className="mt-4 min-w-0 overflow-x-auto overscroll-x-contain">
+            <table className="w-full min-w-[32rem] text-left text-sm">
               <thead>
                 <tr className="border-b border-[var(--color-line)] text-xs tracking-wide text-[var(--color-muted)] uppercase">
                   <th className="pb-2 pr-4 font-medium">ID</th>
