@@ -5,32 +5,45 @@ ROOT="${RENTACAR_ROOT:-/opt/rentacar}"
 COMPOSE_FILE="${COMPOSE_FILE:-$ROOT/docker-compose.aws.yml}"
 ENV_FILE="${COMPOSE_ENV_FILE:-$ROOT/config/compose.env}"
 RELEASE_FILE="${1:-}"
+ASSET_ROOT="${2:-$(dirname "$0")}" 
+PAYLOAD_COMPOSE="$ASSET_ROOT/docker-compose.aws.yml"
+PAYLOAD_MONITORING="$ASSET_ROOT/monitoring"
 
 if [[ -z "$RELEASE_FILE" || ! -f "$RELEASE_FILE" ]]; then
-  echo "Usage: $0 /path/to/verified-release.env" >&2
+  echo "Usage: $0 /path/to/verified-release.env [/path/to/deployment-assets]" >&2
   exit 2
 fi
 
-for command in docker curl awk grep mktemp; do
+for command in docker curl awk grep mktemp cp mv rm mkdir; do
   if ! command -v "$command" >/dev/null 2>&1; then
     echo "Required command is missing: $command" >&2
     exit 2
   fi
 done
 
-if [[ ! -f "$COMPOSE_FILE" ]]; then
-  echo "Compose file not found: $COMPOSE_FILE" >&2
+if [[ ! -f "$ENV_FILE" ]]; then
+  echo "Compose environment file not found: $ENV_FILE" >&2
   exit 2
 fi
 
-if [[ ! -f "$ENV_FILE" ]]; then
-  echo "Compose environment file not found: $ENV_FILE" >&2
+if [[ ! -f "$PAYLOAD_COMPOSE" ]]; then
+  echo "Deployment payload compose file not found: $PAYLOAD_COMPOSE" >&2
+  exit 2
+fi
+
+if [[ ! -d "$PAYLOAD_MONITORING" ]]; then
+  echo "Deployment payload monitoring directory not found: $PAYLOAD_MONITORING" >&2
   exit 2
 fi
 
 read_release_value() {
   local key="$1"
   awk -F= -v key="$key" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "$RELEASE_FILE"
+}
+
+read_env_value() {
+  local key="$1"
+  awk -F= -v key="$key" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "$ENV_FILE"
 }
 
 IMAGE_TAG="$(read_release_value IMAGE_TAG)"
@@ -128,25 +141,49 @@ cd "$ROOT"
 mkdir -p "$ROOT/config/deploy-backups"
 TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 BACKUP_FILE="$ROOT/config/deploy-backups/compose.env.$TIMESTAMP"
+INFRA_BACKUP_DIR="$ROOT/config/deploy-backups/infra.$TIMESTAMP"
 CANDIDATE_FILE="$(mktemp "$ROOT/config/.compose.env.XXXXXX")"
+COMPOSE_CANDIDATE="$ROOT/.docker-compose.aws.yml.$TIMESTAMP.new"
+MONITORING_CANDIDATE="$ROOT/.monitoring.$TIMESTAMP.new"
 ROLLBACK_ARMED=0
 
 cleanup() {
-  rm -f "$CANDIDATE_FILE"
+  rm -f "$CANDIDATE_FILE" "$COMPOSE_CANDIDATE"
+  rm -rf "$MONITORING_CANDIDATE"
+}
+
+restore_infrastructure() {
+  if [[ -f "$INFRA_BACKUP_DIR/docker-compose.aws.yml" ]]; then
+    cp -a "$INFRA_BACKUP_DIR/docker-compose.aws.yml" "$COMPOSE_FILE"
+  elif [[ -f "$INFRA_BACKUP_DIR/compose.absent" ]]; then
+    rm -f "$COMPOSE_FILE"
+  fi
+
+  if [[ -d "$INFRA_BACKUP_DIR/monitoring" ]]; then
+    rm -rf "$ROOT/monitoring"
+    cp -a "$INFRA_BACKUP_DIR/monitoring" "$ROOT/monitoring"
+  elif [[ -f "$INFRA_BACKUP_DIR/monitoring.absent" ]]; then
+    rm -rf "$ROOT/monitoring"
+  fi
 }
 
 rollback() {
   local exit_code=$?
   trap - ERR
 
-  if [[ "$ROLLBACK_ARMED" == "1" && -f "$BACKUP_FILE" ]]; then
-    echo "Deployment failed. Restoring previous image references..." >&2
-    cp -a "$BACKUP_FILE" "$ENV_FILE"
+  if [[ "$ROLLBACK_ARMED" == "1" ]]; then
+    echo "Deployment failed. Restoring previous release configuration and infrastructure..." >&2
 
-    # The previous images normally remain cached locally. If they do not,
-    # the ECR login performed by the workflow is still valid for this run.
-    compose pull backend worker customer admin >/dev/null 2>&1 || true
-    compose up -d --remove-orphans || true
+    if [[ -f "$BACKUP_FILE" ]]; then
+      cp -a "$BACKUP_FILE" "$ENV_FILE"
+    fi
+
+    restore_infrastructure
+
+    if [[ -f "$COMPOSE_FILE" ]]; then
+      compose pull backend worker customer admin >/dev/null 2>&1 || true
+      compose up -d --remove-orphans || true
+    fi
   fi
 
   cleanup
@@ -157,6 +194,20 @@ trap cleanup EXIT
 trap rollback ERR
 
 cp -a "$ENV_FILE" "$BACKUP_FILE"
+mkdir -p "$INFRA_BACKUP_DIR"
+chmod 700 "$INFRA_BACKUP_DIR" || true
+
+if [[ -f "$COMPOSE_FILE" ]]; then
+  cp -a "$COMPOSE_FILE" "$INFRA_BACKUP_DIR/docker-compose.aws.yml"
+else
+  touch "$INFRA_BACKUP_DIR/compose.absent"
+fi
+
+if [[ -d "$ROOT/monitoring" ]]; then
+  cp -a "$ROOT/monitoring" "$INFRA_BACKUP_DIR/monitoring"
+else
+  touch "$INFRA_BACKUP_DIR/monitoring.absent"
+fi
 
 if ! awk \
   -v api="$API_IMAGE" \
@@ -182,19 +233,26 @@ if command -v chown >/dev/null 2>&1; then
   chown --reference="$ENV_FILE" "$CANDIDATE_FILE" 2>/dev/null || true
 fi
 
-# Validate the full production Compose configuration before changing the live file.
-docker compose --env-file "$CANDIDATE_FILE" -f "$COMPOSE_FILE" config --quiet
+# Validate the exact compose payload from the release commit before touching live infrastructure.
+docker compose --env-file "$CANDIDATE_FILE" -f "$PAYLOAD_COMPOSE" config --quiet
 
-mv "$CANDIDATE_FILE" "$ENV_FILE"
+# Stage infrastructure on the same filesystem so final moves are local and predictable.
+cp -a "$PAYLOAD_COMPOSE" "$COMPOSE_CANDIDATE"
+cp -a "$PAYLOAD_MONITORING" "$MONITORING_CANDIDATE"
+
 ROLLBACK_ARMED=1
+mv "$CANDIDATE_FILE" "$ENV_FILE"
+mv "$COMPOSE_CANDIDATE" "$COMPOSE_FILE"
+rm -rf "$ROOT/monitoring"
+mv "$MONITORING_CANDIDATE" "$ROOT/monitoring"
 
 printf 'Deploying commit %s\n' "$IMAGE_TAG"
 printf 'API image:      %s\n' "$API_IMAGE"
 printf 'Customer image: %s\n' "$CUSTOMER_IMAGE"
 printf 'Admin image:    %s\n' "$ADMIN_IMAGE"
 
-# Pull first so a registry/network failure happens before containers are touched.
-compose pull backend worker customer admin
+# Pull first so registry/network failures happen before application containers are touched.
+compose pull backend worker customer admin prometheus alertmanager grafana
 
 # Pause background jobs while the API container runs its startup database setup.
 compose stop worker >/dev/null 2>&1 || true
@@ -207,7 +265,13 @@ compose up -d worker customer admin
 wait_http "http://127.0.0.1:8081/" "Customer frontend" 20
 wait_http "http://127.0.0.1:8082/" "Admin frontend" 20
 
-for service in db backend worker customer admin; do
+# Start monitoring only after the application path is healthy.
+compose up -d alertmanager prometheus grafana
+wait_http "http://127.0.0.1:9093/-/ready" "Alertmanager" 20
+wait_http "http://127.0.0.1:9090/-/ready" "Prometheus" 20
+wait_http "http://127.0.0.1:3001/api/health" "Grafana" 30
+
+for service in db backend worker customer admin prometheus alertmanager grafana; do
   assert_running "$service"
 done
 
@@ -215,6 +279,21 @@ assert_image backend "$API_IMAGE"
 assert_image worker "$API_IMAGE"
 assert_image customer "$CUSTOMER_IMAGE"
 assert_image admin "$ADMIN_IMAGE"
+
+METRICS_TOKEN="$(read_env_value METRICS_TOKEN)"
+if [[ -z "$METRICS_TOKEN" ]]; then
+  echo "METRICS_TOKEN is unexpectedly empty after compose validation" >&2
+  exit 1
+fi
+
+if ! curl --fail --silent --show-error --max-time 5 \
+  -H "Authorization: Bearer $METRICS_TOKEN" \
+  http://127.0.0.1:3000/prometheus >/dev/null; then
+  echo "Authenticated backend Prometheus endpoint check failed" >&2
+  exit 1
+fi
+
+echo "Authenticated backend Prometheus endpoint is responding"
 
 cat > "$ROOT/config/current-release.env" <<EOF
 IMAGE_TAG=$IMAGE_TAG
