@@ -77,8 +77,6 @@ jobs:
           echo "Resolved immutable release SHA:"
           echo "$TAG"
 
-          # Manual deployments must also reference a commit that had
-          # a successful CI run on main.
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "Verifying successful CI for $TAG..."
 
@@ -220,8 +218,10 @@ jobs:
       cancel-in-progress: false
 
     steps:
-      - name: Check out deployment code
+      - name: Check out exact release commit
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-gate.outputs.image_tag }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -280,6 +280,18 @@ jobs:
             echo "ADMIN_IMAGE=$ADMIN_IMAGE"
           } > verified-release.env
 
+      - name: Validate deployment payload
+        run: |
+          set -euo pipefail
+
+          test -f docker-compose.aws.yml
+          test -d monitoring/prometheus
+          test -d monitoring/alertmanager
+          test -d monitoring/grafana/provisioning
+          test -f ops/deploy-production.sh
+
+          echo "Versioned deployment payload is present for ${{ needs.release-gate.outputs.image_tag }}"
+
       - name: Authenticate Lightsail host to ECR
         env:
           LIGHTSAIL_HOST: ${{ secrets.LIGHTSAIL_HOST }}
@@ -323,7 +335,15 @@ jobs:
             -o BatchMode=yes \
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
-            ops/deploy-production.sh verified-release.env \
+            ops/deploy-production.sh verified-release.env docker-compose.aws.yml \
+            "$LIGHTSAIL_USER@$LIGHTSAIL_HOST:$REMOTE_DIR/"
+
+          scp -r \
+            -i "$HOME/.ssh/lightsail_deploy" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            monitoring \
             "$LIGHTSAIL_USER@$LIGHTSAIL_HOST:$REMOTE_DIR/"
 
       - name: Deploy verified release
@@ -342,7 +362,7 @@ jobs:
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
             "$LIGHTSAIL_USER@$LIGHTSAIL_HOST" \
-            "chmod 700 '$REMOTE_DIR/deploy-production.sh' && '$REMOTE_DIR/deploy-production.sh' '$REMOTE_DIR/verified-release.env'"
+            "chmod 700 '$REMOTE_DIR/deploy-production.sh' && '$REMOTE_DIR/deploy-production.sh' '$REMOTE_DIR/verified-release.env' '$REMOTE_DIR'"
 
       - name: Remove remote deployment payload
         if: always()
