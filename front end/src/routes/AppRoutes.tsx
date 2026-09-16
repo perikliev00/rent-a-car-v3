@@ -25,10 +25,12 @@ import {
   ContactPage,
 } from '../pages/static/StaticPages';
 import { NotFoundPage } from '../pages/NotFoundPage';
+import { ScrollToTop } from './ScrollToTop';
 
 export function AppRoutes() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <Routes>
         <Route element={<PublicLayout />}>
           <Route index element={<HomePage />} />
