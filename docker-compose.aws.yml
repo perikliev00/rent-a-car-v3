@@ -120,10 +120,11 @@ services:
     image: prom/alertmanager:v0.27.0
     ports:
       - "127.0.0.1:9093:9093"
-    environment:
-      ALERTMANAGER_WEBHOOK_URL: ${ALERTMANAGER_WEBHOOK_URL:-}
+    env_file:
+      - ${ALERTMANAGER_ENV_FILE:-/opt/rentacar/config/alertmanager.env}
     volumes:
       - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./monitoring/alertmanager/alertmanager.yml.tpl:/etc/alertmanager/alertmanager.yml.tpl:ro
       - ./monitoring/alertmanager/docker-entrypoint.sh:/docker-entrypoint.sh:ro
       - alertmanager_data:/alertmanager
     entrypoint: ["/bin/sh", "/docker-entrypoint.sh"]

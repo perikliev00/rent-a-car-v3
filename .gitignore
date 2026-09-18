@@ -45,6 +45,9 @@ backend/src/public/images/uploads/
 Thumbs.db
 desktop.ini
 
+# Local validation scratch
+.tmp-am-validate-*/
+
 # Editor
 .idea/
 *.suo

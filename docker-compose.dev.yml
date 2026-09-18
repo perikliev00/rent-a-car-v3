@@ -166,6 +166,7 @@ services:
       ALERTMANAGER_WEBHOOK_URL: ${ALERTMANAGER_WEBHOOK_URL:-}
     volumes:
       - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./monitoring/alertmanager/alertmanager.yml.tpl:/etc/alertmanager/alertmanager.yml.tpl:ro
       - ./monitoring/alertmanager/docker-entrypoint.sh:/docker-entrypoint.sh:ro
       - alertmanager_data:/alertmanager
     entrypoint: ["/bin/sh", "/docker-entrypoint.sh"]

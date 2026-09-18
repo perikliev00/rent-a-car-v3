@@ -1,3 +1,6 @@
+# Static fallback used when SMTP env vars are not provided (local/dev).
+# Production AWS renders monitoring/alertmanager/alertmanager.yml.tpl at runtime
+# from /opt/rentacar/config/alertmanager.env — never commit real SMTP secrets.
 global:
   resolve_timeout: 5m
 

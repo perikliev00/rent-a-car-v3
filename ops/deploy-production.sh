@@ -36,6 +36,60 @@ if [[ ! -d "$PAYLOAD_MONITORING" ]]; then
   exit 2
 fi
 
+read_compose_env_value() {
+  local key="$1"
+  awk -F= -v key="$key" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "$ENV_FILE"
+}
+
+# Fail before any live compose.env / infrastructure replacement when SMTP env is missing.
+ALERTMANAGER_ENV_FILE_PATH="$(read_compose_env_value ALERTMANAGER_ENV_FILE)"
+ALERTMANAGER_ENV_FILE_PATH="${ALERTMANAGER_ENV_FILE_PATH:-/opt/rentacar/config/alertmanager.env}"
+
+if [[ ! -f "$ALERTMANAGER_ENV_FILE_PATH" ]]; then
+  echo "Alertmanager environment file not found: $ALERTMANAGER_ENV_FILE_PATH" >&2
+  exit 2
+fi
+
+# Production AWS requires real SMTP email delivery. An empty/incomplete file must not
+# silently fall through to the disabled Alertmanager webhook fallback.
+# Never print variable values (especially ALERT_SMTP_PASSWORD).
+require_alertmanager_smtp_config() {
+  local env_file="$1"
+  local missing=""
+  local key
+  local value
+
+  for key in \
+    ALERT_SMTP_HOST \
+    ALERT_SMTP_PORT \
+    ALERT_SMTP_FROM \
+    ALERT_SMTP_USERNAME \
+    ALERT_SMTP_PASSWORD \
+    ALERT_EMAIL_TO
+  do
+    value="$(awk -F= -v key="$key" '
+      $1 == key {
+        sub(/^[^=]*=/, "")
+        print
+        exit
+      }
+    ' "$env_file")"
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    if [[ -z "$value" ]]; then
+      missing+=" $key"
+    fi
+  done
+
+  if [[ -n "$missing" ]]; then
+    echo "Alertmanager environment file is missing required SMTP variable(s):${missing}" >&2
+    echo "File: $env_file" >&2
+    exit 2
+  fi
+}
+
+require_alertmanager_smtp_config "$ALERTMANAGER_ENV_FILE_PATH"
+
 read_release_value() {
   local key="$1"
   awk -F= -v key="$key" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "$RELEASE_FILE"

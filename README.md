@@ -716,7 +716,12 @@ Prometheus rules in `monitoring/prometheus/alerts.yml`. Critical alerts include:
 
 Warning alerts include Stripe webhook failures, high 5xx, background job failures, booking conflict spikes, and storage errors.
 
-Configure webhook delivery in root `.env`:
+**AWS Lightsail (production):** configure SMTP email delivery via an untracked host file
+`/opt/rentacar/config/alertmanager.env`. See
+[docs/ops/production-alertmanager-email.md](docs/ops/production-alertmanager-email.md).
+Never commit real SMTP credentials.
+
+**Local / `docker-compose.prod.yml`:** optional webhook delivery in root `.env`:
 
 ```env
 ALERTMANAGER_WEBHOOK_URL=https://hooks.slack.com/services/...
@@ -734,6 +739,7 @@ Sentry:
 | Stripe webhook failure | [docs/runbooks/webhook-failure.md](docs/runbooks/webhook-failure.md) |
 | Roll back previous version | [docs/runbooks/rollback.md](docs/runbooks/rollback.md) |
 | Restore the database | [docs/runbooks/db-restore.md](docs/runbooks/db-restore.md) |
+| Production Alertmanager email | [docs/ops/production-alertmanager-email.md](docs/ops/production-alertmanager-email.md) |
 
 ### Local monitoring stack
 
