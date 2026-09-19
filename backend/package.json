@@ -18,6 +18,7 @@
     "db:seed:fleet": "node sql/seedFleetAlerts.js",
     "db:seed:portal": "node sql/seedCustomerPortal.js",
     "db:seed:tasks": "node sql/seedStaffTasks.js",
+    "db:seed:history": "node sql/seedOperationalHistory.js",
     "db:reset": "node sql/reset.js",
     "db:backup": "node sql/backup.js",
     "db:restore": "node sql/restore.js",
