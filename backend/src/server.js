@@ -17,7 +17,9 @@ const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
 const paymentController = require('./controllers/payment');
 const {
-  adminLimiter,
+  adminReadLimiter,
+  adminWriteLimiter,
+  adminRealtimeLimiter,
   checkoutLimiter,
   bookingLimiter,
   chatLimiter,
@@ -159,7 +161,12 @@ function mountVersionedApi(prefix) {
   app.use(`${prefix}/reservations`, bookingLimiter);
   app.use(`${prefix}/chat`, chatLimiter);
   app.use(`${prefix}/contacts`, contactLimiter);
-  app.use(`${prefix}/admin`, adminLimiter);
+  app.use(
+    `${prefix}/admin`,
+    adminReadLimiter,
+    adminWriteLimiter,
+    adminRealtimeLimiter
+  );
   app.use(prefix, apiRoutes);
 }
 

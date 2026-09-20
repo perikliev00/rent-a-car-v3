@@ -1,6 +1,9 @@
 const rateLimit = require('express-rate-limit');
 const apiResponse = require('../utils/apiResponse');
 const { TooManyRequestsError } = require('../utils/appError');
+const logger = require('../utils/logger');
+
+const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 function defaultHandler(req, res) {
   const error = new TooManyRequestsError();
@@ -16,6 +19,22 @@ function readPositiveInt(envKey, fallback) {
   return Number.isFinite(value) && value >= 0 ? value : fallback;
 }
 
+function createPolicyHandler(policy) {
+  return function handler(req, res) {
+    res.setHeader('X-RateLimit-Policy', policy);
+    logger.warn(
+      {
+        limiter: policy,
+        method: req.method,
+        path: req.originalUrl,
+        userId: req.session?.user?.id,
+      },
+      'Rate limit exceeded'
+    );
+    return defaultHandler(req, res);
+  };
+}
+
 function createLimiter(options) {
   return rateLimit({
     standardHeaders: true,
@@ -23,6 +42,28 @@ function createLimiter(options) {
     handler: defaultHandler,
     ...options,
   });
+}
+
+function isReadMethod(req) {
+  return READ_METHODS.has(String(req.method || '').toUpperCase());
+}
+
+function isAdminRealtimeStream(req) {
+  const url = String(req.originalUrl || req.url || '').split('?')[0];
+  return url.includes('/admin/realtime/stream');
+}
+
+function adminRateLimitKey(req) {
+  if (req.session?.user?.id != null && String(req.session.user.id) !== '') {
+    return `staff:${req.session.user.id}`;
+  }
+  if (req.sessionID) {
+    return `session:${req.sessionID}`;
+  }
+  const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+  const ipKeyGenerator =
+    typeof rateLimit.ipKeyGenerator === 'function' ? rateLimit.ipKeyGenerator : null;
+  return `ip:${ipKeyGenerator ? ipKeyGenerator(ip) : ip}`;
 }
 
 const DEFAULT_WINDOW_MS = readPositiveInt('RATE_LIMIT_WINDOW_MS', 15 * 60 * 1000);
@@ -47,9 +88,34 @@ const emailVerificationLimiter = createLimiter({
   max: readPositiveInt('RATE_LIMIT_EMAIL_VERIFICATION_MAX', 10),
 });
 
-const adminLimiter = createLimiter({
+const adminLimiterShared = {
+  keyGenerator: adminRateLimitKey,
+  // Custom staff/session keys are not IPs; skip the IPv6 keyGenerator check.
+  validate: { ip: false },
+};
+
+const adminReadLimiter = createLimiter({
+  ...adminLimiterShared,
   windowMs: DEFAULT_WINDOW_MS,
-  max: readPositiveInt('RATE_LIMIT_ADMIN_MAX', 100),
+  max: readPositiveInt('RATE_LIMIT_ADMIN_READ_MAX', 1200),
+  skip: (req) => !isReadMethod(req) || isAdminRealtimeStream(req),
+  handler: createPolicyHandler('admin-read'),
+});
+
+const adminWriteLimiter = createLimiter({
+  ...adminLimiterShared,
+  windowMs: DEFAULT_WINDOW_MS,
+  max: readPositiveInt('RATE_LIMIT_ADMIN_WRITE_MAX', 300),
+  skip: (req) => isReadMethod(req),
+  handler: createPolicyHandler('admin-write'),
+});
+
+const adminRealtimeLimiter = createLimiter({
+  ...adminLimiterShared,
+  windowMs: readPositiveInt('RATE_LIMIT_ADMIN_REALTIME_WINDOW_MS', 60 * 1000),
+  max: readPositiveInt('RATE_LIMIT_ADMIN_REALTIME_MAX', 30),
+  skip: (req) => !isAdminRealtimeStream(req),
+  handler: createPolicyHandler('admin-realtime'),
 });
 
 const adminUploadLimiter = createLimiter({
@@ -87,7 +153,9 @@ module.exports = {
   loginLimiter,
   signupLimiter,
   emailVerificationLimiter,
-  adminLimiter,
+  adminReadLimiter,
+  adminWriteLimiter,
+  adminRealtimeLimiter,
   accountUploadLimiter,
   adminUploadLimiter,
   checkoutLimiter,
@@ -96,4 +164,7 @@ module.exports = {
   contactLimiter,
   createLimiter,
   defaultHandler,
+  adminRateLimitKey,
+  isAdminRealtimeStream,
+  isReadMethod,
 };

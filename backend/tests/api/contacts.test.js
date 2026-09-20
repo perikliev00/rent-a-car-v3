@@ -1,19 +1,9 @@
 const { createApiTestApp, initTestAgent, withCsrf } = require('../helpers/apiTestApp');
 
 jest.mock('../../src/services/reservationService', () => ({}));
-jest.mock('../../src/middleware/rateLimit', () => ({
-  authLimiter: (_req, _res, next) => next(),
-  loginLimiter: (_req, _res, next) => next(),
-  signupLimiter: (_req, _res, next) => next(),
-  emailVerificationLimiter: (_req, _res, next) => next(),
-  adminLimiter: (_req, _res, next) => next(),
-  adminUploadLimiter: (_req, _res, next) => next(),
-  accountUploadLimiter: (_req, _res, next) => next(),
-  checkoutLimiter: (_req, _res, next) => next(),
-  bookingLimiter: (_req, _res, next) => next(),
-  chatLimiter: (_req, _res, next) => next(),
-  contactLimiter: (_req, _res, next) => next(),
-}));
+jest.mock('../../src/middleware/rateLimit', () =>
+  require('../helpers/rateLimitPassthrough')
+);
 jest.mock('../../src/services/sql/contactSqlService');
 
 const contactSql = require('../../src/services/sql/contactSqlService');

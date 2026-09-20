@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthContext } from '../auth/auth-context';
 import { toast } from '../components/ui/toastStore';
-import { useAdminRealtime } from './useAdminRealtime';
+import { noteLocalAdminMutation, useAdminRealtime } from './useAdminRealtime';
 
 vi.mock('../components/ui/toastStore', () => ({
   toast: vi.fn(),
@@ -106,6 +106,7 @@ describe('useAdminRealtime', () => {
     MockEventSource.instances = [];
     vi.stubGlobal('EventSource', MockEventSource);
     vi.mocked(toast).mockClear();
+    noteLocalAdminMutation(0);
   });
 
   afterEach(() => {
@@ -143,9 +144,13 @@ describe('useAdminRealtime', () => {
     });
 
     expect(toast).toHaveBeenCalledWith('Payment failed · reservation #7', 'error');
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['admin', 'calendar'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['admin', 'payments'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['admin', 'reservations'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['admin', 'dashboard'] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['admin', 'orders'] });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['admin', 'tasks'] });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ['admin', 'calendar'] });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ['admin', 'tasks'] });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ['admin', 'fleet-alerts'] });
 
     unmount();
     expect(MockEventSource.instances[0].closed).toBe(true);
@@ -193,6 +198,71 @@ describe('useAdminRealtime', () => {
 
     expect(toast).not.toHaveBeenCalled();
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['admin', 'reservations'] });
+  });
+
+  it('reservation_confirmed invalidates reservation views without fleet-alerts', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    const { result } = renderHook(() => useAdminRealtime(), {
+      wrapper: staffWrapper(queryClient),
+    });
+
+    await waitFor(() => {
+      expect(result.current).toBe('live');
+    });
+
+    act(() => {
+      MockEventSource.instances[0].emit(
+        'reservation_confirmed',
+        basePayload({
+          type: 'reservation_confirmed',
+          status: 'confirmed',
+          message: 'Reservation confirmed #7',
+        }),
+      );
+    });
+
+    expect(toast).toHaveBeenCalledWith('Reservation confirmed #7', 'success');
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['admin', 'reservations'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['admin', 'dashboard'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['admin', 'calendar'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['admin', 'orders'] });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ['admin', 'fleet-alerts'] });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ['admin', 'payments'] });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ['admin', 'notifications'] });
+  });
+
+  it('suppresses SSE echo after a local status mutation', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    const { result } = renderHook(() => useAdminRealtime(), {
+      wrapper: staffWrapper(queryClient),
+    });
+
+    await waitFor(() => {
+      expect(result.current).toBe('live');
+    });
+
+    noteLocalAdminMutation();
+    act(() => {
+      MockEventSource.instances[0].emit(
+        'reservation_confirmed',
+        basePayload({
+          type: 'reservation_confirmed',
+          status: 'confirmed',
+          message: 'Reservation confirmed #7',
+        }),
+      );
+    });
+
+    expect(toast).not.toHaveBeenCalled();
+    expect(invalidateSpy).not.toHaveBeenCalled();
   });
 
   it('does not connect for non-staff users', () => {

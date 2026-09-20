@@ -13,6 +13,7 @@ import { hasPermission } from '../../../auth/permissions';
 import { Button } from '../../../components/ui/Button';
 import { Select } from '../../../components/ui/Select';
 import { toast } from '../../../components/ui/toastStore';
+import { noteLocalAdminMutation } from '../../../hooks/useAdminRealtime';
 import { RefundConfirmModal } from '../refund/RefundConfirmModal';
 
 export function StatusActions({
@@ -46,6 +47,7 @@ export function StatusActions({
     onSuccess: () => {
       toast('Status updated', 'success');
       setStatus('');
+      noteLocalAdminMutation();
       onChanged();
     },
     onError: (err) => toast((err as Error).message, 'error'),
