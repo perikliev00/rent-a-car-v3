@@ -717,4 +717,169 @@ describeIfDb('DB consistency', () => {
       await cleanupCar(carId);
     }
   });
+
+  test('overdue active_rental survives purge and blocks then frees booking after return', async () => {
+    const { changeStatus } = require('../src/services/reservation/reservationStatusService');
+
+    const carId = await insertCar();
+    const pickup = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
+    const returnDate = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+    const secondSessionId = `second-customer-${carId}`;
+    const futureStart = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const futureEnd = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000);
+
+    const countForCar = async () => {
+      const [reservations, pending, orders, blocks] = await Promise.all([
+        pool.query(`SELECT COUNT(*)::int AS count FROM reservations WHERE car_id = $1`, [carId]),
+        pool.query(
+          `
+          SELECT COUNT(*)::int AS count
+          FROM reservations
+          WHERE car_id = $1 AND status = 'pending_payment'
+          `,
+          [carId]
+        ),
+        pool.query(`SELECT COUNT(*)::int AS count FROM orders WHERE car_id = $1`, [carId]),
+        pool.query(`SELECT COUNT(*)::int AS count FROM car_date_blocks WHERE car_id = $1`, [
+          carId,
+        ]),
+      ]);
+      return {
+        reservations: reservations.rows[0].count,
+        pending: pending.rows[0].count,
+        orders: orders.rows[0].count,
+        blocks: blocks.rows[0].count,
+      };
+    };
+
+    try {
+      const inserted = await pool.query(
+        `
+        INSERT INTO reservations (
+          car_id, session_id, pickup_date, return_date,
+          pickup_location, return_location, rental_days, total_price,
+          status, hold_expires_at
+        )
+        VALUES ($1, $2, $3, $4, 'office', 'office', 3, 150, 'confirmed', $5)
+        RETURNING id
+        `,
+        [
+          carId,
+          `overdue-active-${carId}`,
+          pickup,
+          returnDate,
+          new Date(Date.now() + 3600000),
+        ]
+      );
+      const reservationId = inserted.rows[0].id;
+
+      await pool.query(
+        `
+        INSERT INTO orders (
+          reservation_id, car_id, pickup_date, return_date,
+          pickup_time, return_time, pickup_location, return_location,
+          rental_days, total_price, full_name, phone_number, email, address,
+          status, is_deleted
+        )
+        VALUES (
+          $1, $2, $3, $4, '10:00', '10:00', 'office', 'office',
+          3, 150, 'Overdue Active Guest', '123456', $5, 'Addr',
+          'active', FALSE
+        )
+        `,
+        [reservationId, carId, pickup, returnDate, `overdue-active-${carId}@example.com`]
+      );
+
+      await bookingSync.addRange(carId, pickup, returnDate);
+
+      await changeStatus({
+        reservationId,
+        newStatus: 'car_prepared',
+        reason: 'db_consistency_overdue_active_rental',
+      });
+      await changeStatus({
+        reservationId,
+        newStatus: 'picked_up',
+        reason: 'db_consistency_overdue_active_rental',
+      });
+      await changeStatus({
+        reservationId,
+        newStatus: 'active_rental',
+        reason: 'db_consistency_overdue_active_rental',
+      });
+
+      await pool.query(`UPDATE reservations SET return_date = $2 WHERE id = $1`, [
+        reservationId,
+        returnDate,
+      ]);
+      await pool.query(`UPDATE car_date_blocks SET end_date = $2 WHERE car_id = $1`, [
+        carId,
+        returnDate,
+      ]);
+
+      const beforeReject = await countForCar();
+      expect(beforeReject.reservations).toBe(1);
+      expect(beforeReject.pending).toBe(0);
+      expect(beforeReject.orders).toBe(1);
+      expect(beforeReject.blocks).toBe(1);
+
+      await bookingSync.purgeExpired(carId);
+
+      const blocksAfterPurge = await pool.query(
+        `SELECT start_date, end_date FROM car_date_blocks WHERE car_id = $1`,
+        [carId]
+      );
+      expect(blocksAfterPurge.rowCount).toBe(1);
+      expect(new Date(blocksAfterPurge.rows[0].end_date).getTime()).toBeGreaterThan(
+        Date.now() - 1000
+      );
+
+      const rejectedHold = await reservationSql.createPendingReservationWithAvailabilityCheck({
+        carId,
+        sessionId: secondSessionId,
+        startDate: futureStart,
+        endDate: futureEnd,
+        pickupLocation: 'office',
+        returnLocation: 'office',
+        pricing: { rentalDays: 3, totalPrice: 150 },
+      });
+      expect(rejectedHold.reservation).toBeNull();
+      expect(rejectedHold.bookedOverlap).toBeTruthy();
+
+      const afterReject = await countForCar();
+      expect(afterReject.reservations).toBe(beforeReject.reservations);
+      expect(afterReject.pending).toBe(0);
+      expect(afterReject.orders).toBe(beforeReject.orders);
+      expect(afterReject.blocks).toBe(1);
+
+      await changeStatus({
+        reservationId,
+        newStatus: 'returned',
+        reason: 'db_consistency_overdue_active_rental',
+      });
+
+      await bookingSync.purgeExpired(carId);
+      expect(
+        (await pool.query(`SELECT id FROM car_date_blocks WHERE car_id = $1`, [carId])).rowCount
+      ).toBe(0);
+
+      const allowedHold = await reservationSql.createPendingReservationWithAvailabilityCheck({
+        carId,
+        sessionId: secondSessionId,
+        startDate: futureStart,
+        endDate: futureEnd,
+        pickupLocation: 'office',
+        returnLocation: 'office',
+        pricing: { rentalDays: 3, totalPrice: 150 },
+      });
+      expect(allowedHold.reservation).toBeTruthy();
+      expect(allowedHold.reservation.status).toBe('pending_payment');
+
+      const afterAllow = await countForCar();
+      expect(afterAllow.pending).toBe(1);
+      expect(afterAllow.orders).toBe(1);
+    } finally {
+      await cleanupCar(carId);
+    }
+  });
 });
