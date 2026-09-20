@@ -16,6 +16,7 @@ dist-ssr/
 coverage/
 
 # Jest / Vitest result JSON
+test-results/
 backend/test-results/
 front end/test-results/
 admin-front-end/test-results/
@@ -25,6 +26,10 @@ e2e/playwright-report/
 e2e/test-results/
 e2e/blob-report/
 e2e/playwright/.cache/
+
+# Local scratch / accidental shell redirects
+.rehearsal-pids.txt
+*-test-out.txt
 
 # Logs
 logs/
