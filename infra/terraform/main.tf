@@ -22,14 +22,15 @@ resource "aws_lightsail_static_ip_attachment" "rentacar" {
 resource "aws_lightsail_instance_public_ports" "rentacar" {
   instance_name = aws_lightsail_instance.rentacar.name
 
-  # SSH only through AWS Lightsail browser SSH for now.
+  # SSH open for GitHub Actions deploy (key auth). 0.0.0.0/0 already
+  # covers Lightsail browser SSH; cannot combine with lightsail-connect alias.
   port_info {
     protocol  = "tcp"
     from_port = 22
     to_port   = 22
 
-    cidr_list_aliases = [
-      "lightsail-connect"
+    cidrs = [
+      "0.0.0.0/0"
     ]
   }
 

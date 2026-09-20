@@ -25,7 +25,11 @@ resource "aws_iam_role" "github_actions" {
         Condition = {
           StringEquals = {
             "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
-            "token.actions.githubusercontent.com:sub" = "repo:perikliev00@117957025/rent-a-car-v3@1334199680:ref:refs/heads/main"
+            # Custom GitHub OIDC sub template includes owner_id / repo_id.
+            "token.actions.githubusercontent.com:sub" = [
+              "repo:perikliev00@117957025/rent-a-car-v3@1334199680:ref:refs/heads/main",
+              "repo:perikliev00@117957025/rent-a-car-v3@1334199680:environment:production"
+            ]
           }
         }
       }
