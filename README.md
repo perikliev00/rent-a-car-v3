@@ -617,7 +617,7 @@ GitHub Actions (`.github/workflows/ci.yml`) runs on every push/PR. The aggregate
 | `migration-test` | empty DB → `db:setup` → assert all migrations applied → idempotent `db:migrate` |
 | `e2e-playwright` | fresh PostgreSQL + Playwright; **fails if any test needed a retry** (flake signal) |
 | `docker-build` | builds API + customer + admin images tagged with commit SHA; **on `main` push also pushes them to GHCR** and records digests |
-| `security-scan` | `npm audit --audit-level=high` for backend, frontends, e2e |
+| `security-scan` | Gitleaks full-history secret scan (`fetch-depth: 0`) + `npm audit --audit-level=high` for backend, frontends, e2e |
 | `CI` (`ci-gate`) | fails unless every job above succeeded |
 
 Playwright JSON/HTML and Jest results upload as artifacts (`if: always()`). Do not ignore failing integration/E2E — fix root causes.
