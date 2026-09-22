@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Drops and recreates the public schema, then applies schema, migrations, and seed.
+ * Drops and recreates the public schema, then applies schema and migrations.
  * Development only — requires --confirm or FORCE_DB_RESET=1.
  *
  * Usage: node sql/reset.js [--confirm]
@@ -10,7 +10,6 @@ require('dotenv').config();
 const pool = require('../src/db/pool');
 const { applySchema } = require('./applySchema');
 const { migrate } = require('./migrate');
-const { seed } = require('./seed');
 const {
   assertDevelopmentOnly,
   parseCliArgs,
@@ -49,7 +48,6 @@ async function reset(argv = process.argv.slice(2)) {
   await dropPublicSchema();
   await applySchema({ endPool: false });
   await migrate({ endPool: false });
-  await seed({ endPool: false });
   await pool.end();
 
   console.log('✓ Database reset complete');
