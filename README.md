@@ -98,10 +98,6 @@ Apply schema and migrations:
 
     npm run db:setup
 
-Optional development seed:
-
-    npm run db:seed
-
 ### Backend
 
     cd backend
