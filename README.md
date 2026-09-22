@@ -1,756 +1,306 @@
 # LuxRide
 
-Premium car rental platform for Bulgaria. Browse a fleet of vehicles, search by dates and locations, hold a car temporarily, pay securely via Stripe Checkout, and receive booking confirmation emails. Staff manage cars, orders, contacts, and payments in a separate admin application.
-
-## Screenshots
-
-| Home | Search results |
-|------|----------------|
-| ![Home page](docs/screenshots/home.png) | ![Search results](docs/screenshots/search.png) |
-
-| Car detail | Booking review |
-|------------|----------------|
-| ![Car detail](docs/screenshots/car-detail.png) | ![Order review](docs/screenshots/order.png) |
-
-## Tech Stack
-
-### Backend (`backend/`)
-
-| Layer | Technology |
-|-------|------------|
-| Runtime | Node.js 22 |
-| Framework | Express 5 |
-| Language | JavaScript |
-| Database | PostgreSQL 16 (raw SQL via `pg`, no ORM) |
-| Auth | `express-session` + `connect-pg-simple` (session stored in Postgres) |
-| Payments | Stripe Checkout Sessions |
-| Email | Nodemailer (optional SMTP) |
-| Image storage | Local filesystem or S3-compatible storage |
-| Logging | Pino (structured JSON) |
-| Monitoring | Prometheus metrics, Grafana dashboards, Alertmanager, Sentry (optional) |
-| Tests | Jest + Supertest |
-
-### Customer frontend (`front end/`)
-
-| Layer | Technology |
-|-------|------------|
-| Framework | React 19 |
-| Build tool | Vite 8 |
-| Language | TypeScript |
-| Styling | Tailwind CSS v4 |
-| Server state | TanStack React Query |
-| Routing | React Router v7 |
-| Tests | Vitest + Testing Library |
-
-### Admin frontend (`admin-front-end/`)
-
-Same stack as the customer frontend. Runs on port **5174** in development.
-
-## Project Structure
-
-```
-rent-a-car-v3/
-├── backend/           # Express API, SQL schema, migrations, Docker
-├── front end/         # Customer/public React SPA
-├── admin-front-end/   # Staff admin React SPA
-├── e2e/               # Playwright tests
-├── docs/screenshots/  # README screenshots
-└── README.md
-```
-
-## Prerequisites
-
-- **Node.js** 22+
-- **PostgreSQL** 16+ (local install or Docker)
-- **Stripe** account with test keys (for payments)
-- **Stripe CLI** (optional, for local webhook testing)
-
-## Backend Setup
-
-```bash
-cd backend
-npm install
-cp .env.example .env   # edit with your values
-npm run db:setup       # apply schema + migrations
-npm run dev            # http://localhost:3000
-```
-
-### Backend scripts
-
-| Script | Description |
-|--------|-------------|
-| `npm run dev` | Start API with nodemon |
-| `npm start` | Start API (production) |
-| `npm run worker` | Start background worker (jobs + health only) |
-| `npm test` | Run Jest tests |
-| `npm run test:coverage` | Run Jest with coverage reports and global floors |
-| `npm run test:db` | Run DB consistency tests (`RUN_DB_TESTS=1`) |
-| `npm run test:integration` | Run concurrency + webhook integration tests (`RUN_INTEGRATION_TESTS=1`) |
-| `npm run db:schema` | Apply initial SQL schema |
-| `npm run db:migrate` | Apply versioned migrations |
-| `npm run db:seed` | Seed demo data, realistic 20-car fleet, and dev users |
-| `npm run db:seed:cars` | Seed only the 20-car realistic fleet (idempotent; no bookings) |
-| `npm run db:reset` | Drop schema, re-apply setup + seed (dev only) |
-| `npm run db:backup` | Create SQL backup in `backend/backups/` |
-| `npm run db:restore` | Restore from backup (dev only) |
-| `npm run db:setup` | Schema + migrations |
-| `npm run reconcile:stripe` | Reconcile stuck Stripe sessions |
-
-## Frontend Setup
-
-Customer app:
-
-```bash
-cd "front end"
-npm install
-cp .env.example .env   # set VITE_API_BASE_URL (optional VITE_ADMIN_FRONTEND_URL)
-npm run dev            # http://localhost:5173
-```
+Production-oriented car-rental reservation and operations platform built with Node.js, Express, PostgreSQL, React, Stripe, Docker, GitHub Actions, and AWS.
 
-Admin app:
+LuxRide covers the customer booking journey and the staff operational lifecycle: availability search, temporary holds, Stripe Checkout, booking finalization, customer account management, fleet operations, pickup/return workflows, refunds, monitoring, and production deployment.
 
-```bash
-cd admin-front-end
-npm install
-cp .env.example .env   # set VITE_API_BASE_URL (optional VITE_CUSTOMER_FRONTEND_URL)
-npm run dev            # http://localhost:5174
-```
+## Current status
 
-### Frontend scripts
+- Customer and admin applications are split into separate React frontends.
+- The API and background worker run as separate production processes.
+- PostgreSQL enforces booking consistency with exclusion constraints in addition to application-level locking.
+- CI validates linting, unit tests, frontend tests/builds, database consistency, migrations, integration flows, security scans, Docker images, and Playwright E2E.
+- The production workflow promotes immutable container images from Amazon ECR to AWS Lightsail after CI succeeds.
+- Prometheus, Grafana, Alertmanager, structured logs, health/readiness endpoints, and optional Sentry provide operational visibility.
 
-| Script | Description |
-|--------|-------------|
-| `npm run dev` | Start Vite dev server |
-| `npm run build` | Typecheck + production build |
-| `npm run preview` | Preview production build |
-| `npm test` | Run Vitest tests |
-| `npm run test:coverage` | Run Vitest with coverage reports and global floors |
-| `npm run check` | Lint + typecheck + test |
+> Production note: the current AWS Compose topology includes PostgreSQL on a persistent Docker volume. For business-critical use, prefer managed PostgreSQL with automated backups and PITR, or maintain validated off-host backups and regular restore drills. See `docs/runbooks/db-restore.md`.
 
-## Database Setup
+## Product capabilities
 
-LuxRide uses PostgreSQL with raw SQL — no ORM. Database CLI commands are available from the **repo root** (they delegate to `backend/`).
+### Customer application
 
-### Option A: Docker (recommended for local dev)
+- Search available cars by pickup/return date, time, and location.
+- Temporary reservation holds before payment.
+- Stripe-hosted Checkout with success and cancel flows.
+- Email verification and authenticated customer account.
+- Reservation history and detail views.
+- Travel-detail updates, cancellation requests, document upload/download, and generated reservation PDFs.
+- Responsive public and account interfaces with mobile E2E coverage.
 
-```bash
-docker compose -f docker-compose.dev.yml up -d db
-```
+### Staff application
 
-Default credentials:
+- Operations dashboard and reservation lifecycle management.
+- Fleet, vehicle details, service records, damage, compliance, and documents.
+- Order create/edit/restore flows with conflict protection.
+- Calendar views, manual blocks, tasks, and reservation operations.
+- Pickup and return checklists.
+- Payments, refund/reconciliation workflows, contacts, notifications, analytics, audit logs, users, roles, and RBAC.
+- Realtime admin updates through server-sent events.
 
-- Database: `luxride`
-- User: `luxride`
-- Password: `luxride`
-- URL: `postgres://luxride:luxride@localhost:5432/luxride`
+## Reliability and booking consistency
 
-### Option B: Existing PostgreSQL instance
+Booking correctness is protected at multiple layers:
 
-Create a database and set `DATABASE_URL` in `backend/.env`.
+1. Active payment holds use a PostgreSQL GiST exclusion constraint so overlapping `pending_payment` / `processing_payment` reservations for the same car cannot coexist.
+2. Confirmed operational ranges are stored in `car_date_blocks` and protected by the `no_overlapping_car_blocks` GiST exclusion constraint.
+3. Staff booking writes use per-car PostgreSQL advisory locks before availability-changing mutations.
+4. Checkout session creation is serialized per reservation and reuses an existing valid Stripe Checkout Session when possible.
+5. Stripe webhook processing is idempotent and validates the payment/session context before finalization.
+6. A paid booking that becomes conflicting is routed to `manual_review` instead of silently confirming an inconsistent state.
+7. `picked_up` and `active_rental` reservations remain unavailable even when the scheduled return time has passed; expired-block cleanup preserves open physical rentals.
 
-### Commands (from repo root)
+## Architecture
 
-| Command | Description |
-|---------|-------------|
-| `npm run db:setup` | Apply schema + migrations (first-time setup) |
-| `npm run db:migrate` | Apply pending migrations only |
-| `npm run db:seed` | Insert demo data, realistic 20-car fleet, and admin/demo users |
-| `npm run db:seed:cars` | Insert/skip the 20-car realistic fleet only (safe to re-run; no fake bookings) |
-| `npm run db:reset` | Wipe DB and re-run setup + seed (development only) |
-| `npm run db:backup` | Export plain SQL dump to `backend/backups/` |
-| `npm run db:restore` | Restore from a backup file (development only) |
+| Component | Technology / responsibility |
+| --- | --- |
+| Customer SPA | React 19, TypeScript, Vite, Tailwind CSS, React Query |
+| Admin SPA | React 19, TypeScript, Vite, Tailwind CSS, React Query |
+| API | Node.js 22, Express 5, raw SQL through `pg` |
+| Worker | Same backend image; scheduled/background operational jobs |
+| Database | PostgreSQL 16 |
+| Sessions | `express-session` + `connect-pg-simple` |
+| Payments | Stripe Checkout + signed webhooks + reconciliation |
+| Storage | S3-compatible public/private storage; local drivers for development |
+| Email | Nodemailer / SMTP |
+| Observability | Pino, Prometheus, Grafana, Alertmanager, optional Sentry |
+| Testing | Jest, Supertest, Vitest, Testing Library, Playwright |
+| Delivery | GitHub Actions, Amazon ECR, AWS Lightsail, Docker Compose |
 
-Typical local workflow:
+## Repository layout
 
-```bash
-npm run db:setup
-npm run db:seed
-```
+    rent-a-car-v3/
+    ├── backend/           Express API, worker, SQL schema/migrations, tests
+    ├── front end/         Customer React application
+    ├── admin-front-end/   Staff/admin React application
+    ├── e2e/               Playwright browser tests
+    ├── monitoring/        Prometheus, Alertmanager, Grafana configuration
+    ├── ops/               Production deployment scripts
+    ├── infra/             AWS/Terraform infrastructure
+    ├── docs/              Runbooks, operational notes, audit evidence
+    └── .github/workflows/ CI and production deployment
 
-Full dev reset (requires confirmation):
+## Local development
 
-```bash
-npm run db:reset -- --confirm
-# or: FORCE_DB_RESET=1 npm run db:reset -- --confirm
-```
+### Prerequisites
 
-Backup and restore:
+- Node.js 22+
+- PostgreSQL 16+ or Docker
+- Stripe test credentials for payment work
+- Stripe CLI only when forwarding local webhooks
 
-```bash
-npm run db:backup
-npm run db:restore -- --file=backend/backups/luxride_YYYY-MM-DD_HH-mm-ss.sql --confirm
-# or latest backup:
-npm run db:restore -- --latest --confirm
-```
+### Database
 
-`db:reset` and `db:restore` are blocked when `NODE_ENV=production`.
+Start PostgreSQL with Docker:
 
-Backup/restore require PostgreSQL client tools (`pg_dump`, `psql`) in PATH. If they are not installed locally, use Docker:
+    docker compose -f docker-compose.dev.yml up -d db
 
-```bash
-docker compose -f docker-compose.dev.yml exec -T db pg_dump -U luxride luxride > backup.sql
-docker compose -f docker-compose.dev.yml exec -T db psql -U luxride luxride < backup.sql
-```
+Apply schema and migrations:
 
-#### Managed backups and point-in-time recovery (production)
+    npm run db:setup
 
-`docker-compose.prod.yml` ships a local Postgres volume for demos only — **not** production DR. Use managed PostgreSQL 16 (RDS, Cloud SQL, Neon, Aiven, Azure, etc.) with:
+Optional development seed:
 
-1. Automated daily snapshots (encrypted)
-2. Continuous WAL / **PITR** with retention ≥ 7–14 days
-3. Alerts on failed backups
-4. Documented RPO/RTO for the team
-
-`npm run db:backup` is a logical dump for drills and local recovery — it does **not** replace provider PITR.
-
-#### Restore drill (required before trusting backups)
-
-A backup that has never been restored is not a proven backup. Drill against a **separate** database (never overwrite production/`DATABASE_URL` you care about):
-
-```bash
-# 1) Backup source
-cd backend
-DATABASE_URL=postgres://…/luxride_source npm run db:backup -- --out=backups/drill_source.sql
-
-# 2) Create empty drill DB, then restore into it
-createdb luxride_restore_drill
-DATABASE_URL=postgres://…/luxride_restore_drill NODE_ENV=development \
-  npm run db:restore -- --file=backups/drill_source.sql --confirm
-
-# 3) Boot API against the restored DB and check readiness
-DATABASE_URL=postgres://…/luxride_restore_drill npm start
-# GET /health/ready — then spot-check reservations, users, payment_events / refunds
-```
-
-Pass criteria: restore succeeds, `/health/ready` is OK, row counts for reservations/users/payments match expectations, GiST exclusion constraints (`no_overlapping_car_blocks`, `no_overlapping_active_reservation_holds`) exist.
-
-### Schema and migrations
-
-- **Schema** — `backend/sql/schema/` (categories, cars, users, sessions, reservations, orders, calendar, payments, etc.)
-- **Migrations** — `backend/migrations/` (tracked in `schema_migrations` table)
-- Fresh databases: always prefer `npm run db:setup` (schema + migrations). Migration `034_car_date_blocks_exclusion.sql` also installs `btree_gist` + `no_overlapping_car_blocks` for migrate-only / legacy paths.
-- Connection pool / timeouts: see `PG_POOL_*` and `PG_STATEMENT_TIMEOUT_MS` / `PG_IDLE_IN_TRANSACTION_TIMEOUT_MS` / `PG_LOCK_TIMEOUT_MS` in [`backend/.env.example`](backend/.env.example). Production defaults: pool max 20, statement 15s, idle-in-tx 30s, lock 5s.
-
-### Demo data
-
-`npm run db:seed` inserts categories, the original 5 demo cars, a **20-car realistic fleet**, sample contacts, demo orders, and two users.
-
-The realistic fleet (`backend/sql/seed/realisticFleetData.js`) is also available on its own:
-
-```bash
-npm run db:seed:cars
-```
-
-That command is idempotent: it inserts a car only when its fictional registration number and VIN are not already present. It does not update existing cars, create bookings/payments, or add calendar blocks. Registration plates (`C 1001 XX` … `C 1020 XX`) and VINs (`ZZ1RACV3SEED00001` …) are fictional test/demo identifiers.
-
-Prices are stored as EUR `NUMERIC(10,2)` (the pricing engine / Stripe currency). Suggested Bulgarian day rates are used as the 1–3 day tier; 7–31 and 31+ tiers follow the existing demo discount shape.
-
-| Role | Default email | Default password |
-|------|---------------|------------------|
-| Admin | `admin@luxride.local` | `Admin123!` |
-| User | `demo@luxride.local` | `Demo123!` |
-
-Override via `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_DEMO_USER_EMAIL`, and `SEED_DEMO_USER_PASSWORD` in `backend/.env` (see [`backend/.env.example`](backend/.env.example)).
-
-Seed is idempotent — safe to re-run without duplicating data.
-
-## Environment Variables
-
-Copy the example files and fill in your values:
-
-- **Backend:** [`backend/.env.example`](backend/.env.example)
-- **Customer frontend:** [`front end/.env.example`](front%20end/.env.example)
-- **Admin frontend:** [`admin-front-end/.env.example`](admin-front-end/.env.example)
-
-### Required (backend, non-test)
-
-| Variable | Description |
-|----------|-------------|
-| `DATABASE_URL` | PostgreSQL connection string |
-| `SESSION_SECRET` | Min 32 characters; used for session cookies |
-| `STRIPE_SECRET` | Stripe secret key (`sk_test_...` in dev, `sk_live_...` in prod) |
-| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret (`whsec_...`) |
-| `FRONTEND_BASE_URL` | Required in production; customer site (Stripe success/cancel, email verify). Defaults to `http://localhost:5173` in dev |
-
-### Commonly configured
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `NODE_ENV` | `development` | Environment |
-| `PORT` | `3000` | API port |
-| `CORS_ORIGINS` | dev defaults | Comma-separated allowed frontend origins (customer and admin) |
-| `EMAIL_ENABLED` | `false` | Enable SMTP email sending |
-| `STORAGE_DRIVER` | `local` | `local` or `s3` for public car images only |
-| `PRIVATE_STORAGE_DRIVER` | `local` | `local` or `s3` for identity docs, signatures, and checklist photos |
-| `PRIVATE_STORAGE_PERSISTENT` | unset | Required in production when private storage is `local` (attests a durable volume) |
-| `PRIVATE_S3_BUCKET` | unset | Required when `PRIVATE_STORAGE_DRIVER=s3`; private bucket, not the CDN image bucket |
-
-### Frontend
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `VITE_API_BASE_URL` | `http://localhost:3000` | Backend API base URL |
-
-## Running Tests
-
-From the **repo root**:
-
-```bash
-npm test                 # backend Jest + frontend Vitest
-npm run test:unit        # backend Jest only
-npm run test:frontend    # frontend Vitest only
-npm run test:db          # DB consistency (needs PostgreSQL)
-npm run test:integration # concurrency / webhooks (needs PostgreSQL)
-npm run test:e2e         # Playwright
-npm run test:all         # everything above
-```
-
-`npm test` does not need a database. `test:db`, `test:integration`, and `test:e2e` use a dedicated test Postgres.
-
-Copy `.env.test.example` to `.env.test` (gitignored) and point `DATABASE_URL` at `luxride_test`, not `rent_a_car`. Test runners load that file automatically — no need to export `DATABASE_URL` in the shell. CI can still set `DATABASE_URL` in the environment (it wins over `.env.test`).
-
-```bash
-# Once: create the DB, then apply schema
-createdb luxride_test
-npm run db:setup:test
-
-npm run test:integration
-npm run test:e2e
-```
+    npm run db:seed
 
 ### Backend
 
-```bash
-cd backend
-npm test
-npm run test:coverage
-```
-
-Jest runs unit tests in `backend/tests/` with `--runInBand`. Tests use a mocked environment (see `tests/setup.js`). Coverage reports land in `backend/coverage/` and `front end/coverage/`; CI uploads them as artifacts. Unit coverage floors are enforced by Jest `coverageThreshold` and Vitest `coverage.thresholds`. Local `npm test` and `npm run check` do not apply the gate. Floors are global integers from the 2026-08-22 baseline; raise them later when coverage actually goes up — do not lower them to make a PR green. Slow tests are printed via Jest/Vitest `slowTestThreshold` (500ms unit, 8000ms integration). Playwright JSON and HTML reports are CI artifacts; retries in the JSON are the flake signal.
-
-Optional database consistency tests (from repo root, uses `.env.test`):
-
-```bash
-npm run test:db
-```
-
-### Integration & E2E tests
-
-Concurrency and webhook integration tests use a **separate test database** with real PostgreSQL, HTTP, and signed Stripe webhooks (no mocked `bookingFinalizationService` or `reservationSqlService`).
-
-```bash
-createdb luxride_test
-npm run db:setup:test
-npm run test:integration
-npm run test:e2e
-```
+    cd backend
+    npm ci
+    cp .env.example .env
+    npm run dev
 
-Recommended env for local integration/E2E:
-
-| Variable | Example |
-|----------|---------|
-| `DATABASE_URL` | `postgres://luxride:luxride@localhost:5432/luxride_test` |
-| `RUN_INTEGRATION_TESTS` | `1` |
-| `STRIPE_STUB` | `1` (mock Checkout create/retrieve; webhooks stay real + signed) |
-| `STRIPE_WEBHOOK_SECRET` | fixed test secret |
-| `SESSION_SECRET` | 32+ char test secret |
-| `EMAIL_ENABLED` | `false` |
+The API starts on port 3000 by default.
 
-Playwright E2E (full UI journey: search → checkout → webhook → admin):
+### Customer frontend
 
-```bash
-# From repo root
-npm run e2e:install
-DATABASE_URL=postgres://luxride:luxride@localhost:5432/luxride_test npm run db:setup
-npm run e2e
+    cd "front end"
+    npm ci
+    cp .env.example .env
+    npm run dev
 
-# Interactive UI mode
-npm run e2e:ui
-```
-
-E2E starts backend (`STRIPE_STUB=1`), the customer frontend (`:5173`), and the admin frontend (`:5174`) via Playwright `webServer`, or reuses already-running dev servers locally.
-
-### Frontend
-
-```bash
-cd "front end"
-npm test          # single run
-npm run test:watch
-npm run test:coverage
-npm run check     # lint + typecheck + test (no coverage)
-
-cd ../admin-front-end
-npm test
-npm run check
-```
-
-Tests are co-located under each app’s `src/` directory.
-
-## Stripe Payment Flow
+The customer app uses port 5173 by default.
 
-LuxRide uses **Stripe Checkout Sessions** (hosted payment page). No Stripe publishable key is needed on the frontend — users are redirected to Stripe.
+### Admin frontend
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant Frontend
-    participant API
-    participant DB
-    participant Stripe
+    cd admin-front-end
+    npm ci
+    cp .env.example .env
+    npm run dev
 
-    User->>Frontend: Select car + dates
-    Frontend->>API: POST /api/orders
-    API->>DB: Create reservation (status=pending_payment, 35min hold)
-    API-->>Frontend: Pricing preview
+The admin app uses port 5174 by default.
 
-    User->>Frontend: Continue to checkout
-    Frontend->>API: POST /api/checkout
-    API->>DB: Update reservation (status=processing_payment)
-    API->>Stripe: checkout.sessions.create
-    API->>DB: Store stripe_session_id
-    API-->>Frontend: checkoutUrl
-    Frontend->>Stripe: Redirect to hosted checkout
+## Environment and production validation
 
-    Stripe->>API: POST /webhook/stripe (checkout.session.completed)
-    API->>DB: Block dates + create order + status paid then confirmed
-    API->>API: Send confirmation emails (async)
+Reference files:
 
-    Stripe-->>Frontend: Redirect /checkout/success?session_id=...
-    Frontend->>API: GET /api/checkout/success
-    API-->>Frontend: Confirmation (fallback if webhook delayed)
-```
+- `backend/.env.example`
+- `front end/.env.example`
+- `admin-front-end/.env.example`
+- `.env.docker.example`
 
-### Key endpoints
+Important backend variables include:
 
-| Method | Route | Purpose |
-|--------|-------|---------|
-| `POST` | `/api/orders` | Create pending reservation + price preview |
-| `POST` | `/api/checkout` | Create Stripe Checkout Session |
-| `GET` | `/api/checkout/success` | Confirm payment (webhook fallback) |
-| `POST` | `/api/checkout/cancel` | Release hold on cancel |
-| `POST` | `/webhook/stripe` | Stripe webhook (raw body) |
+| Variable | Purpose |
+| --- | --- |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `SESSION_SECRET` | Session signing secret; minimum 32 characters |
+| `FRONTEND_BASE_URL` | Customer-site URL used by redirects and verification |
+| `CORS_ORIGINS` | Explicit customer/admin browser origins |
+| `STRIPE_SECRET` | Stripe secret key |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret |
+| `EMAIL_ENABLED` + SMTP variables | Transactional email |
+| `STORAGE_DRIVER` / `S3_BUCKET` | Public asset storage |
+| `PRIVATE_STORAGE_DRIVER` / `PRIVATE_S3_BUCKET` | Private customer/staff documents |
+| `METRICS_TOKEN` | Protects metrics endpoints |
+| `SENTRY_DSN` | Optional backend error reporting |
 
-### Local webhook testing
+When `NODE_ENV=production`, startup validation rejects unsafe or incomplete configuration, including weak session secrets, Stripe stub mode, invalid webhook secrets, insecure frontend/CORS URLs, loopback database URLs, disabled secure cookies, non-durable public storage, incomplete private-storage configuration, and missing production SMTP configuration.
 
-```bash
-stripe listen --forward-to localhost:3000/webhook/stripe
-```
+## Security controls
 
-Copy the webhook signing secret (`whsec_...`) into `STRIPE_WEBHOOK_SECRET`.
+- PostgreSQL-backed server sessions with secure, httpOnly cookies in production.
+- CSRF protection on mutating session-authenticated API routes.
+- Explicit CORS allowlist.
+- Helmet security headers and HSTS in production.
+- Separate auth/signup/login/admin/upload/checkout rate limits.
+- Role-based authorization for staff operations.
+- Upload validation and separate private-storage handling.
+- Structured logging with sensitive-field redaction in Sentry integration.
+- Full-history Gitleaks scan and `npm audit --audit-level=high` in CI.
 
-### Reconciliation
+## Testing
 
-If a reservation stays in `processing_payment` after payment, run:
+Run the common suites from the repository root:
 
-```bash
-cd backend
-npm run reconcile:stripe
-```
+    npm test
+    npm run test:db
+    npm run test:integration
+    npm run test:e2e
+    npm run test:all
 
-## Booking / Reservation Logic
+`npm test` runs backend unit/API tests and both frontend unit suites without PostgreSQL. Database consistency, integration, and E2E suites use a dedicated test database.
 
-### Flow
+See [`TESTING.md`](TESTING.md) for ownership boundaries, local test setup, concurrency coverage, CI behavior, and Playwright reporting.
 
-1. **Search** — User picks dates, times, and pickup/return locations.
-2. **Hold** — `POST /api/orders` creates a `pending_payment` reservation with a **35-minute hold**.
-3. **Checkout** — `POST /api/checkout` links a Stripe Checkout Session (expires in **30 minutes**) and sets status to `processing_payment`.
-4. **Payment** — Stripe webhook `checkout.session.completed` finalizes the booking (`paid` → `confirmed`).
-5. **Confirmation** — Date range is blocked in `car_date_blocks`, an order is created, reservation becomes `confirmed`, and emails are sent.
+## CI/CD
 
-### Reservation statuses
+### CI
 
-| Status | Meaning |
-|--------|---------|
-| `pending_payment` | Hold created, not yet in Stripe |
-| `processing_payment` | Stripe Checkout Session active |
-| `paid` | Payment received; confirming booking |
-| `confirmed` | Paid; order created |
-| `car_prepared` | Vehicle prepared for pickup |
-| `picked_up` | Customer has the car |
-| `active_rental` | Rental in progress |
-| `returned` | Car returned |
-| `completed` | Rental closed |
-| `cancelled` | User released or checkout cancelled |
-| `expired` | Hold timed out |
-| `no_show` | Customer did not pick up |
-| `manual_review` | Paid but overlap conflict — needs admin action |
-| `refunded` | Payment refunded |
+`.github/workflows/ci.yml` runs on pushes and pull requests. The pipeline includes:
 
-Statuses `pending_payment` and `processing_payment` block availability for other users. Status changes go through `ReservationStatusService` with history in `reservation_status_history`. Admin ops: `/admin/reservations`.
+- backend lint and Jest coverage;
+- customer frontend lint, typecheck, Vitest coverage, and production build;
+- admin frontend lint, typecheck, Vitest coverage, and production build;
+- migration installation/idempotency checks;
+- PostgreSQL database-consistency tests;
+- integration tests with real PostgreSQL and signed Stripe webhook flows;
+- Playwright E2E with a retry/flake gate;
+- full-history Gitleaks and high-severity npm audits;
+- Docker image builds for API, customer, and admin applications.
 
-### Availability checking
+On `main`, the Docker job publishes commit-SHA-tagged images to Amazon ECR. Deployments use immutable image digests rather than rebuilding on the server.
 
-Two layers prevent double-booking:
+### Production deployment
 
-1. **Active holds** — Overlapping `pending_payment`/`processing_payment` reservations on the same car (with `hold_expires_at > now`).
-2. **Confirmed blocks** — `car_date_blocks` table with a GiST EXCLUDE constraint preventing date-range overlaps.
+`.github/workflows/deploy.yml` starts after a successful CI run on `main` or through an explicit manual dispatch.
 
-Creation uses a per-car PostgreSQL advisory lock inside a transaction.
-
-### Pricing
-
-```
-total = (dayPrice × rentalDays) + deliveryFee + returnFee
-```
-
-Day price uses tiered rates based on rental length:
-
-- **1–3 days** → `price_tier_1_3`
-- **4–31 days** → `price_tier_7_31`
-- **32+ days** → `price_tier_31_plus`
-
-Falls back to `cars.price` when tiers are not set. Delivery/return fees depend on the selected location.
-
-### Cancellation / release
-
-| Action | Endpoint | Effect |
-|--------|----------|--------|
-| Release hold | `POST /api/reservations/release` | Sets `cancelled` |
-| Checkout cancel | `POST /api/checkout/cancel` | Releases hold + shows support info |
-| Admin delete order | Admin panel | Soft-deletes order, removes date blocks |
-
-There is no customer-facing API to cancel a confirmed order.
-
-## Docker Setup
-
-Docker files live in `backend/`:
-
-- [`backend/Dockerfile`](backend/Dockerfile) — Node 22 Alpine, exposes port 3000
-- [`backend/docker-compose.yml`](backend/docker-compose.yml) — `app` + `db` services
-
-### Database only
-
-```bash
-cd backend
-docker compose up -d db
-```
-
-### Full stack
-
-```bash
-cd backend
-cp .env.example .env   # set DATABASE_URL to postgres://luxride:luxride@db:5432/luxride
-docker compose up --build
-```
-
-The `app` service depends on `db`, loads env from `.env`, and exposes port 3000 with a health check on `/health`.
-
-> **Note:** The frontend is not included in Docker Compose. Build and serve it separately (e.g. Vite preview, Nginx, or a static host) and point `VITE_API_BASE_URL` at the API.
-
-## Deployment Plan
-
-### 1. Infrastructure
-
-| Component | Recommendation |
-|-----------|----------------|
-| API | 2× containers from `backend/Dockerfile` (`node src/server.js`, `RUN_BACKGROUND_JOBS=false`) |
-| Worker | 1× same image (`node src/worker.js`) for expiry / cleanup / notifications / fleet reconcile |
-| Database | Managed PostgreSQL 16 with automated backups + PITR (job locks use `pg_try_advisory_lock`; Redis not required). Compose `db` volume is not production DR. |
-| Frontend | Static build (`npm run build`) served via CDN/Nginx |
-| Images | `STORAGE_DRIVER=s3` with S3-compatible bucket + CDN URL |
-| Private documents | `PRIVATE_STORAGE_DRIVER=s3` with a private (non-CDN) bucket, or a backed-up volume at `/app/uploads/private` |
-
-`docker-compose.prod.yml` wires `backend` (API, jobs off) + `worker` (jobs on). Local `npm run dev` may still run jobs in-process when `RUN_BACKGROUND_JOBS` is unset.
-
-### 2. Environment (production)
-
-Set these in the production `.env`:
-
-```env
-NODE_ENV=production
-DATABASE_URL=postgres://...
-SESSION_SECRET=<32+ random chars>
-FRONTEND_BASE_URL=https://your-domain.com
-CORS_ORIGINS=https://your-domain.com,https://admin.your-domain.com
-STRIPE_SECRET=sk_live_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-STORAGE_DRIVER=s3
-S3_BUCKET=...
-STORAGE_PUBLIC_BASE_URL=https://cdn.your-domain.com
-PRIVATE_STORAGE_DRIVER=s3
-PRIVATE_S3_BUCKET=...
-SENTRY_DSN=https://...
-EMAIL_ENABLED=true
-SMTP_HOST=...
-SMTP_USER=...
-SMTP_PASS=...
-MAIL_FROM=noreply@your-domain.com
-```
-
-Production validation (in `backend/src/config/env.js`) refuses to start when:
-
-- `STRIPE_STUB` is enabled
-- Stripe webhook secret is missing, not `whsec_...`, or a known placeholder
-- `SESSION_SECRET` is short or a known default
-- `FRONTEND_BASE_URL` / `CORS_ORIGINS` use HTTP or localhost/dev hosts
-- `DATABASE_URL` points at localhost / loopback
-- `SESSION_COOKIE_SECURE` is explicitly disabled
-- `STORAGE_DRIVER` is not `s3` (ephemeral local public uploads)
-- Private storage is local without `PRIVATE_STORAGE_PERSISTENT=true` (prefer `PRIVATE_STORAGE_DRIVER=s3`)
-- Email/SMTP is not fully configured (`EMAIL_ENABLED=true` + SMTP vars)
-- Stripe secret is not a live key (`sk_live_...`)
-
-Also enforced at runtime: CORS allowlist, `trust proxy`, CSRF on mutating `/api` routes, and `secure` / `httpOnly` / `sameSite` session cookies. Keep secrets in the environment or a secret manager — never in Git or the Docker image (`.env` is gitignored and dockerignored).
-
-### 3. Deploy steps
-
-1. **Database** — Provision PostgreSQL, run `npm run db:setup` against production DB.
-2. **Stripe** — Register webhook endpoint `https://api.your-domain.com/webhook/stripe` for `checkout.session.completed`.
-3. **API** — Deploy API replicas behind a reverse proxy with `trust proxy` enabled (`RUN_BACKGROUND_JOBS=false`). Express sets trust proxy in production.
-4. **Worker** — Deploy one worker (`npm run worker` / compose `worker` service) for periodic jobs. PostgreSQL advisory locks skip overlapping runs.
-5. **Customer frontend** — `cd "front end" && npm run build`, deploy `dist/` with `VITE_API_BASE_URL` pointing to the API. Optional `VITE_ADMIN_FRONTEND_URL` for staff redirect.
-6. **Admin frontend** — `cd admin-front-end && npm run build`, deploy `dist/` on the admin hostname. Same `VITE_API_BASE_URL`.
-7. **Verify** — Health check (`GET /health/live`), readiness (`GET /health/ready`), test booking flow end-to-end with Stripe test mode first. Confirm Stripe success/cancel still land on the customer site.
-8. **Monitoring** — See [Observability](#observability) below.
-
-### 4. CI
-
-GitHub Actions (`.github/workflows/ci.yml`) runs on every push/PR. The aggregate job **`CI`** must be green before merge once branch protection is enabled.
-
-| Job | What it runs |
-|-----|----------------|
-| `backend-lint` | ESLint |
-| `backend-unit` | Jest unit + coverage floor |
-| `frontend` / `frontend-admin` | lint + typecheck + Vitest + coverage + production `build` |
-| `db-consistency` | PostgreSQL + `npm run test:db` |
-| `integration` | PostgreSQL + `npm run test:integration` |
-| `migration-test` | empty DB → `db:setup` → assert all migrations applied → idempotent `db:migrate` |
-| `e2e-playwright` | fresh PostgreSQL + Playwright; **fails if any test needed a retry** (flake signal) |
-| `docker-build` | builds API + customer + admin images tagged with commit SHA; **on `main` push also pushes them to GHCR** and records digests |
-| `security-scan` | Gitleaks full-history secret scan (`fetch-depth: 0`) + `npm audit --audit-level=high` for backend, frontends, e2e |
-| `CI` (`ci-gate`) | fails unless every job above succeeded |
-
-Playwright JSON/HTML and Jest results upload as artifacts (`if: always()`). Do not ignore failing integration/E2E — fix root causes.
-
-**Deploy** (`.github/workflows/deploy.yml`): after a successful CI run on `main`, **does not rebuild**. It pulls the SHA images CI already pushed, records digests, deploys staging, then production with the **same digests**. Manual `workflow_dispatch` must pass a commit SHA that already has green CI on `main` and images in GHCR. Set repo variables `VITE_API_BASE_URL` (required on main), optional `VITE_ADMIN_FRONTEND_URL` / `VITE_CUSTOMER_FRONTEND_URL`. Hosts use `IMAGE_PREFIX=ghcr.io/<org>/<repo> IMAGE_TAG=<sha>` with `docker-compose.prod.yml` — never `up --build` for promote.
-
-#### Making CI mandatory (after 3 fully green runs)
-
-Gate: wait until **`CI` is fully green three times in a row** on `main` (no Playwright retries in the flake check). Then:
-
-```bash
-# requires: gh auth login with repo admin
-bash scripts/enable-main-protection.sh
-```
-
-Or in GitHub UI:
-
-1. **Settings → Rules → Rulesets** (or Branch protection) for `main`
-2. Require a pull request before merging; block direct pushes
-3. Require status checks: at minimum the aggregate **`CI`** job (or every individual job above)
-4. Require branches to be up to date; do not allow admin bypass if you want a hard gate
-5. Deploy only via the Deploy workflow / environment protection on `staging` and `production`
-
-Until that gate is met, keep fixing flakes — do not mark checks optional and do not raise Playwright `retries`.
-
-### 5. Post-deploy operations
-
-- Run `npm run reconcile:stripe` periodically or on alert for stuck `processing_payment` reservations.
-- Apply new migrations with `npm run db:migrate` on each release.
-- Confirm managed backup + PITR is enabled; run a restore drill to a separate database after first deploy and after major schema changes (see [Restore drill](#restore-drill-required-before-trusting-backups)).
-- Size `PG_POOL_MAX` so `max × (API replicas + worker) < managed max_connections − ~10`.
-
-## Observability
-
-The stack includes structured logging, Prometheus metrics, Grafana dashboards, and Alertmanager alerts (via root `docker-compose.dev.yml` / `docker-compose.prod.yml`).
-
-### Request tracing
-
-Every API request gets a `requestId` (UUID). Response headers:
-
-- `X-Request-Id` (primary)
-- `X-Correlation-Id` (backward compatible alias)
-
-Pass `X-Request-Id` from clients/upstream to correlate logs across services.
-
-### Health endpoints
+Release flow:
+
+1. Resolve the exact 40-character commit SHA.
+2. Verify that the API, customer, and admin images exist in ECR.
+3. Resolve immutable ECR digests for all three images.
+4. Check out the exact release commit.
+5. Authenticate the Lightsail host to ECR through GitHub Actions AWS OIDC credentials.
+6. Copy the versioned Compose, monitoring, and deployment payload.
+7. Run `ops/deploy-production.sh` on the host.
+8. Validate backend readiness, worker/frontend containers, Prometheus, Alertmanager, and Grafana.
+9. Verify that the running API/worker/customer/admin containers use the expected immutable image references.
+10. Automatically restore the previous deployment configuration if the deployment fails after rollback is armed.
+
+Current AWS Compose services:
+
+- PostgreSQL
+- backend API
+- background worker
+- customer frontend
+- admin frontend
+- Prometheus
+- Alertmanager
+- Grafana
+
+Use the deployment workflow for rollback rather than rebuilding an older commit. See [`docs/runbooks/rollback.md`](docs/runbooks/rollback.md).
+
+## Health and observability
 
 | Endpoint | Purpose |
-|----------|---------|
-| `GET /health/live` | Liveness — process up, uptime, app version |
-| `GET /health/ready` | Readiness — PostgreSQL, Stripe config, migration status |
-| `GET /health` | Alias for `/health/live` |
-| `GET /ready` | Alias for `/health/ready` |
+| --- | --- |
+| `GET /health/live` | Process liveness, uptime, version |
+| `GET /health/ready` | Database, Stripe configuration, migration readiness |
+| `GET /health` | Liveness alias |
+| `GET /ready` | Readiness alias |
+| `GET /metrics` | Authenticated JSON metrics snapshot |
+| `GET /prometheus` | Authenticated Prometheus metrics |
 
-### Metrics
+Important alerts include API/worker availability, stale worker heartbeat, migration failures, database-pool pressure, Stripe webhook failures, paid-but-not-confirmed bookings, post-payment conflicts, high checkout error rate, 5xx spikes, storage errors, and low disk space.
 
-| Endpoint | Auth (prod) | Format |
-|----------|-------------|--------|
-| `GET /metrics` | `METRICS_TOKEN` | JSON snapshot |
-| `GET /prometheus` | `METRICS_TOKEN` | Prometheus text |
+Operational documentation:
 
-Key business gauges (polled every 30s from DB):
+- [`docs/README.md`](docs/README.md) — documentation index
+- [`docs/runbooks/webhook-failure.md`](docs/runbooks/webhook-failure.md) — Stripe/payment recovery
+- [`docs/runbooks/rollback.md`](docs/runbooks/rollback.md) — application rollback
+- [`docs/runbooks/db-restore.md`](docs/runbooks/db-restore.md) — backup/restore and DR guidance
+- [`docs/ops/production-alertmanager-email.md`](docs/ops/production-alertmanager-email.md) — production alert email setup
 
-- `paid_not_confirmed_count` — **critical** — Stripe paid but reservation not confirmed
-- `processing_paid_count` — stuck in `processing_payment` with Stripe session
-- `active_reservations_count`, `db_pool_*`, `unresolved_payment_failures_count`
-- `ready_status`, `migrations_ok`, `migrations_pending`
-- `storage_free_bytes` / `storage_size_bytes` (upload volumes + `postgres_data` via RO mount `/mnt/pgdata`)
-- `pg_database_size_bytes` — logical DB size (growth signal; free space still comes from `storage_*` on `postgres_data`)
-- Worker-only: `worker_heartbeat_unixtime`, `background_job_*`
+## Reservation lifecycle
 
-### Structured business events (Pino logs)
+Primary statuses:
 
-Events include `checkout.started`, `checkout.completed`, `checkout.failed`, `reservation.created`, `reservation.confirmed`, `reservation.cancelled`, `stripe.webhook.received`, `stripe.payment.succeeded`, `stripe.payment.failed`, `admin.login.success`, `admin.login.failed`, `email.confirmation.failed`.
+| Status | Meaning |
+| --- | --- |
+| `pending_payment` | Temporary hold created |
+| `processing_payment` | Stripe Checkout session in progress |
+| `paid` | Payment received while finalization is completing |
+| `confirmed` | Booking finalized and operational order exists |
+| `car_prepared` | Vehicle prepared for pickup |
+| `picked_up` | Vehicle handed to customer |
+| `active_rental` | Rental currently open |
+| `returned` | Vehicle returned |
+| `completed` | Rental workflow closed |
+| `cancelled` | Reservation cancelled/released |
+| `no_show` | Pickup did not occur |
+| `expired` | Temporary hold expired |
+| `manual_review` | Paid booking requires staff intervention |
+| `refunded` | Payment refunded |
 
-Slow requests (> `SLOW_REQUEST_MS`, default 1000) log as `http.slow_request`.
+Status history is persisted for operational visibility. Customer cancellation requests and admin actions follow the service-layer transition rules rather than mutating statuses directly from the UI.
 
-### Grafana dashboards (port 3001)
+## Payment flow
 
-| Dashboard | UID |
-|-----------|-----|
-| API | `luxride-api` |
-| Booking | `luxride-booking` |
-| Payment | `luxride-payment` |
-| Database | `luxride-database` |
-| System Health | `luxride-system` |
+1. Customer creates a reservation hold.
+2. Checkout validates the current reservation and pricing context.
+3. A Stripe Checkout Session is created or an existing valid session is reused under a reservation checkout lock.
+4. Stripe sends `checkout.session.completed` to the raw-body webhook endpoint.
+5. The backend validates the signed event, payment/session metadata, amount/currency context, and reservation state.
+6. Finalization atomically creates/updates the operational booking state and date block.
+7. Duplicate events are safely ignored.
+8. Paid conflicts are retained for `manual_review` and surfaced through metrics/alerts.
 
-### Alerts (Alertmanager, port 9093)
+Use `npm --prefix backend run reconcile:stripe` for operational reconciliation of stuck Stripe sessions when required.
 
-Prometheus rules in `monitoring/prometheus/alerts.yml`. Critical alerts include:
+## Backups and disaster recovery
 
-- **ApiDown** / **ReadinessFailed** / **MigrationsPendingOrFailed**
-- **PaidButNotConfirmed** — Stripe paid but reservation not confirmed
-- **ReservationConflictAfterPayment** / **DbPoolExhausted**
-- **WorkerDown** / **WorkerStale** / **DiskSpaceLow**
+The repository includes logical PostgreSQL backup/restore tooling and a restore runbook. Logical dumps are useful for drills and recovery, but they are not a substitute for a tested production DR strategy.
 
-Warning alerts include Stripe webhook failures, high 5xx, background job failures, booking conflict spikes, and storage errors.
+For a real business deployment, maintain all of the following:
 
-**AWS Lightsail (production):** configure SMTP email delivery via an untracked host file
-`/opt/rentacar/config/alertmanager.env`. See
-[docs/ops/production-alertmanager-email.md](docs/ops/production-alertmanager-email.md).
-Never commit real SMTP credentials.
+- automated off-host backups or managed snapshots;
+- defined retention and encryption;
+- alerts when backups fail;
+- a documented RPO/RTO;
+- regular restore drills into a separate database;
+- post-restore checks for migrations, booking constraints, payment state, and application readiness.
 
-**Local / `docker-compose.prod.yml`:** optional webhook delivery in root `.env`:
-
-```env
-ALERTMANAGER_WEBHOOK_URL=https://hooks.slack.com/services/...
-```
-
-Sentry:
-
-- Backend / worker: `SENTRY_DSN`
-- Customer + admin frontends: `VITE_SENTRY_DSN` (optional build arg / repo variable)
-
-### Runbooks
-
-| Scenario | Doc |
-|----------|-----|
-| Stripe webhook failure | [docs/runbooks/webhook-failure.md](docs/runbooks/webhook-failure.md) |
-| Roll back previous version | [docs/runbooks/rollback.md](docs/runbooks/rollback.md) |
-| Restore the database | [docs/runbooks/db-restore.md](docs/runbooks/db-restore.md) |
-| Production Alertmanager email | [docs/ops/production-alertmanager-email.md](docs/ops/production-alertmanager-email.md) |
-
-### Local monitoring stack
-
-```bash
-docker compose -f docker-compose.dev.yml up --build
-```
-
-- Prometheus: http://localhost:9090
-- Grafana: http://localhost:3001 (admin / admin by default)
-- Alertmanager: http://localhost:9093
-- Worker exposes `/prometheus` on the compose network (scraped as job `worker`)
+See [`docs/runbooks/db-restore.md`](docs/runbooks/db-restore.md).
 
 ## License
 
