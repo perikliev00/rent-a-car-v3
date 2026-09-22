@@ -1,33 +1,57 @@
-# Runbook: Stripe webhook failure
+# Runbook: Stripe webhook / payment finalization failure
 
-## Symptoms
+## Signals
 
-- Alertmanager: `StripeWebhookFailed`
-- Grafana Payment dashboard: rising `stripe_webhook_failures_total`
-- Logs: `event=webhook_failure` or `stripe.webhook.*` with `requestId`
+Common signals include:
+
+- `StripeWebhookFailed`
+- `PaidButNotConfirmed`
+- `ReservationConflictAfterPayment`
+- rising `stripe_webhook_failures_total`
+- non-zero `paid_not_confirmed_count`
+- non-zero `processing_paid_count`
+- logs containing `stripe.webhook.*`, `checkout.failed`, or a request/correlation ID
 
 ## Immediate checks
 
-1. Confirm Stripe Dashboard → Developers → Webhooks → endpoint delivery attempts (status, response body).
-2. Correlate with API logs using `X-Request-Id` / `requestId`.
-3. Check `/ready` (DB, Stripe secrets, migrations) and `DbPoolExhausted`.
+1. Check Stripe Dashboard webhook delivery attempts.
+2. Confirm the endpoint is the production `/webhook/stripe` endpoint.
+3. Inspect response status and delivery timing.
+4. Correlate the event/request ID with backend logs.
+5. Check `GET /ready` for database, Stripe configuration, and migration failures.
+6. Check database-pool, worker, and 5xx alerts.
 
-## Classify
+## Classification
 
 | Signal | Likely cause | Action |
-|--------|--------------|--------|
-| 400 / signature | Wrong `STRIPE_WEBHOOK_SECRET` or body not raw | Fix env / middleware; redeploy |
-| 5xx / timeout | API or DB unhealthy | Fix readiness; scale/restart carefully |
-| Handler error after verify | Finalization / conflict | Inspect reservation by `stripe_session_id` |
+| --- | --- | --- |
+| HTTP 400 before handler work | Signature/body/configuration problem | Verify webhook secret and raw-body middleware |
+| HTTP 5xx / timeout | API or database failure | Restore readiness before replaying events |
+| Paid + `processing_payment` | Finalization/reconciliation incomplete | Inspect reservation and run reconciliation |
+| `manual_review` | Paid booking conflicted with availability/state | Resolve in staff workflow; do not auto-confirm blindly |
+| Duplicate event | Normal Stripe retry/idempotency path | Verify it was safely skipped |
+| Amount/currency/session mismatch | Invalid/stale payment context | Investigate before any manual status change |
 
 ## Recovery
 
-1. If Stripe shows `paid` but reservation is `processing_payment` / `manual_review`, use admin review tools and/or `npm run reconcile:stripe` in the backend.
-2. Customer fallback: `GET /api/checkout/success` can confirm when the webhook is delayed.
-3. After fixing root cause, Resend the event from Stripe Dashboard (handlers must stay idempotent).
-4. Confirm `paid_not_confirmed_count` and `processing_paid_count` return to 0.
+1. Verify the payment in Stripe first.
+2. Inspect the reservation/order by Stripe session/payment identifiers.
+3. If appropriate, run:
 
-## Escalate when
+```bash
+cd backend
+npm run reconcile:stripe
+```
 
-- Paid money with no confirmed booking after manual reconcile
-- Repeated signature failures after secret rotation
+4. Use the staff manual-review/refund/reconciliation workflow when the system deliberately refused automatic finalization.
+5. After fixing the root cause, resend the webhook from Stripe Dashboard if needed.
+6. Confirm:
+   - `paid_not_confirmed_count == 0`;
+   - `processing_paid_count == 0` for completed payments;
+   - no new reservation-conflict alert remains unexplained.
+
+## Important safety rule
+
+Do not manually mark a reservation confirmed merely because Stripe shows a payment. Finalization also protects vehicle availability, order creation, payment context, and idempotency.
+
+When money was received but automatic confirmation was blocked, preserve the state for reconciliation/manual review and resolve the booking or refund explicitly.
