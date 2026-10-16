@@ -1,6 +1,17 @@
+/**
+ * Idempotency store for processed Stripe webhook event ids.
+ */
 const { clientQuery } = require('../../db/transaction');
 
+/**
+ * Record a processed Stripe event id. Returns false when the id was already seen
+ * (ON CONFLICT DO NOTHING) so webhooks stay idempotent under retries.
+ * @param {{eventId: string, stripeSessionId?: string|null}} fields
+ * @param {object|null} [client]
+ * @returns {Promise<boolean>} true if newly inserted
+ */
 async function insertProcessedEvent({ eventId, stripeSessionId }, client = null) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!eventId) {
     throw new Error('Stripe event id is required');
   }
@@ -23,7 +34,9 @@ async function insertProcessedEvent({ eventId, stripeSessionId }, client = null)
   return result.rowCount > 0;
 }
 
+/** @param {string} eventId @param {object|null} [client] */
 async function findProcessedEventByEventId(eventId, client = null) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!eventId) {
     return null;
   }

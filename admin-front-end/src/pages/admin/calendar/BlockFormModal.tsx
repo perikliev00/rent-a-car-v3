@@ -1,3 +1,6 @@
+/**
+ * Create/edit car block (maintenance/unavailable) with force option.
+ */
 import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { formatISO, parseISO } from 'date-fns';
@@ -15,6 +18,7 @@ import { TimeSelect } from '../../../components/ui/TimeSelect';
 import { toast } from '../../../components/ui/toastStore';
 import type { CalendarCar, CalendarConflict } from './calendar.types';
 
+/** Split Iso. */
 function splitIso(iso: string | undefined): { date: string; time: string } {
   if (!iso) {
     const now = new Date();
@@ -30,10 +34,12 @@ function splitIso(iso: string | undefined): { date: string; time: string } {
   };
 }
 
+/** Join Iso. */
 function joinIso(date: string, time: string): string {
   return new Date(`${date}T${time}:00`).toISOString();
 }
 
+/** Create/edit car block (maintenance/unavailable) with force option. */
 export function BlockFormModal({
   open,
   onClose,
@@ -97,6 +103,7 @@ export function BlockFormModal({
     setNotes(defaults?.notes || '');
   }, [open, defaults, cars]);
 
+  /** Submit. */
   async function submit(force = false) {
     const body = {
       carId,

@@ -1,3 +1,6 @@
+/**
+ * Custom listbox select used where native selects lack styling control.
+ */
 import { useEffect, useId, useRef, useState } from 'react';
 
 export type FieldTone = 'light' | 'onDark';
@@ -21,6 +24,18 @@ interface DropdownSelectProps {
 const triggerClass =
   'flex w-full items-center justify-between rounded-xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] px-3.5 py-2.5 text-left text-sm text-[var(--color-ink)] shadow-sm transition-[border-color,box-shadow] focus:border-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/25';
 
+/**
+ * Accessible custom listbox with keyboard navigation and outside-click dismiss.
+ *
+ * @param label - Optional visible label
+ * @param value - Controlled selected value
+ * @param options - Available options
+ * @param onChange - Called with the new value when an option is chosen
+ * @param error - Optional error text (also tints the trigger border)
+ * @param id - Explicit control id; otherwise derived from label or React id
+ * @param className - Extra classes on the root
+ * @param tone - Label color tone for light vs on-dark surfaces
+ */
 export function DropdownSelect({
   label,
   value,
@@ -32,10 +47,12 @@ export function DropdownSelect({
   tone = 'light',
 }: DropdownSelectProps) {
   const reactId = useId();
+  // Prefer stable id from label; fall back to React useId when unlabeled.
   const selectId = id ?? (label ? label.toLowerCase().replace(/\s+/g, '-') : reactId);
   const listboxId = `${selectId}-listbox`;
   const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
+  // Clamp unknown values to index 0 so aria-activedescendant stays valid.
   const selectedIndex = Math.max(
     0,
     options.findIndex((opt) => opt.value === value),
@@ -44,6 +61,7 @@ export function DropdownSelect({
 
   const selected = options.find((opt) => opt.value === value) ?? options[0];
 
+  // Outside click + Escape close the listbox while open.
   useEffect(() => {
     if (!open) return;
 
@@ -68,12 +86,14 @@ export function DropdownSelect({
     };
   }, [open]);
 
+  // Sync highlight to the selected option each time the menu opens.
   useEffect(() => {
     if (open) {
       setActiveIndex(selectedIndex);
     }
   }, [open, selectedIndex]);
 
+  /** Commit an option by index and close the menu. */
   const selectOption = (index: number) => {
     const opt = options[index];
     if (!opt) return;
@@ -81,6 +101,7 @@ export function DropdownSelect({
     setOpen(false);
   };
 
+  /** Open / navigate / commit from the trigger button keyboard. */
   const onTriggerKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
     if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
@@ -88,6 +109,7 @@ export function DropdownSelect({
         setOpen(true);
         return;
       }
+      // Enter/Space commits the highlighted option when already open.
       if (event.key === 'Enter' || event.key === ' ') {
         selectOption(activeIndex);
       }

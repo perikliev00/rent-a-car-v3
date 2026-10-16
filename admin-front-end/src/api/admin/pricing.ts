@@ -1,3 +1,7 @@
+/**
+ * Admin pricing settings APIs: seasons, weekend rules, discounts, deposit,
+ * delivery/global fees, extras, and a quote preview for validation.
+ */
 import { api } from '../client';
 
 export interface PriceLine {
@@ -75,6 +79,7 @@ export interface PricingExtra {
   sortOrder: number;
 }
 
+/** Full pricing config bundle returned by the admin pricing page loader. */
 export interface PricingBundle {
   seasons: PricingSeason[];
   weekendRules: PricingWeekendRule[];
@@ -86,10 +91,17 @@ export interface PricingBundle {
   extras: PricingExtra[];
 }
 
+/**
+ * Load the full admin pricing configuration bundle.
+ */
 export async function getAdminPricing(): Promise<{ pricing: PricingBundle }> {
   return api('/api/admin/pricing');
 }
 
+/**
+ * Replace the delivery-fee table (per location).
+ * @param fees - Full set of location delivery fees to persist
+ */
 export async function updateDeliveryFees(fees: PricingDeliveryFee[]) {
   return api<{ deliveryFees: PricingDeliveryFee[] }>('/api/admin/pricing/delivery-fees', {
     method: 'PUT',
@@ -97,6 +109,11 @@ export async function updateDeliveryFees(fees: PricingDeliveryFee[]) {
   });
 }
 
+/**
+ * Upsert one global fee by key.
+ * @param feeKey - Stable fee key (path segment)
+ * @param data - Label/amount and optional other fee fields
+ */
 export async function updateGlobalFee(
   feeKey: string,
   data: Partial<PricingGlobalFee> & { label: string; amount: number }
@@ -107,6 +124,10 @@ export async function updateGlobalFee(
   });
 }
 
+/**
+ * Create a seasonal price adjustment window.
+ * @param data - Season fields without id
+ */
 export async function createSeason(data: Omit<PricingSeason, 'id'>) {
   return api<{ season: PricingSeason }>('/api/admin/pricing/seasons', {
     method: 'POST',
@@ -114,6 +135,11 @@ export async function createSeason(data: Omit<PricingSeason, 'id'>) {
   });
 }
 
+/**
+ * Update an existing season rule.
+ * @param id - Season id
+ * @param data - Full season payload without id
+ */
 export async function updateSeason(id: number, data: Omit<PricingSeason, 'id'>) {
   return api<{ season: PricingSeason }>(`/api/admin/pricing/seasons/${id}`, {
     method: 'PUT',
@@ -121,10 +147,18 @@ export async function updateSeason(id: number, data: Omit<PricingSeason, 'id'>) 
   });
 }
 
+/**
+ * Delete a season rule.
+ * @param id - Season id
+ */
 export async function deleteSeason(id: number) {
   return api(`/api/admin/pricing/seasons/${id}`, { method: 'DELETE' });
 }
 
+/**
+ * Update the weekend surcharge rule (single active rule endpoint).
+ * @param data - Partial weekend rule; `adjValue` required
+ */
 export async function updateWeekend(data: Partial<PricingWeekendRule> & { adjValue: number }) {
   return api<{ weekendRule: PricingWeekendRule }>('/api/admin/pricing/weekend', {
     method: 'PUT',
@@ -132,6 +166,11 @@ export async function updateWeekend(data: Partial<PricingWeekendRule> & { adjVal
   });
 }
 
+/**
+ * Update one discount rule by id.
+ * @param id - Discount rule id
+ * @param data - Partial discount fields
+ */
 export async function updateDiscount(id: number, data: Partial<PricingDiscountRule>) {
   return api<{ discountRule: PricingDiscountRule }>(`/api/admin/pricing/discounts/${id}`, {
     method: 'PUT',
@@ -139,6 +178,10 @@ export async function updateDiscount(id: number, data: Partial<PricingDiscountRu
   });
 }
 
+/**
+ * Update the deposit rule defaults.
+ * @param data - Partial deposit rule; `defaultAmount` required
+ */
 export async function updateDeposit(data: Partial<PricingDepositRule> & { defaultAmount: number }) {
   return api<{ depositRule: PricingDepositRule }>('/api/admin/pricing/deposit', {
     method: 'PUT',
@@ -146,6 +189,10 @@ export async function updateDeposit(data: Partial<PricingDepositRule> & { defaul
   });
 }
 
+/**
+ * Create a bookable extra (addon) price row.
+ * @param data - Extra fields without id
+ */
 export async function createExtra(data: Omit<PricingExtra, 'id'>) {
   return api<{ extra: PricingExtra }>('/api/admin/pricing/extras', {
     method: 'POST',
@@ -153,6 +200,11 @@ export async function createExtra(data: Omit<PricingExtra, 'id'>) {
   });
 }
 
+/**
+ * Update an existing extra.
+ * @param id - Extra id
+ * @param data - Partial extra fields
+ */
 export async function updateExtra(id: number, data: Partial<PricingExtra>) {
   return api<{ extra: PricingExtra }>(`/api/admin/pricing/extras/${id}`, {
     method: 'PUT',
@@ -160,10 +212,20 @@ export async function updateExtra(id: number, data: Partial<PricingExtra>) {
   });
 }
 
+/**
+ * Delete an extra.
+ * @param id - Extra id
+ */
 export async function deleteExtra(id: number) {
   return api(`/api/admin/pricing/extras/${id}`, { method: 'DELETE' });
 }
 
+/**
+ * Server-side quote preview so admins can verify rule changes without
+ * creating an order.
+ *
+ * @param body - Quote inputs mirroring checkout (car, dates, locations, flags)
+ */
 export async function previewPricing(body: {
   carId: number;
   pickupDate: string;

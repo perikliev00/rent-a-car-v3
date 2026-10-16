@@ -1,3 +1,6 @@
+/**
+ * Admin car CRUD and fleet status change handlers.
+ */
 const { validationResult } = require('express-validator');
 const carAdminService = require('../../../../services/admin/carAdminService');
 const { logAdminAction } = require('../../../../services/admin/adminAuditService');
@@ -11,6 +14,14 @@ const {
   notFoundOrForward,
 } = require('./carControllerHelpers');
 
+/**
+ * List cars for admin fleet management.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 const listCars = asyncHandler(async (req, res, next) => {
   try {
     const cars = await carAdminService.listCars();
@@ -23,8 +34,18 @@ const listCars = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Return a single admin car by id.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 const getCarById = asyncHandler(async (req, res, next) => {
+  // Collect express-validator results for this request.
   const errors = validationResult(req);
+  // Validation failed — respond before running domain logic.
   if (!errors.isEmpty()) {
     return validationErrorResponse(res, errors);
   }
@@ -43,20 +64,34 @@ const getCarById = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Create a car (optional image upload).
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 const createCar = asyncHandler(async (req, res, _next) => {
   try {
+    // Multer/content validation soft-failed earlier in the chain.
     if (req.fileValidationError) {
+      // Drop temp uploads so failed requests leave no orphans.
       await cleanupUploads(req);
       return apiResponse.error(res, 'VALIDATION_ERROR', req.fileValidationError, 422);
     }
 
+    // Collect express-validator results for this request.
     const errors = validationResult(req);
+    // Validation failed — respond before running domain logic.
     if (!errors.isEmpty()) {
+      // Drop temp uploads so failed requests leave no orphans.
       await cleanupUploads(req);
       return validationErrorResponse(res, errors);
     }
 
     const car = await carAdminService.createCar(req.body, req.file);
+    // Record an admin audit entry for this mutation.
     await logAdminAction(req, {
       action: 'admin.created_car',
       entityType: 'car',
@@ -66,6 +101,7 @@ const createCar = asyncHandler(async (req, res, _next) => {
 
     return apiResponse.success(res, { car }, 201);
   } catch (err) {
+    // Drop temp uploads so failed requests leave no orphans.
     await cleanupUploads(req);
     logger.error({ err, correlationId: req.correlationId, context: 'api.createAdminCar' }, 'Create car error');
     return apiResponse.error(
@@ -77,20 +113,34 @@ const createCar = asyncHandler(async (req, res, _next) => {
   }
 });
 
+/**
+ * Update a car (optional image upload).
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 const updateCar = asyncHandler(async (req, res, _next) => {
   try {
+    // Multer/content validation soft-failed earlier in the chain.
     if (req.fileValidationError) {
+      // Drop temp uploads so failed requests leave no orphans.
       await cleanupUploads(req);
       return apiResponse.error(res, 'VALIDATION_ERROR', req.fileValidationError, 422);
     }
 
+    // Collect express-validator results for this request.
     const errors = validationResult(req);
+    // Validation failed — respond before running domain logic.
     if (!errors.isEmpty()) {
+      // Drop temp uploads so failed requests leave no orphans.
       await cleanupUploads(req);
       return validationErrorResponse(res, errors);
     }
 
     const { car, audit } = await carAdminService.updateCar(req.params.id, req.body, req.file);
+    // Record an admin audit entry for this mutation.
     await logAdminAction(req, {
       action: audit?.priceChanged ? 'admin.updated_price' : 'admin.updated_car',
       entityType: 'car',
@@ -108,6 +158,7 @@ const updateCar = asyncHandler(async (req, res, _next) => {
 
     return apiResponse.success(res, { car });
   } catch (err) {
+    // Drop temp uploads so failed requests leave no orphans.
     await cleanupUploads(req);
     if (err.message === 'Car not found') {
       return apiResponse.error(res, 'NOT_FOUND', 'Car not found.', 404);
@@ -122,14 +173,25 @@ const updateCar = asyncHandler(async (req, res, _next) => {
   }
 });
 
+/**
+ * Delete a car by id.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 const deleteCar = asyncHandler(async (req, res, next) => {
+  // Collect express-validator results for this request.
   const errors = validationResult(req);
+  // Validation failed — respond before running domain logic.
   if (!errors.isEmpty()) {
     return validationErrorResponse(res, errors);
   }
 
   try {
     await carAdminService.deleteCar(req.params.id);
+    // Record an admin audit entry for this mutation.
     await logAdminAction(req, {
       action: 'admin.changed_car_status',
       entityType: 'car',
@@ -148,8 +210,18 @@ const deleteCar = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Change fleet operational status for a car.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 const changeFleetStatus = asyncHandler(async (req, res, next) => {
+  // Collect express-validator results for this request.
   const errors = validationResult(req);
+  // Validation failed — respond before running domain logic.
   if (!errors.isEmpty()) {
     return validationErrorResponse(res, errors);
   }
@@ -160,6 +232,7 @@ const changeFleetStatus = asyncHandler(async (req, res, next) => {
       req.body.status,
       req.body.reason || null
     );
+    // Record an admin audit entry for this mutation.
     await logAdminAction(req, {
       action: 'admin.changed_car_fleet_status',
       entityType: 'car',

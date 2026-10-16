@@ -1,3 +1,6 @@
+/**
+ * Path-param validation for admin contact message :id.
+ */
 const { param } = require('express-validator');
 
 const adminContactIdParamValidation = [

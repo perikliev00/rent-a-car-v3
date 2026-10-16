@@ -1,3 +1,7 @@
+/**
+ * React context contract for admin session state.
+ * Separated from the provider so hooks can import without a circular dependency.
+ */
 import { createContext } from 'react';
 import type { User } from '../types/api';
 

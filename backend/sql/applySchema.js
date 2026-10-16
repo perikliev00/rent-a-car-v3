@@ -13,9 +13,18 @@ const { acquireDbSetupLock, releaseDbSetupLock } = require('./dbSetupLock');
 
 const SCHEMA_DIR = path.join(__dirname, 'schema');
 
+/**
+ * Apply all SQL schema files from sql/schema/ in sorted order under the setup lock.
+ *
+ * @param {object} options - { endPool = true } = {}
+ * @returns {Promise<*>}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 async function applySchema({ endPool = true } = {}) {
+  // Fail fast when DATABASE_URL is missing.
   requireDatabaseUrl();
 
+  // Lexicographic order keeps schema fragments deterministic.
   const files = fs
     .readdirSync(SCHEMA_DIR)
     .filter((name) => name.endsWith('.sql'))
@@ -29,6 +38,7 @@ async function applySchema({ endPool = true } = {}) {
   let locked = false;
 
   try {
+    // Serialize with migrate so concurrent containers do not interleave DDL.
     await acquireDbSetupLock(client);
     locked = true;
 
@@ -39,6 +49,7 @@ async function applySchema({ endPool = true } = {}) {
     }
     console.log('✓ Schema applied successfully');
   } finally {
+    // Always unlock and release; optionally end the process pool for CLI mode.
     if (locked) {
       try {
         await releaseDbSetupLock(client);

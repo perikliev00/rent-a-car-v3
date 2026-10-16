@@ -1,3 +1,6 @@
+/**
+ * express-validator rules for customer account travel details and cancel requests.
+ */
 const { body, param } = require('express-validator');
 
 const accountTravelValidationRules = [

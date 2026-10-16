@@ -1,15 +1,36 @@
+/**
+ * High-level failure tracking: metrics, logs, Sentry, and payment_failure persistence.
+ */
+
 const logger = require('../utils/logger');
 const { captureException, captureMessage } = require('../config/sentry');
 const metrics = require('./metrics');
 const paymentFailureSql = require('../services/sql/paymentFailureSqlService');
 
+/**
+ * Resolve a correlation id from explicit context fields.
+ *
+ * @param {Record<string, unknown>} [context={}]
+ * @returns {string | null}
+ * @throws {never}
+ */
 function resolveRequestId(context = {}) {
   return context.requestId || context.correlationId || null;
 }
 
+/**
+ * Persist a payment failure row and best-effort enqueue notifications / live events.
+ * Fire-and-forget: persistence / notify failures are logged, not thrown to callers.
+ *
+ * @param {string} reason - Short machine-readable failure reason
+ * @param {Record<string, unknown>} [context={}] - reservationId, stripeSessionId, email, …
+ * @returns {void}
+ * @throws {never}
+ */
 function persistPaymentFailure(reason, context = {}) {
   const requestId = resolveRequestId(context);
 
+  // Insert the ops row, then best-effort notify + live publish.
   paymentFailureSql
     .insertPaymentFailure({
       reason,
@@ -22,6 +43,7 @@ function persistPaymentFailure(reason, context = {}) {
     .then(async (row) => {
       try {
         const { enqueuePaymentFailed } = require('../modules/notifications/notifications.enqueue');
+        // Prefer email from context; else look it up from the reservation row.
         let email =
           context.email ||
           context.customerEmail ||
@@ -47,6 +69,7 @@ function persistPaymentFailure(reason, context = {}) {
           });
         }
 
+        // Live admin event is optional; failures must not block persistence.
         try {
           const { publishPaymentFailed } = require('../modules/realtime/realtime.publisher');
           publishPaymentFailed({
@@ -69,6 +92,14 @@ function persistPaymentFailure(reason, context = {}) {
     });
 }
 
+/**
+ * Record a payment failure (metrics, warn log, Sentry, DB row).
+ *
+ * @param {string} reason
+ * @param {Record<string, unknown>} [context={}]
+ * @returns {void}
+ * @throws {never}
+ */
 function trackPaymentFailure(reason, context = {}) {
   metrics.incrementPaymentFailures();
 
@@ -85,6 +116,14 @@ function trackPaymentFailure(reason, context = {}) {
   persistPaymentFailure(reason, context);
 }
 
+/**
+ * Record a Stripe webhook failure (also persists a payment_failure row for ops).
+ *
+ * @param {string} reason
+ * @param {Record<string, unknown>} [context={}]
+ * @returns {void}
+ * @throws {never}
+ */
 function trackWebhookFailure(reason, context = {}) {
   metrics.incrementWebhookFailures(reason);
 
@@ -101,6 +140,14 @@ function trackWebhookFailure(reason, context = {}) {
   persistPaymentFailure(reason, context);
 }
 
+/**
+ * Record an unexpected error (metrics, error log, Sentry exception).
+ *
+ * @param {Error} error
+ * @param {Record<string, unknown>} [context={}]
+ * @returns {void}
+ * @throws {never}
+ */
 function trackError(error, context = {}) {
   metrics.incrementErrors();
 

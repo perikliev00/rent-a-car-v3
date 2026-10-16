@@ -1,3 +1,6 @@
+/**
+ * Service-record query/mutation hooks for a car.
+ */
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -8,6 +11,13 @@ import {
 import { toast } from '../../../components/ui/toastStore';
 import type { ServiceForm, Tab } from './carDetailTypes';
 
+/**
+ * Service-record list/create/delete for a car (active on the Service tab).
+ * Empty optional form strings are omitted from the create payload.
+ *
+ * @param id - Car id
+ * @param tab - Active detail tab
+ */
 export function useCarService(id: string, tab: Tab) {
   const queryClient = useQueryClient();
   const [serviceForm, setServiceForm] = useState<ServiceForm>({
@@ -50,6 +60,7 @@ export function useCarService(id: string, tab: Tab) {
     onError: (err) => toast((err as Error).message, 'error'),
   });
 
+  /** Delete a service record and refresh the service list. */
   async function deleteServiceRecord(recordId: number) {
     try {
       await deleteCarServiceRecord(id, recordId);

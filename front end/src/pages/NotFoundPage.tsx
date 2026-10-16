@@ -1,7 +1,13 @@
+/** Catch-all 404 page for unknown public routes. */
 import { Link } from 'react-router-dom';
 import { StaticPageHero } from '../components/static/StaticPageHero';
 import { Button } from '../components/ui/Button';
 
+/**
+ * Catch-all 404 page for unknown public routes.
+ *
+ * @returns Hero + large “404” mark and a home CTA.
+ */
 export function NotFoundPage() {
   return (
     <div>

@@ -1,3 +1,6 @@
+/**
+ * Auth API handlers: login, signup, email verification, session/CSRF, and logout.
+ */
 const { validationResult } = require('express-validator');
 const bcrypt = require('bcrypt');
 const userSql = require('../../services/sql/userSqlService');
@@ -12,10 +15,21 @@ const { forwardControllerError } = require('../../utils/controllerError');
 const logger = require('../../utils/logger');
 const logEvent = require('../../monitoring/logEvent');
 
+/**
+ * Whether the user record is considered email-verified.
+ * @param {{ emailVerifiedAt?: Date|string|null }|null|undefined} user
+ * @returns {boolean}
+ */
 function isEmailVerified(user) {
   return Boolean(user?.emailVerifiedAt);
 }
 
+/**
+ * Build the public session user payload including optional RBAC access.
+ * @param {object} user - User row from SQL
+ * @param {{ roles?: string[], permissions?: string[] }|null} [access=null]
+ * @returns {{ id: *, email: *, role: *, roles: string[], permissions: string[], emailVerified: boolean }}
+ */
 function toUserPayload(user, access = null) {
   return {
     id: user.id,
@@ -27,6 +41,13 @@ function toUserPayload(user, access = null) {
   };
 }
 
+/**
+ * Map known auth service errors to API envelope responses.
+ * Side effects: may write an API error response when `err` has status/code.
+ * @param {import('express').Response} res
+ * @param {Error&{status?: number, code?: string}} err
+ * @returns {import('express').Response|null}
+ */
 function respondServiceError(res, err) {
   if (err?.status && err?.code) {
     return apiResponse.error(res, err.code, err.message, err.status);
@@ -34,6 +55,12 @@ function respondServiceError(res, err) {
   return null;
 }
 
+/**
+ * Load RBAC roles/permissions for a user id.
+ * Side effects: may query RBAC tables; failures degrade to empty access.
+ * @param {{ id?: number|string }|null|undefined} user
+ * @returns {Promise<{ roles: string[], permissions: string[] }>}
+ */
 async function loadAccessForUser(user) {
   if (!user?.id) {
     return { roles: [], permissions: [] };
@@ -46,6 +73,14 @@ async function loadAccessForUser(user) {
   }
 }
 
+/**
+ * Populate session fields after successful authentication.
+ * Side effects: regenerates the session, sets user/CSRF, and saves the store.
+ * @param {import('express').Request} req
+ * @param {object} user
+ * @param {{ roles?: string[], permissions?: string[] }} access
+ * @returns {Promise<void>}
+ */
 function establishUserSession(req, user, access) {
   return new Promise((resolve, reject) => {
     req.session.regenerate((err) => {
@@ -70,21 +105,37 @@ function establishUserSession(req, user, access) {
   });
 }
 
+/**
+ * Promise wrapper around req.session.save.
+ * Side effects: persists the current session to the store.
+ * @param {import('express').Request} req
+ * @returns {Promise<void>}
+ */
 function saveSession(req) {
   return new Promise((resolve, reject) => {
     req.session.save((err) => (err ? reject(err) : resolve()));
   });
 }
 
+/**
+ * Authenticate with email/password and establish a session.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.postLogin = asyncHandler(async (req, res, next) => {
   try {
     if (req.session?.isLoggedIn) {
       return apiResponse.error(res, 'ALREADY_LOGGED_IN', 'You are already logged in.', 409);
     }
 
+    // Collect express-validator results for this request.
     const errors = validationResult(req);
     const { email, password } = req.body;
 
+    // Validation failed — respond before running domain logic.
     if (!errors.isEmpty()) {
       return apiResponse.error(
         res,
@@ -143,15 +194,25 @@ exports.postLogin = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Register a new customer account (may require email verification).
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.postSignup = asyncHandler(async (req, res, next) => {
   try {
     if (req.session?.isLoggedIn) {
       return apiResponse.error(res, 'ALREADY_LOGGED_IN', 'You are already logged in.', 409);
     }
 
+    // Collect express-validator results for this request.
     const errors = validationResult(req);
     const { email, password } = req.body;
 
+    // Validation failed — respond before running domain logic.
     if (!errors.isEmpty()) {
       return apiResponse.error(
         res,
@@ -206,9 +267,19 @@ exports.postSignup = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Verify email using a token and refresh session access.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.postVerifyEmail = asyncHandler(async (req, res, next) => {
   try {
+    // Collect express-validator results for this request.
     const errors = validationResult(req);
+    // Validation failed — respond before running domain logic.
     if (!errors.isEmpty()) {
       return apiResponse.error(
         res,
@@ -245,6 +316,14 @@ exports.postVerifyEmail = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Resend the email verification message for the current user.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.postResendVerification = asyncHandler(async (req, res, next) => {
   try {
     const userId = req.session?.user?.id;
@@ -260,10 +339,26 @@ exports.postResendVerification = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Return the session CSRF token for cookie-based clients.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.getCsrf = asyncHandler(async (req, res) => {
   return apiResponse.success(res, { csrfToken: getCsrfToken(req) });
 });
 
+/**
+ * Return the current session user payload (or anonymous state).
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.getMe = asyncHandler(async (req, res) => {
   if (!req.session?.isLoggedIn || !req.session?.user) {
     return apiResponse.error(res, 'UNAUTHORIZED', 'You are not logged in.', 401);
@@ -293,6 +388,14 @@ exports.getMe = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Destroy the current session.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.postLogout = asyncHandler(async (req, res) => {
   if (!req.session?.isLoggedIn) {
     return apiResponse.error(res, 'UNAUTHORIZED', 'You are not logged in.', 401);

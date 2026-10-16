@@ -1,6 +1,16 @@
+/**
+ * Compact badge for refund operation status in tables.
+ */
 import type { OpsReservationRow } from '../../../api/admin/reservations';
 import { refundLedgerChipClass, refundLedgerLabel, truncateFailure } from './refundFormat';
 
+/**
+ * Renders pending/failed refund chips; optionally shows an explicit “none” chip.
+ *
+ * @param row - Ops row with optional refundOperation
+ * @param showNone - When true, render a muted “none” chip if no refund op
+ * @param className - Extra classes appended to the chip
+ */
 export function RefundLedgerBadge({
   row,
   showNone = false,
@@ -12,6 +22,7 @@ export function RefundLedgerBadge({
 }) {
   const label = refundLedgerLabel(row);
   const extra = className ? ` ${className}` : '';
+  // No refund operation — hide unless the table wants an explicit none marker.
   if (label === 'none') {
     if (!showNone) return null;
     return (
@@ -38,5 +49,6 @@ export function RefundLedgerBadge({
       </span>
     );
   }
+  // Succeeded (and any other) — parent tables usually show money elsewhere.
   return null;
 }

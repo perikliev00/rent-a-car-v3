@@ -1,3 +1,8 @@
+/**
+ * Staff analytics routes. Overview/series require revenue or export permission;
+ * CSV export specifically requires can_export_reports.
+ */
+
 const express = require('express');
 const analyticsController = require('./analytics.controller');
 const {

@@ -1,3 +1,6 @@
+/**
+ * Month grid overview of fleet occupancy density.
+ */
 import { useMemo, type MouseEvent } from 'react';
 import {
   eachDayOfInterval,
@@ -12,6 +15,7 @@ import { eventChipClass, eventTypeLabel } from './eventStyles';
 
 type BucketKey = 'reservation' | 'block' | 'task' | 'problem';
 
+/** Bucket Type. */
 function bucketType(type: string): BucketKey {
   if (type === 'task') return 'task';
   if (type === 'blocked' || type === 'maintenance' || type === 'cleaning') return 'block';
@@ -19,6 +23,7 @@ function bucketType(type: string): BucketKey {
   return 'reservation';
 }
 
+/** Events On Day. */
 function eventsOnDay(events: CalendarEvent[], day: Date): CalendarEvent[] {
   const dayStart = startOfDay(day).getTime();
   const dayEnd = dayStart + 24 * 60 * 60 * 1000 - 1;
@@ -29,6 +34,7 @@ function eventsOnDay(events: CalendarEvent[], day: Date): CalendarEvent[] {
   });
 }
 
+/** Month grid overview of fleet occupancy density. */
 export function MonthFleetGrid({
   cars,
   events,
@@ -49,6 +55,7 @@ export function MonthFleetGrid({
     [from, to]
   );
 
+  /** Handle Cell Click. */
   function handleCellClick(day: Date, carId: string, dayEvents: CalendarEvent[]) {
     const dateStr = formatISO(day, { representation: 'date' });
     if (dayEvents.length === 1) {
@@ -58,6 +65,7 @@ export function MonthFleetGrid({
     onDayClick(dateStr, carId);
   }
 
+  /** Handle Chip Click. */
   function handleChipClick(
     e: MouseEvent,
     day: Date,

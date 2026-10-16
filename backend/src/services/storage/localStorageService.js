@@ -1,3 +1,7 @@
+/**
+ * Local filesystem driver for public car images under backend/public/images/uploads.
+ * Validates managed URL prefixes to prevent path traversal on delete/read.
+ */
 const fs = require('fs');
 const path = require('path');
 const { reencodeCarImageToFile } = require('./imageProcessing');
@@ -14,17 +18,33 @@ const PUBLIC_CAR_IMAGES_DIR = path.join(
 const MANAGED_PUBLIC_PREFIX = '/images/uploads/';
 const MANAGED_FILENAME_PREFIX = 'car-';
 
+/**
+ * generate stored filename.
+ * @param {string} originalName
+ * @returns {*}
+ */
 function generateStoredFilename(originalName) {
   const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
   const ext = path.extname(originalName || '').toLowerCase();
   return `${MANAGED_FILENAME_PREFIX}${unique}${ext}`;
 }
 
+/**
+ * Transform helper: build public url.
+ * @param {string} filename
+ * @returns {*}
+ */
 function buildPublicUrl(filename) {
   return `${MANAGED_PUBLIC_PREFIX}${filename}`;
 }
 
+/**
+ * Predicate helper: is managed public url.
+ * @param {*} publicUrl
+ * @returns {*}
+ */
 function isManagedPublicUrl(publicUrl) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!publicUrl || typeof publicUrl !== 'string') return false;
   const filename = path.posix.basename(publicUrl);
   return (
@@ -33,22 +53,40 @@ function isManagedPublicUrl(publicUrl) {
   );
 }
 
+/**
+ * Resolve local path from public url from inputs / Stripe / DB.
+ * @param {*} publicUrl
+ * @returns {*}
+ */
 function resolveLocalPathFromPublicUrl(publicUrl) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!isManagedPublicUrl(publicUrl)) return null;
   const filename = path.basename(publicUrl);
   const resolved = path.resolve(PUBLIC_CAR_IMAGES_DIR, filename);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!resolved.startsWith(path.resolve(PUBLIC_CAR_IMAGES_DIR))) {
     return null;
   }
   return resolved;
 }
 
+/**
+ * Ensure temp dir exists or is initialized.
+ * @returns {Promise<*>}
+ */
 async function ensureTempDir() {
   await fs.promises.mkdir(UPLOAD_TEMP_DIR, { recursive: true });
 }
 
+/**
+ * Delete by path; returns whether a row was affected.
+ * @param {*} filePath
+ * @returns {Promise<*>}
+ */
 async function deleteByPath(filePath) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!filePath) return;
+  // Protected block: isolate failure modes.
   try {
     await fs.promises.unlink(filePath);
   } catch {
@@ -56,9 +94,16 @@ async function deleteByPath(filePath) {
   }
 }
 
+/**
+ * open managed public read stream.
+ * @param {*} publicUrl
+ * @returns {Promise<*>}
+ */
 async function openManagedPublicReadStream(publicUrl) {
   const filePath = resolveLocalPathFromPublicUrl(publicUrl);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!filePath) return null;
+  // Protected block: isolate failure modes.
   try {
     await fs.promises.access(filePath, fs.constants.R_OK);
   } catch {
@@ -70,7 +115,13 @@ async function openManagedPublicReadStream(publicUrl) {
   };
 }
 
+/**
+ * process uploaded file with domain side effects as documented by callers.
+ * @param {object} params
+ * @returns {Promise<*>}
+ */
 async function processUploadedFile({ tempPath, tempFilename }) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!tempPath) {
     throw new Error('Missing temp upload path.');
   }
@@ -92,14 +143,25 @@ async function processUploadedFile({ tempPath, tempFilename }) {
   };
 }
 
+/**
+ * Delete by public url; returns whether a row was affected.
+ * @param {*} publicUrl
+ * @returns {Promise<*>}
+ */
 async function deleteByPublicUrl(publicUrl) {
   const filePath = resolveLocalPathFromPublicUrl(publicUrl);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!filePath) return false;
   await deleteByPath(filePath);
   return true;
 }
 
+/**
+ * List managed public urls from SQL.
+ * @returns {Promise<*>}
+ */
 async function listManagedPublicUrls() {
+  // Protected block: isolate failure modes.
   try {
     const entries = await fs.promises.readdir(PUBLIC_CAR_IMAGES_DIR, {
       withFileTypes: true,
@@ -115,6 +177,11 @@ async function listManagedPublicUrls() {
   }
 }
 
+/**
+ * cleanup orphans.
+ * @param {*} referencedPublicUrls
+ * @returns {Promise<*>}
+ */
 async function cleanupOrphans(referencedPublicUrls) {
   const referenced = new Set(referencedPublicUrls);
   const managed = await listManagedPublicUrls();
@@ -130,10 +197,16 @@ async function cleanupOrphans(referencedPublicUrls) {
   return { removed };
 }
 
+/**
+ * cleanup stale temp files.
+ * @param {*} maxAgeMs
+ * @returns {Promise<*>}
+ */
 async function cleanupStaleTempFiles(maxAgeMs) {
   const removed = [];
   let entries;
 
+  // Protected block: isolate failure modes.
   try {
     entries = await fs.promises.readdir(UPLOAD_TEMP_DIR, { withFileTypes: true });
   } catch (err) {
@@ -144,6 +217,7 @@ async function cleanupStaleTempFiles(maxAgeMs) {
   const cutoff = Date.now() - maxAgeMs;
 
   for (const entry of entries) {
+    // Guard: early-return or throw when required input is missing/invalid.
     if (!entry.isFile()) continue;
     const filePath = path.join(UPLOAD_TEMP_DIR, entry.name);
     const stat = await fs.promises.stat(filePath);

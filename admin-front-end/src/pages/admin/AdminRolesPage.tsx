@@ -1,3 +1,6 @@
+/**
+ * RBAC matrix editor for role permission sets.
+ */
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getRbacCatalog, updateRolePermissions } from '../../api/admin/rbac';
@@ -6,6 +9,7 @@ import { Card, CardBody } from '../../components/ui/Card';
 import { PageLoader } from '../../components/ui/Loading';
 import { toast } from '../../components/ui/toastStore';
 
+/** RBAC matrix editor for role permission sets. */
 export function AdminRolesPage() {
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({
@@ -55,6 +59,7 @@ export function AdminRolesPage() {
     onError: (err) => toast((err as Error).message, 'error'),
   });
 
+  /** Toggle Key. */
   function toggleKey(key: string) {
     if (isOwner) return;
     setSelectedKeys((prev) =>

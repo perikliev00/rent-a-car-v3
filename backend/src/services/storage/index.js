@@ -1,5 +1,13 @@
+/**
+ * Public car-image storage facade selected by STORAGE_DRIVER (local | s3).
+ * Exports a metrics-wrapped driver module used for managed public uploads.
+ */
 const { wrapStorageMetrics } = require('./wrapStorageMetrics');
 
+/**
+ * Insert storage service and return the mapped result.
+ * @returns {*}
+ */
 function createStorageService() {
   const driver = (process.env.STORAGE_DRIVER || 'local').toLowerCase();
 

@@ -1,3 +1,6 @@
+/**
+ * Modal summarizing a single days operational workload.
+ */
 import { useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
@@ -7,6 +10,7 @@ import { PageLoader } from '../../../components/ui/Loading';
 
 type TabId = 'pickups' | 'returns' | 'fleet' | 'problems' | 'warnings';
 
+/** Modal summarizing a single days operational workload. */
 export function DayOperationsModal({
   date,
   open,
@@ -196,6 +200,7 @@ export function DayOperationsModal({
   );
 }
 
+/** Stat. */
 function Stat({
   label,
   value,
@@ -221,10 +226,12 @@ function Stat({
   );
 }
 
+/** List. */
 function List({ children }: { children: ReactNode }) {
   return <div className="space-y-1">{children}</div>;
 }
 
+/** Sub. */
 function Sub({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section>
@@ -236,10 +243,12 @@ function Sub({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
+/** Empty. */
 function Empty() {
   return <p className="py-4 text-center text-[var(--color-muted)]">Nothing here</p>;
 }
 
+/** Ops Row. */
 function OpsRow({
   label,
   meta,

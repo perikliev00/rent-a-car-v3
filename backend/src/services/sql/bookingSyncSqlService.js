@@ -1,15 +1,29 @@
+/**
+ * Calendar date-block sync for cars: add/update/move/remove ranges and expire finished orders.
+ * Critical for preventing double-booking; callers typically hold advisory locks.
+ */
 const { clientQuery, isCarDateBlockOverlapViolation } = require('../../db/transaction');
 const { parseSofiaDate } = require('../../utils/timeZone');
 const { toUtc } = require('../../utils/toUtc');
 
+/**
+ * Normalize car id before persistence or comparison.
+ * @param {string|number} carId
+ * @returns {*}
+ */
 function normalizeCarId(carId) {
   const id = Number(carId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(id) || id <= 0) {
     return null;
   }
   return id;
 }
 
+/**
+ * overlap error.
+ * @returns {*}
+ */
 function overlapError() {
   const err = new Error('Booking overlaps with existing dates');
   err.code = 'OVERLAP';
@@ -18,6 +32,11 @@ function overlapError() {
 
 const OPEN_PHYSICAL_RENTAL_STATUSES = `('picked_up', 'active_rental')`;
 
+/**
+ * open physical rental overlap sql.
+ * @param {*} [blockAlias]
+ * @returns {*}
+ */
 function openPhysicalRentalOverlapSql(blockAlias = 'b') {
   return `
     EXISTS (
@@ -33,8 +52,15 @@ function openPhysicalRentalOverlapSql(blockAlias = 'b') {
 
 // Премахва изтекли date blocks за една кола или за всички коли.
 // Blocks tied to open physical rentals are extended first so overdue cars stay unbookable.
+/**
+ * extend open physical rental blocks.
+ * @param {string|number} [carId]
+ * @param {*} [now]
+ * @returns {Promise<*>}
+ */
 async function extendOpenPhysicalRentalBlocks(carId = null, now = new Date(), client = null) {
   const normalizedCarId = carId ? normalizeCarId(carId) : null;
+  // Guard: early-return or throw when required input is missing/invalid.
   if (carId && normalizedCarId === null) {
     return;
   }
@@ -76,8 +102,15 @@ async function extendOpenPhysicalRentalBlocks(carId = null, now = new Date(), cl
 }
 
 // After return, prior extend may leave end_date slightly in the future; clamp back so DELETE can remove it.
+/**
+ * clamp closed physical rental blocks.
+ * @param {string|number} [carId]
+ * @param {*} [now]
+ * @returns {Promise<*>}
+ */
 async function clampClosedPhysicalRentalBlocks(carId = null, now = new Date(), client = null) {
   const normalizedCarId = carId ? normalizeCarId(carId) : null;
+  // Guard: early-return or throw when required input is missing/invalid.
   if (carId && normalizedCarId === null) {
     return;
   }
@@ -139,14 +172,22 @@ async function clampClosedPhysicalRentalBlocks(carId = null, now = new Date(), c
   );
 }
 
+/**
+ * Extend open-rental blocks, clamp closed ones, then delete expired date blocks.
+ * Extension runs first so overdue picked_up/active_rental cars stay unbookable.
+ * @param {number|string|null} [carId] Null = all cars
+ * @param {object|null} [client]
+ */
 async function purgeExpired(carId = null, client = null) {
   const now = new Date();
   const normalizedCarId = carId ? normalizeCarId(carId) : null;
 
+  // Guard: early-return or throw when required input is missing/invalid.
   if (carId && normalizedCarId === null) {
     return;
   }
 
+  // Protected block: isolate failure modes.
   try {
     await extendOpenPhysicalRentalBlocks(normalizedCarId, now, client);
   } catch (err) {
@@ -196,8 +237,16 @@ async function purgeExpired(carId = null, client = null) {
 
 // Хвърля OVERLAP ако новият интервал се застъпва със съществуващ block.
 // Fast-path check; authoritative protection is no_overlapping_car_blocks (GiST EXCLUDE).
+/**
+ * Throw OVERLAP if any car_date_blocks row intersects [start, end).
+ * @param {number|string} carId
+ * @param {Date} start
+ * @param {Date} end
+ * @param {object|null} [client]
+ */
 async function assertNoOverlap(carId, start, end, client = null) {
   const normalizedCarId = normalizeCarId(carId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId) {
     throw new Error('Invalid car id');
   }
@@ -220,12 +269,22 @@ async function assertNoOverlap(carId, start, end, client = null) {
   }
 }
 
+/**
+ * Insert date block and return the mapped result.
+ * @param {string|number} carId
+ * @param {*} start
+ * @param {*} end
+ * @param {object|null} [client]
+ * @param {object} [options]
+ * @returns {Promise<*>}
+ */
 async function insertDateBlock(carId, start, end, client = null, options = {}) {
   const blockType = options.blockType || 'booking';
   const reason = options.reason || null;
   const notes = options.notes || null;
   const createdByUserId = options.createdByUserId != null ? Number(options.createdByUserId) : null;
 
+  // Protected block: isolate failure modes.
   try {
     await clientQuery(
       client,
@@ -244,6 +303,7 @@ async function insertDateBlock(carId, start, end, client = null, options = {}) {
       ]
     );
   } catch (err) {
+    // Concurrency / overlap guard (race-sensitive).
     if (isCarDateBlockOverlapViolation(err)) {
       throw overlapError();
     }
@@ -251,14 +311,25 @@ async function insertDateBlock(carId, start, end, client = null, options = {}) {
   }
 }
 
+/**
+ * Book a calendar range: purge expired, assert no overlap, insert date block.
+ * Unique/exclusion constraints may still raise; mapped to OVERLAP where applicable.
+ * @param {number|string} carId
+ * @param {Date} start
+ * @param {Date} end
+ * @param {object|null} [client]
+ * @param {object} [options]
+ */
 async function addRange(carId, start, end, client = null, options = {}) {
   const normalizedCarId = normalizeCarId(carId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId) {
     throw new Error('Invalid car id');
   }
 
   const s = toUtc(start);
   const e = toUtc(end);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!(s < e)) {
     throw new Error('Invalid date range');
   }
@@ -273,8 +344,18 @@ async function addRange(carId, start, end, client = null, options = {}) {
   });
 }
 
+/**
+ * Resize a booking on the same car: remove previous block endpoints then add the new range.
+ * @param {number|string} carId
+ * @param {Date} prevStart
+ * @param {Date} prevEnd
+ * @param {Date} newStart
+ * @param {Date} newEnd
+ * @param {object|null} [client]
+ */
 async function updateRange(carId, prevStart, prevEnd, newStart, newEnd, client = null) {
   const normalizedCarId = normalizeCarId(carId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId) {
     throw new Error('Invalid car id');
   }
@@ -283,6 +364,7 @@ async function updateRange(carId, prevStart, prevEnd, newStart, newEnd, client =
   const pe = toUtc(prevEnd);
   const ns = toUtc(newStart);
   const ne = toUtc(newEnd);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!(ns < ne)) {
     throw new Error('Invalid date range');
   }
@@ -300,9 +382,20 @@ async function updateRange(carId, prevStart, prevEnd, newStart, newEnd, client =
   await insertDateBlock(normalizedCarId, ns, ne, client);
 }
 
+/**
+ * Move a booking between cars: remove from prev car, add on new car (same transaction preferred).
+ * @param {number|string} prevCarId
+ * @param {number|string} newCarId
+ * @param {Date} prevStart
+ * @param {Date} prevEnd
+ * @param {Date} newStart
+ * @param {Date} newEnd
+ * @param {object|null} [client]
+ */
 async function moveRange(prevCarId, newCarId, prevStart, prevEnd, newStart, newEnd, client = null) {
   const prevId = normalizeCarId(prevCarId);
   const newId = normalizeCarId(newCarId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!prevId || !newId) {
     throw new Error('Invalid car id');
   }
@@ -311,6 +404,7 @@ async function moveRange(prevCarId, newCarId, prevStart, prevEnd, newStart, newE
   const pe = toUtc(prevEnd);
   const ns = toUtc(newStart);
   const ne = toUtc(newEnd);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!(ns < ne)) {
     throw new Error('Invalid date range');
   }
@@ -329,12 +423,21 @@ async function moveRange(prevCarId, newCarId, prevStart, prevEnd, newStart, newE
   await insertDateBlock(newId, ns, ne, client);
 }
 
+/**
+ * Delete the date block matching start/end for a car (soft-delete / cancel path).
+ * @param {number|string} carId
+ * @param {Date} startDate
+ * @param {Date} endDate
+ * @param {object|null} [client]
+ */
 async function removeRange(carId, startDate, endDate, client = null) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!carId || !startDate || !endDate) {
     return;
   }
 
   const normalizedCarId = normalizeCarId(carId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId) {
     return;
   }
@@ -350,8 +453,15 @@ async function removeRange(carId, startDate, endDate, client = null) {
 }
 
 // Премахва blocks без съответстващ активен order – repair helper за drift.
+/**
+ * purge orphaned.
+ * @param {string|number} carId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function purgeOrphaned(carId, client = null) {
   const normalizedCarId = normalizeCarId(carId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId) {
     return;
   }
@@ -366,6 +476,7 @@ async function purgeOrphaned(carId, client = null) {
     [normalizedCarId]
   );
 
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!blocksResult.rows.length) {
     return;
   }
@@ -398,6 +509,7 @@ async function purgeOrphaned(carId, client = null) {
     .filter((block) => !hasOverlapWithAnyOrder(block))
     .map((block) => block.id);
 
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!orphanIds.length) {
     return;
   }
@@ -409,6 +521,10 @@ async function purgeOrphaned(carId, client = null) {
   );
 }
 
+/**
+ * Mark active orders whose return date has passed as expired (dashboard/list hygiene).
+ * @param {object|null} [client]
+ */
 async function expireFinishedOrders(client = null) {
   const now = new Date();
 
@@ -427,6 +543,12 @@ async function expireFinishedOrders(client = null) {
   );
 }
 
+/**
+ * Load date blocks by car ids.
+ * @param {Array<*>} carIds
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function fetchDateBlocksByCarIds(carIds, client = null) {
   const normalizedIds = [...new Set(
     carIds
@@ -435,6 +557,7 @@ async function fetchDateBlocksByCarIds(carIds, client = null) {
   )];
 
   const map = new Map();
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedIds.length) {
     return map;
   }
@@ -452,6 +575,7 @@ async function fetchDateBlocksByCarIds(carIds, client = null) {
 
   for (const row of result.rows) {
     const carId = Number(row.car_id);
+    // Guard: early-return or throw when required input is missing/invalid.
     if (!map.has(carId)) {
       map.set(carId, []);
     }
@@ -464,6 +588,12 @@ async function fetchDateBlocksByCarIds(carIds, client = null) {
   return map;
 }
 
+/**
+ * Load date blocks for car.
+ * @param {string|number} carId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function fetchDateBlocksForCar(carId, client = null) {
   const map = await fetchDateBlocksByCarIds([carId], client);
   const normalizedCarId = normalizeCarId(carId);

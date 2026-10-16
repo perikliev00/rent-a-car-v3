@@ -1,3 +1,6 @@
+/**
+ * Admin audit-log listing endpoint.
+ */
 const express = require('express');
 const auditLogController = require('../../../controllers/api/admin/auditLogController');
 const { requirePermission } = require('../../../middleware/auth');
@@ -8,6 +11,7 @@ const {
 
 const router = express.Router();
 
+// Filterable audit trail for compliance / debugging.
 router.get(
   '/',
   requirePermission('can_view_audit_logs'),

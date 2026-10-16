@@ -1,3 +1,6 @@
+/**
+ * Two-column layout for login/signup/verify pages: form column + branded aside image.
+ */
 import type { ReactNode } from 'react';
 import { authAsideImage } from '../../data/marketingAssets';
 
@@ -9,6 +12,16 @@ interface AuthPageShellProps {
   sideDescription?: string;
 }
 
+/**
+ * Two-column auth layout: branded photo aside (lg+) and form column.
+ *
+ * @param props.title - Form-column heading (e.g. “Sign in”).
+ * @param props.subtitle - Short supporting line under the title.
+ * @param props.children - Form controls rendered under the subtitle.
+ * @param props.sideTitle - Aside headline; defaults to brand marketing copy.
+ * @param props.sideDescription - Aside supporting sentence.
+ * @returns Responsive auth page shell.
+ */
 export function AuthPageShell({
   title,
   subtitle,

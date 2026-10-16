@@ -1,3 +1,6 @@
+/**
+ * Body validation for customer order/hold create (car, dates, locations, times).
+ */
 const { body } = require('express-validator');
 const { ALLOWED_LOCATIONS } = require('../constants/locations');
 const { bodyTimeRule } = require('./timeFieldRules');

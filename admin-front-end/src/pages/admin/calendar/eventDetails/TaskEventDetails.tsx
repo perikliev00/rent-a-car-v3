@@ -1,3 +1,6 @@
+/**
+ * Detail panel UI for staff task calendar events.
+ */
 import { Button } from '../../../../components/ui/Button';
 import {
   TASK_STATUS_LABELS,
@@ -7,6 +10,7 @@ import {
 import { Field, Section } from './EventDetailsPrimitives';
 import { fmt } from './formatEventDate';
 
+/** Detail panel UI for staff task calendar events. */
 export function TaskEventDetails({
   task,
   canTasks,

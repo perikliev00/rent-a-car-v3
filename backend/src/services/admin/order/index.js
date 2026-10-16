@@ -1,3 +1,6 @@
+/**
+ * Admin order service barrel: list/create/update/delete/restore and form helpers.
+ */
 const {
   getOrdersList,
   getExpiredOrders,

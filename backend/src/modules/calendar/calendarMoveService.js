@@ -1,3 +1,10 @@
+/**
+ * Move / resize calendar events (reservations, blocks, tasks).
+ *
+ * Reservations update pricing + booking-sync ranges under car advisory locks.
+ * Force+OVERRIDE clears soft block overlaps so GiST booking rows can be written.
+ */
+
 const repo = require('./calendar.repository');
 const mapper = require('./calendar.eventMapper');
 const conflictEngine = require('./calendar.conflictEngine');
@@ -27,6 +34,10 @@ async function clearOverridableBlocksInRange(carId, start, end, client) {
   );
 }
 
+/**
+ * Hard-fail if the target range overlaps an active hold or open physical rental.
+ * Re-checked inside the transaction after advisory locks.
+ */
 async function assertNoHoldOrOpenPhysicalRental({
   carId,
   start,
@@ -82,7 +93,17 @@ async function assertNoHoldOrOpenPhysicalRental({
   }
 }
 
+/**
+ * Move or resize a calendar event by parsed `type:id`.
+ * @param {object} access
+ * @param {string} eventId
+ * @param {object} body start, end, optional carId/force
+ * @param {object} req Express request (audit)
+ * @param {'move'|'resize'} mode
+ * @returns {Promise<object[]>} Updated mapped events
+ */
 async function moveOrResizeEvent(access, eventId, body, req, mode) {
+  // Parse composite calendar id: reservation|blocked|task : numeric id.
   const parsed = mapper.parseEventId(eventId);
   if (!parsed) throw createHttpError('VALIDATION_ERROR', 'Invalid event id.', 422);
 
@@ -91,6 +112,7 @@ async function moveOrResizeEvent(access, eventId, body, req, mode) {
   const start = new Date(body.start);
   const end = new Date(body.end);
 
+  // --- Reservation move / resize ---
   if (parsed.type === 'reservation') {
     const perm = mode === 'resize' ? CALENDAR_PERMISSIONS.RESIZE : CALENDAR_PERMISSIONS.MOVE;
     if (!rbacService.userHasPermission(access, perm)) {
@@ -103,6 +125,7 @@ async function moveOrResizeEvent(access, eventId, body, req, mode) {
     const existing = await reservationSql.findById(parsed.id);
     if (!existing) throw createHttpError('NOT_FOUND', 'Reservation not found.', 404);
 
+    // Optional car change on move; default to current car.
     const targetCarId = body.carId != null ? Number(body.carId) : Number(
       existing.carId?.id || existing.carId
     );
@@ -112,7 +135,7 @@ async function moveOrResizeEvent(access, eventId, body, req, mode) {
       end,
       excludeReservationId: existing.id,
     });
-    // Ignore booking-synced blocks (they represent this reservation's own range)
+    // Ignore booking-synced blocks (they represent this reservation's own range).
     const writableConflicts = conflicts.filter(
       (c) => !(c.code === 'BLOCK_OVERLAP' && c.blockType === 'booking')
     );
@@ -124,6 +147,7 @@ async function moveOrResizeEvent(access, eventId, body, req, mode) {
     let orderSynced = false;
 
     await runWithTransaction(async (client) => {
+      // Lock previous + target cars before re-checking hard conflicts.
       await acquireCarAdvisoryLocks(client, [prevCarId, targetCarId]);
       await assertNoHoldOrOpenPhysicalRental({
         carId: targetCarId,
@@ -133,6 +157,7 @@ async function moveOrResizeEvent(access, eventId, body, req, mode) {
         client,
       });
 
+      // Reprice linked order for the new range/car, then persist reservation fields.
       const { pricing, orderSynced: synced } = await syncLinkedOrderAfterReservationMove({
         reservationId: existing.id,
         carId: targetCarId,
@@ -169,6 +194,7 @@ async function moveOrResizeEvent(access, eventId, body, req, mode) {
         client
       );
 
+      // Sync GiST booking rows; same-car uses updateRange, cross-car uses moveRange.
       try {
         if (prevCarId === targetCarId) {
           await bookingSync.updateRange(prevCarId, prevStart, prevEnd, start, end, client);
@@ -185,12 +211,12 @@ async function moveOrResizeEvent(access, eventId, body, req, mode) {
         }
       } catch (err) {
         if (err.code === 'OVERLAP' && force && canOverride) {
+          // Force path: drop old booking row, clear soft blocks, write new booking range.
           await bookingSync.removeRange(prevCarId, prevStart, prevEnd, client);
-          // Force override cleared soft conflicts in the engine; also clear overlapping
-          // manual/maintenance blocks so the booking row can be written under GiST.
           await clearOverridableBlocksInRange(targetCarId, start, end, client);
           await bookingSync.addRange(targetCarId, start, end, client, { blockType: 'booking' });
         } else if (err.code === 'OVERLAP') {
+          // Soft GiST overlap without override permission → 409.
           throw createHttpError('CALENDAR_CONFLICT', err.message, 409, {
             conflicts: [
               {
@@ -233,6 +259,7 @@ async function moveOrResizeEvent(access, eventId, body, req, mode) {
     return mapper.mapReservationEvents(updated, { includeMarkers: true });
   }
 
+  // --- Manual / maintenance block move ---
   if (parsed.type === 'blocked') {
     if (!rbacService.userHasPermission(access, CALENDAR_PERMISSIONS.CREATE_BLOCKS)) {
       throw createHttpError('FORBIDDEN', 'Not allowed.', 403);
@@ -244,6 +271,7 @@ async function moveOrResizeEvent(access, eventId, body, req, mode) {
     const updated = await runWithTransaction(async (client) => {
       await acquireCarAdvisoryLocks(client, [block.car_id, targetCarId]);
 
+      // Exclude this block from overlap so resizing itself is allowed.
       const conflicts = await conflictEngine.checkReservationRangeConflicts({
         carId: targetCarId,
         start,
@@ -278,6 +306,7 @@ async function moveOrResizeEvent(access, eventId, body, req, mode) {
     return [mapper.mapBlockEvent(updated)];
   }
 
+  // --- Ops task schedule move (startsAt/dueAt + optional car) ---
   if (parsed.type === 'task') {
     if (!rbacService.userHasPermission(access, CALENDAR_PERMISSIONS.CREATE_TASKS)) {
       throw createHttpError('FORBIDDEN', 'Not allowed.', 403);

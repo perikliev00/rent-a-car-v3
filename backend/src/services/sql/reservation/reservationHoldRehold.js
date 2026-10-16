@@ -1,3 +1,6 @@
+/**
+ * Extend/re-issue an existing hold (same session) without losing the slot.
+ */
 const {
   acquireCarAdvisoryLocks,
   acquireSessionAdvisoryLock,
@@ -27,6 +30,13 @@ const {
   expireStaleHoldsForSession,
 } = require('./reservationHoldExpiry');
 
+/**
+ * Update a pending_payment hold's dates/pricing/car and refresh hold_expires_at.
+ * Only touches rows still in pending_payment (rehold race guard).
+ * @param {object} params
+ * @param {object} client - Required open transaction client
+ * @returns {Promise<object|null>}
+ */
 async function updateHoldForRehold(
   {
     reservationId,
@@ -103,6 +113,12 @@ async function updateHoldForRehold(
   return mapSqlReservation(result.rows[0]) || null;
 }
 
+/**
+ * Rehold the session's pending reservation after availability checks and locks.
+ * Expires stale holds, rejects overlaps, then updates the pending row in a transaction.
+ * @param {object} params
+ * @returns {Promise<object>} create/rehold result shape used by checkout
+ */
 async function reholdPendingReservationWithAvailabilityCheck({
   sessionId,
   carId,
@@ -119,6 +135,7 @@ async function reholdPendingReservationWithAvailabilityCheck({
   if (!normalizedNewCarId) {
     throw new Error('Invalid car id');
   }
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!sessionId || typeof sessionId !== 'string') {
     throw new Error('Invalid session id');
   }
@@ -128,6 +145,7 @@ async function reholdPendingReservationWithAvailabilityCheck({
 
     const sessionHolds = await findSessionHoldRows(sessionId, client);
     const peeked = await findActiveBySessionId(sessionId, client);
+    // Status / lifecycle guard before mutating domain state.
     if (peeked?.status === 'processing_payment') {
       return { ok: false, reason: 'rehold_not_allowed' };
     }
@@ -140,20 +158,25 @@ async function reholdPendingReservationWithAvailabilityCheck({
     ]);
     await expireStaleHoldsForSession(sessionId, now, client);
 
+    // Guard: early-return or throw when required input is missing/invalid.
     if (!peeked) {
       return { ok: false, reason: 'not_found' };
     }
+    // Status / lifecycle guard before mutating domain state.
     if (peeked.status !== 'pending_payment') {
       return { ok: false, reason: 'rehold_not_allowed' };
     }
 
     const locked = await findByIdForUpdate(peeked.id, client);
+    // Guard: early-return or throw when required input is missing/invalid.
     if (!locked || locked.sessionId !== sessionId) {
       return { ok: false, reason: 'not_found' };
     }
+    // Status / lifecycle guard before mutating domain state.
     if (locked.status === 'processing_payment') {
       return { ok: false, reason: 'rehold_not_allowed' };
     }
+    // Status / lifecycle guard before mutating domain state.
     if (locked.status !== 'pending_payment') {
       return { ok: false, reason: 'rehold_not_allowed' };
     }
@@ -172,6 +195,7 @@ async function reholdPendingReservationWithAvailabilityCheck({
     };
 
     const overlappingReservation = await findOverlappingHold(holdCriteria, client);
+    // Concurrency / overlap guard (race-sensitive).
     if (overlappingReservation) {
       return { ok: false, conflict: true, reason: 'hold_overlap' };
     }
@@ -187,6 +211,7 @@ async function reholdPendingReservationWithAvailabilityCheck({
       endDate,
       client
     );
+    // Concurrency / overlap guard (race-sensitive).
     if (bookedOverlap) {
       return { ok: false, conflict: true, reason: 'booked_overlap' };
     }
@@ -205,6 +230,7 @@ async function reholdPendingReservationWithAvailabilityCheck({
     };
 
     await client.query('SAVEPOINT hold_rehold');
+    // Protected block: isolate failure modes.
     try {
       const reservation = await updateHoldForRehold(
         {

@@ -1,3 +1,6 @@
+/**
+ * Compliance query/mutation hooks including expiry-aware forms.
+ */
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -11,6 +14,13 @@ import { toast } from '../../../components/ui/toastStore';
 import type { ComplianceForm, Tab } from './carDetailTypes';
 import { refreshCar } from './carDetailRefresh';
 
+/**
+ * Compliance list/create/delete/download for a car (active on the Compliance tab).
+ * Create builds multipart FormData and omits date fields when the type has no expiry.
+ *
+ * @param id - Car id
+ * @param tab - Active detail tab
+ */
 export function useCarCompliance(id: string, tab: Tab) {
   const queryClient = useQueryClient();
   const [complianceForm, setComplianceForm] = useState<ComplianceForm>({
@@ -32,6 +42,7 @@ export function useCarCompliance(id: string, tab: Tab) {
 
   const complianceMutation = useMutation({
     mutationFn: () => {
+      // Equipment types without validity windows skip issued/expires fields.
       const hasExpiry = complianceTypeHasExpiry(complianceForm.itemType);
       const fd = new FormData();
       fd.append('itemType', complianceForm.itemType);
@@ -67,6 +78,7 @@ export function useCarCompliance(id: string, tab: Tab) {
     onError: (err) => toast((err as Error).message, 'error'),
   });
 
+  /** Authenticated download of a compliance attachment; toasts on failure. */
   async function downloadComplianceDocument(itemId: number, filename: string) {
     try {
       await downloadCarComplianceDocument(id, itemId, filename);
@@ -75,6 +87,7 @@ export function useCarCompliance(id: string, tab: Tab) {
     }
   }
 
+  /** Delete a compliance item and refresh car + fleet-alert caches. */
   async function deleteComplianceItem(itemId: number) {
     try {
       await deleteCarCompliance(id, itemId);

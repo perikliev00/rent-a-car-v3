@@ -18,6 +18,12 @@ const {
   requireDestructiveConfirmation,
 } = require('./dbCliUtils');
 
+/**
+ * Drop and recreate the public schema (destructive reset helper).
+ *
+ * @returns {Promise<*>}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 async function dropPublicSchema() {
   const databaseUrl = requireDatabaseUrl();
   const { user } = parseDatabaseUrl(databaseUrl);
@@ -35,10 +41,24 @@ async function dropPublicSchema() {
   }
 }
 
+/**
+ * Quote a PostgreSQL identifier with double quotes.
+ *
+ * @param {*} identifier
+ * @returns {*}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function quoteIdentifier(identifier) {
   return `"${String(identifier).replace(/"/g, '""')}"`;
 }
 
+/**
+ * Reset the database (drop public schema + re-apply schema/migrations as configured).
+ *
+ * @param {*} [argv] - argv = process.argv.slice(2)
+ * @returns {Promise<*>}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 async function reset(argv = process.argv.slice(2)) {
   assertDevelopmentOnly('db:reset');
 

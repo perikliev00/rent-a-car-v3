@@ -1,3 +1,7 @@
+/**
+ * Stripe cancel return URL: notifies the backend once on mount so any active
+ * hold can be released, then shows a calm message to restart search.
+ */
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
@@ -10,6 +14,12 @@ import { PageLoader } from '../../components/ui/Loading';
 const NOOP_MESSAGE =
   'No active reservation hold to cancel. You can start a new search whenever you are ready.';
 
+/**
+ * Shown when the customer abandons Stripe Checkout.
+ *
+ * @returns Cancel confirmation UI after the cancel API call settles.
+ * @remarks Side effect: calls {@link checkoutCancel} once on mount to release any hold.
+ */
 export function CheckoutCancelPage() {
   const cancelMutation = useMutation({
     mutationFn: checkoutCancel,
@@ -30,6 +40,7 @@ export function CheckoutCancelPage() {
       : cancelMutation.error instanceof Error
         ? cancelMutation.error.message
         : null;
+  // Prefer API copy on success; otherwise show the error or a calm no-op message.
   const bodyMessage = cancelMutation.isSuccess
     ? (data?.message ?? NOOP_MESSAGE)
     : (errorMessage || NOOP_MESSAGE);

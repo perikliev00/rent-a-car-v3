@@ -1,3 +1,6 @@
+/**
+ * Public car catalog handlers: list, search, and detail.
+ */
 const { validationResult } = require('express-validator');
 const carRepository = require('../../repositories/carRepository');
 const { getSofiaIsoDateString, getTomorrowSofiaIsoDate } = require('../../utils/date/timezone');
@@ -15,11 +18,20 @@ const apiResponse = require('../../utils/apiResponse');
 const asyncHandler = require('../../utils/asyncHandler');
 const { forwardControllerError } = require('../../utils/controllerError');
 
+/**
+ * List cars for the public catalog with query filters.
+ * Side effects: purges expired unpaid holds before listing so availability stays fresh.
+ * @param {import('express').Request} req - Query: page + car filter fields
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.getCars = asyncHandler(async (req, res, next) => {
   try {
     await purgeExpired();
 
     const criteria = parseCarFilterRaw(req.query);
+    // Browse mode prices a 1-day sample for list cards.
     const rentalDays = 1;
 
     const { cars, currentPage, totalPages } = await carRepository.paginate(criteria, {
@@ -28,6 +40,7 @@ exports.getCars = asyncHandler(async (req, res, next) => {
     });
 
     const now = new Date();
+    // Default search dates for SPA deep-links into booking.
     const pickupDateISO = getSofiaIsoDateString(now);
     const returnDateISO = getTomorrowSofiaIsoDate(now);
 
@@ -47,6 +60,14 @@ exports.getCars = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Return a single public car by id.
+ * Side effects: none beyond DB read.
+ * @param {import('express').Request} req - Params: carId
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.getCarById = asyncHandler(async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -67,6 +88,14 @@ exports.getCarById = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Search available cars for a date range and filters.
+ * Side effects: none beyond DB/config reads; computes per-car prices for the page.
+ * @param {import('express').Request} req - Query: pickup/return date/time/location + filters
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.searchCars = asyncHandler(async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -119,6 +148,7 @@ exports.searchCars = asyncHandler(async (req, res, next) => {
       priceMax,
     });
 
+    // onlyAvailable excludes cars with overlapping holds/bookings for the window.
     const { cars: carsForPage, currentPage, totalPages } = await carRepository.paginate(
       criteria,
       {
@@ -151,6 +181,7 @@ exports.searchCars = asyncHandler(async (req, res, next) => {
         priceBreakdown: p.priceBreakdown,
       };
     });
+    // Price-range filters apply to computed unit price, not raw base rate.
     pageCars = filterCarsByComputedUnitPrice(pageCars, criteria);
 
     const sharedRentalDays = pageCars[0]?.rentalDays || rentalDays || 0;

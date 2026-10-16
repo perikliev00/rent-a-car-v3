@@ -1,6 +1,10 @@
+/**
+ * Sticky time/day header for the fleet timeline.
+ */
 import { format } from 'date-fns';
 import { leftPct } from './timelineLayout';
 
+/** Sticky time/day header for the fleet timeline. */
 export function TimelineHeader({
   hours,
   labelStep,

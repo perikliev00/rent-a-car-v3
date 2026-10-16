@@ -1,6 +1,15 @@
+/**
+ * SQL for user↔role assignments and staff user listing with roles.
+ */
 const { clientQuery } = require('../../db/transaction');
 
+/**
+ * Map a DB/API row into the domain shape used by callers (mapUserRole).
+ * @param {object} row
+ * @returns {*}
+ */
 function mapUserRole(row) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) return null;
   return {
     userId: String(row.user_id),
@@ -12,8 +21,15 @@ function mapUserRole(row) {
   };
 }
 
+/**
+ * List roles for user from SQL.
+ * @param {string|number} userId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function listRolesForUser(userId, client = null) {
   const uid = Number(userId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(uid) || uid <= 0) return [];
 
   const result = await clientQuery(
@@ -36,18 +52,37 @@ async function listRolesForUser(userId, client = null) {
   return result.rows.map(mapUserRole);
 }
 
+/**
+ * List role slugs for user from SQL.
+ * @param {string|number} userId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function listRoleSlugsForUser(userId, client = null) {
   const roles = await listRolesForUser(userId, client);
   return roles.map((r) => r.roleSlug).filter(Boolean);
 }
 
+/**
+ * List role ids for user from SQL.
+ * @param {string|number} userId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function listRoleIdsForUser(userId, client = null) {
   const roles = await listRolesForUser(userId, client);
   return roles.map((r) => Number(r.roleId));
 }
 
+/**
+ * count users with role slug.
+ * @param {string} slug
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function countUsersWithRoleSlug(slug, client = null) {
   const normalized = String(slug || '').trim().toLowerCase();
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalized) return 0;
   const result = await clientQuery(
     client,
@@ -62,9 +97,17 @@ async function countUsersWithRoleSlug(slug, client = null) {
   return result.rows[0]?.count || 0;
 }
 
+/**
+ * user has role slug.
+ * @param {string|number} userId
+ * @param {string} slug
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function userHasRoleSlug(userId, slug, client = null) {
   const uid = Number(userId);
   const normalized = String(slug || '').trim().toLowerCase();
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(uid) || uid <= 0 || !normalized) return false;
 
   const result = await clientQuery(
@@ -81,10 +124,19 @@ async function userHasRoleSlug(userId, slug, client = null) {
   return result.rows.length > 0;
 }
 
+/**
+ * assign role to user.
+ * @param {string|number} userId
+ * @param {string|number} roleId
+ * @param {string|number} [assignedByUserId]
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function assignRoleToUser(userId, roleId, assignedByUserId = null, client = null) {
   const uid = Number(userId);
   const rid = Number(roleId);
   const by = assignedByUserId != null ? Number(assignedByUserId) : null;
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(uid) || uid <= 0 || !Number.isInteger(rid) || rid <= 0) {
     throw new Error('Invalid user or role id');
   }
@@ -102,9 +154,17 @@ async function assignRoleToUser(userId, roleId, assignedByUserId = null, client 
   return listRolesForUser(uid, client);
 }
 
+/**
+ * revoke role from user.
+ * @param {string|number} userId
+ * @param {string|number} roleId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function revokeRoleFromUser(userId, roleId, client = null) {
   const uid = Number(userId);
   const rid = Number(roleId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(uid) || uid <= 0 || !Number.isInteger(rid) || rid <= 0) {
     throw new Error('Invalid user or role id');
   }
@@ -121,8 +181,17 @@ async function revokeRoleFromUser(userId, roleId, client = null) {
   return listRolesForUser(uid, client);
 }
 
+/**
+ * replace user roles.
+ * @param {string|number} userId
+ * @param {Array<*>} roleIds
+ * @param {string|number} [assignedByUserId]
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function replaceUserRoles(userId, roleIds, assignedByUserId = null, client = null) {
   const uid = Number(userId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(uid) || uid <= 0) {
     throw new Error('Invalid user id');
   }
@@ -153,6 +222,11 @@ async function replaceUserRoles(userId, roleIds, assignedByUserId = null, client
   return listRolesForUser(uid, client);
 }
 
+/**
+ * List staff users with roles from SQL.
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function listStaffUsersWithRoles(client = null) {
   const result = await clientQuery(
     client,

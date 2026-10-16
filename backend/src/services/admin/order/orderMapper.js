@@ -1,22 +1,39 @@
+/**
+ * Pure helpers for admin order payloads: date/time formatting, create payload
+ * assembly, in-place field application, and matching stored calendar blocks.
+ */
 const { parseSofiaDate } = require('../../../utils/date/timezone');
 const { toHHMM: normalizeToHHMM } = require('../../../utils/date/normalizeTime');
 
+/** Coerce a date-like value to YYYY-MM-DD (or empty string). */
 function toISODate(value) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!value) return '';
   if (/^\d{4}-\d{2}-\d{2}/.test(value)) return String(value).slice(0, 10);
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
 }
 
+/** Normalize a time-like value to HH:MM (or empty string). */
 function toHHMM(value) {
   return normalizeToHHMM(value) ?? '';
 }
 
+/**
+ * Resolve an order date; Dates pass through, strings parse in Sofia timezone.
+ * @param {Date|string} value
+ * @param {string} [time]
+ * @param {string} [fallbackTime]
+ */
 function resolveOrderDate(value, time, fallbackTime) {
   if (value instanceof Date) return value;
   return parseSofiaDate(value, time || fallbackTime);
 }
 
+/**
+ * Build the SQL create payload from form command + computed range/pricing.
+ * @param {{command: object, range: {start: Date, end: Date}, pricing: object}} args
+ */
 function buildOrderCreatePayload({ command, range, pricing }) {
   return {
     carId: command.carId,
@@ -44,6 +61,12 @@ function buildOrderCreatePayload({ command, range, pricing }) {
   };
 }
 
+/**
+ * Mutate order doc with schedule/location/contact/price fields from payload.
+ * @param {object} order
+ * @param {object} payload
+ * @param {object} contact
+ */
 function applyPayloadToOrder(order, payload, contact) {
   order.pickupDate = payload.pickupDate;
   order.returnDate = payload.returnDate;
@@ -63,6 +86,11 @@ function applyPayloadToOrder(order, payload, contact) {
   return order;
 }
 
+/**
+ * Mutate order doc with recomputed pricing fields and snapshot.
+ * @param {object} order
+ * @param {object} pricing
+ */
 function applyPricingToOrder(order, pricing) {
   order.rentalDays = pricing.rentalDays;
   order.deliveryPrice = pricing.deliveryPrice;
@@ -77,7 +105,15 @@ function applyPricingToOrder(order, pricing) {
   return order;
 }
 
+/**
+ * Find the calendar block overlapping the previous order range so update/restore
+ * can remove the correct booked range even if stored endpoints drifted slightly.
+ * @param {object[]} blocks
+ * @param {Date} prevStart
+ * @param {Date} prevEnd
+ */
 function extractStoredRange(blocks, prevStart, prevEnd) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!Array.isArray(blocks) || !blocks.length) {
     return { storedStart: prevStart, storedEnd: prevEnd };
   }

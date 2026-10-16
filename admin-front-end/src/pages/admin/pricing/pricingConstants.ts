@@ -1,3 +1,6 @@
+/**
+ * Shared labels/options for pricing admin sections.
+ */
 export const LOCATION_LABELS: Record<string, string> = {
   office: 'Office',
   'sunny-beach': 'Sunny Beach',

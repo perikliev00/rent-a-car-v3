@@ -1,3 +1,8 @@
+/**
+ * Core paid-reservation finalization: locate reservation by Stripe session,
+ * enforce session link/amount validation, then create order or recover conflicts.
+ * Shared by webhooks, success page, and reconcile jobs.
+ */
 const orderSql = require('../sql/orderSqlService');
 const { ACTIVE_RESERVATION_STATUSES } = require('../../utils/reservationHelpers');
 const { isOpsLifecycleStatus } = require('../../domain/reservationStatus');
@@ -20,19 +25,30 @@ const {
 const { markPaidReservationConflict } = require('./paidConflictManualReviewService');
 const { paidSnapshotFromFinalizationContext } = require('../payment/stripeSessionValidation');
 
+/**
+ * Finalize a reservation for a paid Stripe Checkout session.
+ *
+ * @param {string} stripeSessionId
+ * @param {object} [options]
+ * @param {object|null} [client] - Optional DB client for transactional callers
+ * @returns {Promise<object>} Result with found/finalized/reason fields
+ */
 async function finalizeReservationCore(stripeSessionId, options = {}, client = null) {
   const { logPrefix, requireActiveStatus = false, reservationId, carId, sessionId } = options;
 
+  // Require a Checkout session id — without it there is nothing to finalize.
   if (!stripeSessionId) {
     throw new NotFoundError('Stripe checkout session was not provided.');
   }
 
+  // Resolve reservation by session metadata / client_reference_id (and optional hints).
   const reservation = await resolveReservationForStripeSession(
     stripeSessionId,
     { reservationId, carId, sessionId },
     client
   );
 
+  // No linked reservation: webhook/success may retry later or surface not_found.
   if (!reservation) {
     if (logPrefix) {
       logger.warn(
@@ -44,10 +60,12 @@ async function finalizeReservationCore(stripeSessionId, options = {}, client = n
     return { found: false, finalized: false, reservation: null, reason: 'not_found' };
   }
 
+  // Idempotent: order already exists for this Stripe session.
   const existingOrderBySession = await orderSql.findOrderByStripeSessionId(
     stripeSessionId,
     client
   );
+  // Idempotent: order already tied to this Stripe session — do not create again.
   if (existingOrderBySession) {
     if (logPrefix) {
       logger.info(
@@ -72,6 +90,7 @@ async function finalizeReservationCore(stripeSessionId, options = {}, client = n
 
   const existingOrder = await orderSql.findOrderByReservationId(reservation.id, client);
 
+  // Idempotent: ops lifecycle + order already present means finalization is done.
   if (isOpsLifecycleStatus(reservation.status) && existingOrder) {
     if (logPrefix) {
       logger.info(
@@ -89,6 +108,7 @@ async function finalizeReservationCore(stripeSessionId, options = {}, client = n
     };
   }
 
+  // Confirmed without order (or order without confirmed) is a hard data corruption.
   if (isOpsLifecycleStatus(reservation.status) && !existingOrder) {
     throw new AppError(
       'FINALIZATION_STATE_CORRUPTED',
@@ -101,6 +121,7 @@ async function finalizeReservationCore(stripeSessionId, options = {}, client = n
     );
   }
 
+  // Order exists but reservation is not in ops lifecycle — data corruption, fail hard.
   if (existingOrder && !isOpsLifecycleStatus(reservation.status)) {
     throw new AppError(
       'FINALIZATION_STATE_CORRUPTED',
@@ -122,16 +143,19 @@ async function finalizeReservationCore(stripeSessionId, options = {}, client = n
     client,
   });
 
+  // Session link/amount validation failed — return structured reason to caller.
   if (!sessionValidation.ok) {
     return sessionValidation;
   }
 
+  // Confirm Stripe payment_status and capture paid amount snapshot for order create.
   const paymentStatus = await resolveStripePaymentStatus(stripeSessionId, options);
   const paidSnapshot = paidSnapshotFromFinalizationContext(
     options,
     sessionValidation.stripeSession
   );
 
+  // Expired hold: unpaid → stop; paid → recover via paid-expired path.
   if (isHoldExpired(reservation)) {
     if (!isStripeSessionPaid(paymentStatus)) {
       if (logPrefix) {
@@ -203,6 +227,7 @@ async function finalizeReservationCore(stripeSessionId, options = {}, client = n
     });
   }
 
+  // Caller required an active hold status and this reservation is not active.
   if (requireActiveStatus && !ACTIVE_RESERVATION_STATUSES.includes(reservation.status)) {
     if (logPrefix) {
       logger.warn(
@@ -224,6 +249,7 @@ async function finalizeReservationCore(stripeSessionId, options = {}, client = n
     };
   }
 
+  // Never create an order for unpaid Checkout sessions.
   if (!isStripeSessionPaid(paymentStatus)) {
     if (logPrefix) {
       logger.warn(
@@ -246,6 +272,7 @@ async function finalizeReservationCore(stripeSessionId, options = {}, client = n
     };
   }
 
+  // Create order + confirm reservation; savepoint lets outer webhook tx recover on overlap.
   try {
     const hasTxClient = Boolean(client && typeof client.query === 'function');
 

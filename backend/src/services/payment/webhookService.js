@@ -1,3 +1,9 @@
+/**
+ * Stripe webhook entrypoint: verify signature, route refund events to the refund
+ * inbox, and route checkout.session.completed to booking finalization.
+ * Always acknowledges with HTTP 200 for processed events so Stripe does not retry
+ * endlessly for business outcomes that require manual review.
+ */
 const stripe = require('../../config/stripe');
 const logger = require('../../utils/logger');
 const logEvent = require('../../monitoring/logEvent');
@@ -5,6 +11,12 @@ const { trackWebhookFailure } = require('../../monitoring/track');
 const { processStripeWebhookEvent } = require('../bookingFinalizationService');
 const { handleRefundWebhookEvent } = require('./refund/refundWebhookInbox');
 
+/**
+ * Handle an inbound Stripe webhook HTTP request.
+ *
+ * @param {import('express').Request} req - Raw body + stripe-signature header required
+ * @returns {Promise<{ statusCode: number, body: object }>}
+ */
 async function handleStripeWebhookFlow(req) {
   const logPrefix = '🌐 [StripeWebhook]';
   const sig = req.headers['stripe-signature'];
@@ -15,7 +27,9 @@ async function handleStripeWebhookFlow(req) {
     `${logPrefix} webhook received`
   );
 
+  // Protected block: isolate failure modes.
   try {
+    // Reject forged payloads; Stripe signature verification is the trust boundary.
     event = stripe.webhooks.constructEvent(
       req.body,
       sig,
@@ -43,6 +57,7 @@ async function handleStripeWebhookFlow(req) {
     `${logPrefix} parsed event`
   );
 
+  // Refund lifecycle is handled separately from checkout finalization.
   if (
     event.type === 'charge.refunded' ||
     event.type === 'refund.updated' ||
@@ -52,8 +67,10 @@ async function handleStripeWebhookFlow(req) {
     return handleRefundWebhookEvent(event, req);
   }
 
+  // Stripe / payment-related branch.
   if (event.type === 'checkout.session.completed') {
     const session = event.data && event.data.object;
+    // Guard: early-return or throw when required input is missing/invalid.
     if (!session || !session.id) {
       trackWebhookFailure('missing_session_id', {
         requestId: req.requestId,
@@ -84,6 +101,7 @@ async function handleStripeWebhookFlow(req) {
       logPrefix: `${logPrefix}[${req.requestId}]`,
     });
 
+    // Status / lifecycle guard before mutating domain state.
     if (session.payment_status === 'paid') {
       logEvent.info('stripe.payment.succeeded', {
         requestId: req.requestId,
@@ -100,6 +118,7 @@ async function handleStripeWebhookFlow(req) {
       });
     }
 
+    // Paid but overlapping dates — ack 200 so Stripe stops retrying; ops handle manually.
     if (result?.reason === 'overlap_after_payment') {
       logger.error(
         {
@@ -117,6 +136,7 @@ async function handleStripeWebhookFlow(req) {
       };
     }
 
+    // Idempotent delivery: same eventId already processed.
     if (result?.reason === 'duplicate_event') {
       logger.info(
         { requestId: req.requestId, eventId: event.id },
@@ -128,6 +148,7 @@ async function handleStripeWebhookFlow(req) {
       };
     }
 
+    // Guard: early-return or throw when required input is missing/invalid.
     if (!result?.found) {
       trackWebhookFailure('reservation_not_found', {
         requestId: req.requestId,
@@ -140,6 +161,7 @@ async function handleStripeWebhookFlow(req) {
       };
     }
 
+    // Status / lifecycle guard before mutating domain state.
     if (result.reason === 'status_not_active' && result.reservation) {
       trackWebhookFailure('reservation_not_active', {
         requestId: req.requestId,

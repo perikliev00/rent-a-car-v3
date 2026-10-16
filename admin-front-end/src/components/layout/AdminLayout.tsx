@@ -1,3 +1,9 @@
+/**
+ * Admin chrome: RBAC-gated nav, fleet-alert badge, SSE live indicator, mobile drawer.
+ *
+ * Nav visibility is permission-driven (not role slug alone). Task links are
+ * inserted after Calendar when present so ops staff find them next to scheduling.
+ */
 import { NavLink, Outlet, Link, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -12,11 +18,13 @@ type NavItem = {
   to: string;
   label: string;
   end?: boolean;
+  /** Visible to any authenticated staff user. */
   staffOnly?: boolean;
   permission?: string;
   anyOf?: string[];
 };
 
+/** Static nav catalog; filtered per-user before render. */
 const adminNav: NavItem[] = [
   { to: '/admin', label: 'Dashboard', end: true, staffOnly: true },
   {
@@ -58,6 +66,10 @@ const adminNav: NavItem[] = [
   { to: '/admin/roles', label: 'Roles', permission: 'can_manage_users' },
 ];
 
+/**
+ * Prefer the role-specific task board when the user holds that staff role.
+ * @param roles - Session role slugs
+ */
 function myTasksPath(roles: string[] | undefined): string {
   if (roles?.includes('driver')) return '/admin/tasks/driver';
   if (roles?.includes('cleaner')) return '/admin/tasks/cleaner';
@@ -65,6 +77,10 @@ function myTasksPath(roles: string[] | undefined): string {
   return '/admin/tasks/driver';
 }
 
+/**
+ * Compact SSE connection badge (hidden while idle).
+ * @param state - Connection state from {@link useAdminRealtime}
+ */
 function LiveIndicator({ state }: { state: ReturnType<typeof useAdminRealtime> }) {
   if (state === 'idle') return null;
   const label = state === 'live' ? 'Live' : state === 'connecting' ? 'Connecting' : 'Offline';
@@ -86,6 +102,15 @@ function LiveIndicator({ state }: { state: ReturnType<typeof useAdminRealtime> }
   );
 }
 
+/**
+ * Renders filtered nav links for sidebar or mobile drawer variants.
+ * Shows a capped alert badge on the Fleet alerts item when `alertCount` > 0.
+ *
+ * @param items - Visible nav items after RBAC filtering
+ * @param alertCount - Unresolved fleet-alert count for the badge
+ * @param onNavigate - Optional click handler (e.g. close mobile drawer)
+ * @param variant - Visual style for sidebar vs drawer
+ */
 function NavItems({
   items,
   alertCount,
@@ -131,10 +156,12 @@ function NavItems({
   );
 }
 
+/** Admin chrome: RBAC-gated nav, fleet-alert badge, SSE live indicator, mobile drawer. Nav visibility is permission-driven (not role slug alone). Task links are inserted after Calendar when present so ops staff find them next to scheduling. */
 export function AdminLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  // SSE lives here so all admin pages share one connection + live indicator.
   const realtimeState = useAdminRealtime();
   const canSeeFleetAlerts = hasPermission(user, 'can_manage_fleet_alerts');
   const { data: fleetAlerts } = useQuery({
@@ -149,6 +176,7 @@ export function AdminLayout() {
     setMenuOpen(false);
   }, [location.pathname]);
 
+  // Manager task board and/or role-specific “My tasks” links.
   const taskNav: NavItem[] = [];
   if (
     hasPermission(user, 'can_create_calendar_tasks') ||
@@ -163,6 +191,7 @@ export function AdminLayout() {
     taskNav.push({ to: myTasksPath(user?.roles), label: 'My tasks' });
   }
 
+  // RBAC filter of the static nav catalog.
   const visibleNav = [
     ...adminNav.filter((item) => {
       if (item.staffOnly) return true;
@@ -172,6 +201,7 @@ export function AdminLayout() {
     }),
   ];
 
+  // Keep task boards adjacent to Calendar in the sidebar order.
   const calendarIdx = visibleNav.findIndex((i) => i.to === '/admin/calendar');
   if (calendarIdx >= 0) {
     visibleNav.splice(calendarIdx + 1, 0, ...taskNav);
@@ -179,6 +209,7 @@ export function AdminLayout() {
     visibleNav.splice(1, 0, ...taskNav);
   }
 
+  // Optional link back to the public booking site (strip trailing slashes).
   const customerUrl = import.meta.env.VITE_CUSTOMER_FRONTEND_URL
     ? import.meta.env.VITE_CUSTOMER_FRONTEND_URL.replace(/\/+$/, '')
     : '';

@@ -1,3 +1,8 @@
+/**
+ * Route paid-but-unconfirmable reservations to manual_review.
+ * Used when payment succeeded but dates overlap, session is stale, or amount mismatches.
+ * Preserves Stripe ids and paid amount for ops/refund handling.
+ */
 const reservationRepository = require('../../repositories/reservationRepository');
 const { changeStatus } = require('../reservation/reservationStatusService');
 const logger = require('../../utils/logger');
@@ -6,6 +11,11 @@ const { trackPaymentFailure } = require('../../monitoring/track');
 const { logSystemAction } = require('../admin/adminAuditService');
 const { paidAmountPatch } = require('../payment/stripeSessionValidation');
 
+/**
+ * Optional contact/time fields useful for admin triage of paid conflicts.
+ * @param {object} context
+ * @returns {string[]}
+ */
 function collectMissingPaidConflictFields(context) {
   const optionalFields = [
     'email',
@@ -18,6 +28,12 @@ function collectMissingPaidConflictFields(context) {
   return optionalFields.filter((field) => context[field] == null || context[field] === '');
 }
 
+/**
+ * Move reservation to manual_review and emit audit/metrics for ops.
+ *
+ * @param {object} params
+ * @returns {Promise<object>} Finalization-shaped result (finalized: false)
+ */
 async function markPaidReservationConflict({
   reservation,
   stripeSessionId,
@@ -38,6 +54,7 @@ async function markPaidReservationConflict({
       : 'manual_review';
 
   let updatedReservation = reservation;
+  // Protected block: isolate failure modes.
   try {
     const result = await changeStatus({
       reservationId: reservation.id,
@@ -64,6 +81,7 @@ async function markPaidReservationConflict({
     });
     updatedReservation = result.reservation;
   } catch (err) {
+    // Status / lifecycle guard before mutating domain state.
     if (err.code !== 'INVALID_STATUS_TRANSITION') {
       throw err;
     }

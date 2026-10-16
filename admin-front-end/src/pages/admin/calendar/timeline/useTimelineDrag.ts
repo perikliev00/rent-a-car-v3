@@ -1,3 +1,6 @@
+/**
+ * Pointer drag/resize state machine for timeline event bars.
+ */
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { parseISO } from 'date-fns';
 import type { CalendarEvent } from '../calendar.types';
@@ -11,18 +14,27 @@ import {
   type TimelineGhost,
 } from './timelineLayout';
 
+/**
+ * Ephemeral window globals let HTML5 dragenter/over handlers on other rows
+ * read the in-flight drop target without React re-renders every pointer move.
+ */
 type DragGlobals = {
   __calResize?: { start: number; end: number };
   __calPointerMove?: TimelineDrop;
   __calDragId?: string;
 };
 
+/** Clear ephemeral resize/move globals when a gesture ends or the hook unmounts. */
 function clearWindowDragState() {
   const w = window as unknown as DragGlobals;
   w.__calResize = undefined;
   w.__calPointerMove = undefined;
 }
 
+/**
+ * Timeline pointer interactions: edge resize and cross-lane drag.
+ * Enforces a 1-hour minimum duration while resizing.
+ */
 export function useTimelineDrag({
   from,
   rangeMs,
@@ -63,6 +75,13 @@ export function useTimelineDrag({
     };
   }, []);
 
+  /**
+   * Start an edge-resize gesture; updates window globals while the pointer moves.
+   * @param e - Pointer down on a resize handle
+   * @param ev - Event being resized
+   * @param edge - Which edge is being dragged
+   * @param trackEl - Parent track used for X→time mapping
+   */
   function beginResize(
     e: ReactPointerEvent,
     ev: CalendarEvent,
@@ -70,6 +89,7 @@ export function useTimelineDrag({
     trackEl: HTMLElement | null
   ) {
     if (!canResize || moving || !onResizeRequest || !trackEl) return;
+    // Ignore if another pointer gesture is already active.
     if (activePointerId.current != null) return;
     e.preventDefault();
     e.stopPropagation();
@@ -89,6 +109,7 @@ export function useTimelineDrag({
       const at = atFromClientX(evMove.clientX, trackEl, from, rangeMs).getTime();
       let nextStart = start0;
       let nextEnd = end0;
+      // Keep at least one hour so zero-width / inverted ranges cannot be submitted.
       if (edge === 'start') {
         nextStart = Math.min(at, end0 - 60 * 60 * 1000);
       } else {
@@ -139,6 +160,10 @@ export function useTimelineDrag({
     window.addEventListener('pointercancel', finish);
   }
 
+  /**
+   * Start a pointer-based move (not HTML5 DnD) for reservations/tasks when permitted.
+   * Ignores pointer-downs that originated on resize handles.
+   */
   function beginPointerMove(
     e: ReactPointerEvent,
     ev: CalendarEvent,
@@ -247,6 +272,7 @@ export function useTimelineDrag({
     window.addEventListener('pointercancel', finish);
   }
 
+  /** HTML5 dragover: update drop highlight + ghost geometry for the target car row. */
   function onTrackDragOver(e: React.DragEvent<HTMLElement>, carId: string) {
     if (!canDrop || moving) return;
     e.preventDefault();
@@ -272,11 +298,13 @@ export function useTimelineDrag({
     });
   }
 
+  /** Clear highlight/ghost when the pointer leaves this car track. */
   function onTrackDragLeave(carId: string) {
     setDragOverCarId((prev) => (prev === carId ? null : prev));
     setGhost((g) => (g?.carId === carId ? null : g));
   }
 
+  /** HTML5 drop: commit a move onto this car at the drop X position. */
   function onTrackDrop(e: React.DragEvent<HTMLElement>, carId: string) {
     if (!canDrop || moving || !onMoveRequest) return;
     e.preventDefault();

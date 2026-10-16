@@ -1,3 +1,6 @@
+/**
+ * Shared TypeScript contracts for admin API payloads (cars, orders, RBAC, payments).
+ */
 export type LocationId =
   | 'office'
   | 'sunny-beach'
@@ -416,13 +419,22 @@ export interface SearchParams {
   hotelDelivery?: boolean;
 }
 
+/**
+ * When `order.carId` is populated as a nested Car object, return it; else null.
+ * @param order - Order that may embed or reference a car
+ */
 export function getCarFromOrder(order: Order): Car | null {
+  // Populated join shape from some admin order payloads.
   if (typeof order.carId === 'object' && order.carId !== null) {
     return order.carId;
   }
   return null;
 }
 
+/**
+ * Normalize a car id whether the field is a string id or a Car object.
+ * @param carId - String id or populated Car
+ */
 export function getCarIdString(carId: string | Car): string {
   return typeof carId === 'object' ? carId.id : carId;
 }

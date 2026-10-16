@@ -1,3 +1,6 @@
+/**
+ * Optional extras catalog CRUD for quotes.
+ */
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   updateExtra,
@@ -7,6 +10,10 @@ import { Input } from '../../../components/ui/Input';
 import { toast } from '../../../components/ui/toastStore';
 import { PricingSection } from './PricingSection';
 
+/**
+ * Editable extras catalog rows (label/amount/mode/active).
+ * @param extras - Extra rows from the pricing bundle
+ */
 export function ExtrasSection({ extras }: { extras: PricingExtra[] }) {
   const queryClient = useQueryClient();
 

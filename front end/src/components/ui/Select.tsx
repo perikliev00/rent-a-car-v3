@@ -1,3 +1,4 @@
+/** Native `<select>` with the shared labeled field chrome. */
 import type { SelectHTMLAttributes } from 'react';
 
 interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
@@ -6,7 +7,18 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   options: Array<{ value: string; label: string }>;
 }
 
+/**
+ * Native `<select>` with the shared labeled field chrome.
+ *
+ * @param props.label - Optional visible label; also used to derive `id` when `id` is omitted.
+ * @param props.error - Optional validation message shown below the field.
+ * @param props.options - Value/label pairs rendered as `<option>` elements.
+ * @param props.id - Explicit select id; falls back to a slug of `label`.
+ * @param props.className - Extra classes merged onto the `<select>`.
+ * @returns Label + select + optional error paragraph.
+ */
 export function Select({ label, error, options, id, className = '', ...props }: SelectProps) {
+  // Derive a stable id from the label when the caller does not supply one.
   const selectId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
   return (
     <div className="min-w-0 space-y-1.5">

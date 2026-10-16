@@ -1,3 +1,10 @@
+/**
+ * Calendar HTTP controller facade.
+ *
+ * Re-exports handlers from query / manual-event / task / mutation controllers
+ * so routes stay on a single require path.
+ */
+
 const {
   getEvents,
   getDay,

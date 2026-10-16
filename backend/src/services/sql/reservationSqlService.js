@@ -1,3 +1,6 @@
+/**
+ * Facade re-exporting reservation repositories for holds, lifecycle, and reads.
+ */
 const {
   ACTIVE_STATUS_SQL,
   mapSqlReservation,

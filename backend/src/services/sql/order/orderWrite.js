@@ -1,10 +1,20 @@
+/**
+ * Order insert/update/soft-delete and hard-purge of aged soft-deleted rows.
+ */
 const { clientQuery } = require('../../../db/transaction');
 const { normalizeId, mapSqlOrder } = require('./orderMapper');
 
+/**
+ * Create an order row from a reservation (payment finalize / admin confirm paths).
+ * @param {object} reservation
+ * @param {number|string} carId
+ * @param {object|null} [client]
+ */
 async function createOrderFromReservation(reservation, carId, client = null) {
   const normalizedCarId = normalizeId(carId);
   const normalizedReservationId = normalizeId(reservation.id);
 
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId || !normalizedReservationId) {
     throw new Error('Invalid car or reservation id for order creation');
   }
@@ -76,8 +86,14 @@ async function createOrderFromReservation(reservation, carId, client = null) {
   return mapSqlOrder(result.rows[0]);
 }
 
+/**
+ * Insert an admin walk-in order (may already include reservationId).
+ * @param {object} orderPayload
+ * @param {object|null} [client]
+ */
 async function createAdminOrder(orderPayload, client = null) {
   const normalizedCarId = normalizeId(orderPayload.carId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId) {
     throw new Error('Invalid car id for order creation');
   }
@@ -145,8 +161,14 @@ async function createAdminOrder(orderPayload, client = null) {
   return mapSqlOrder(result.rows[0]);
 }
 
+/**
+ * Persist a mutated order document (including soft-delete flags).
+ * @param {object} order
+ * @param {object|null} [client]
+ */
 async function updateOrderFromDoc(order, client = null) {
   const orderId = normalizeId(order.id);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!orderId) {
     throw new Error('Invalid order id');
   }
@@ -218,6 +240,11 @@ async function updateOrderFromDoc(order, client = null) {
   return mapSqlOrder(result.rows[0]);
 }
 
+/**
+ * Hard-delete soft-deleted orders older than retentionDays (recycle-bin empty).
+ * @param {{retentionDays?: number}} [opts]
+ * @param {object|null} [client]
+ */
 async function permanentlyDeleteSoftDeletedOrders(
   { retentionDays = 30 } = {},
   client = null

@@ -1,3 +1,6 @@
+/**
+ * Admin home dashboard: high-level order stats and recent activity.
+ */
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getDashboard } from '../../api/admin/orders';
@@ -14,11 +17,13 @@ function formatStat(value: number | null | undefined): string {
   return String(value);
 }
 
+/** Format Revenue Stat. */
 function formatRevenueStat(value: number | string | null | undefined): string {
   if (value === null || value === undefined) return '—';
   return formatPrice(value);
 }
 
+/** Status Chip Class. */
 function statusChipClass(status: string) {
   const s = status.toLowerCase();
   if (s === 'active' || s === 'confirmed' || s === 'done' || s === 'paid') {
@@ -33,6 +38,7 @@ function statusChipClass(status: string) {
   return 'bg-[var(--color-surface)] text-[var(--color-muted)]';
 }
 
+/** Severity Class. */
 function severityClass(severity: string) {
   if (severity === 'critical') {
     return 'bg-[var(--color-danger)]/10 text-[var(--color-danger)]';
@@ -43,6 +49,7 @@ function severityClass(severity: string) {
   return 'bg-[var(--color-surface)] text-[var(--color-muted)]';
 }
 
+/** Admin home dashboard: high-level order stats and recent activity. */
 export function AdminDashboardPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'dashboard'],

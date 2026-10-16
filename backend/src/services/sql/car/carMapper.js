@@ -1,3 +1,6 @@
+/**
+ * Map raw cars SQL rows to camelCase domain objects for public/admin consumers.
+ */
 const { clientQuery } = require('../../../db/transaction');
 
 const CAR_SELECT = `
@@ -29,28 +32,53 @@ const CAR_SELECT = `
   c.updated_at
 `;
 
+/**
+ * Normalize car id before persistence or comparison.
+ * @param {*} value
+ * @returns {*}
+ */
 function normalizeCarId(value) {
   const id = Number(value);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(id) || id <= 0) {
     return null;
   }
   return id;
 }
 
+/**
+ * parse page.
+ * @param {*} raw
+ * @param {*} [{ min]
+ * @param {*} [max]
+ * @returns {*}
+ */
 function parsePage(raw, { min = 1, max = 999999 } = {}) {
   const n = parseInt(String(raw ?? ''), 10);
   const page = Number.isFinite(n) ? n : 1;
   return Math.min(max, Math.max(min, page));
 }
 
+/**
+ * Transform helper: to number or undefined.
+ * @param {*} value
+ * @returns {*}
+ */
 function toNumberOrUndefined(value) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (value === null || value === undefined) return undefined;
 
   const number = Number(value);
   return Number.isFinite(number) ? number : undefined;
 }
 
+/**
+ * Transform helper: to date only.
+ * @param {*} value
+ * @returns {*}
+ */
 function toDateOnly(value) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!value) return undefined;
   if (value instanceof Date) {
     return value.toISOString().slice(0, 10);
@@ -59,6 +87,11 @@ function toDateOnly(value) {
   return str.length >= 10 ? str.slice(0, 10) : str;
 }
 
+/**
+ * Map a DB/API row into the domain shape used by callers (mapFleetFields).
+ * @param {object} row
+ * @returns {*}
+ */
 function mapFleetFields(row) {
   return {
     status: row.status || 'available',
@@ -73,7 +106,14 @@ function mapFleetFields(row) {
 }
 
 // Превръща PostgreSQL row към application object за views и services.
+/**
+ * Map a DB/API row into the domain shape used by callers (mapSqlCar).
+ * @param {object} row
+ * @param {*} [dates]
+ * @returns {*}
+ */
 function mapSqlCar(row, dates = []) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) return null;
 
   return {
@@ -115,6 +155,7 @@ function mapSqlCar(row, dates = []) {
 /** Public catalog DTO — omits fleet ops internals. */
 function mapPublicCar(row, dates = []) {
   const car = mapSqlCar(row, dates);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!car) return null;
 
   return {
@@ -136,6 +177,12 @@ function mapPublicCar(row, dates = []) {
   };
 }
 
+/**
+ * Load car row by id.
+ * @param {string|number} carId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function fetchCarRowById(carId, client = null) {
   const result = await clientQuery(
     client,

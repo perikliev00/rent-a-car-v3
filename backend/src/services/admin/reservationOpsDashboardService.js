@@ -1,8 +1,17 @@
+/**
+ * Reservation ops dashboard widgets (today's pickups/returns, overdue,
+ * manual review, paid-not-confirmed, cancellations, failed payments).
+ * "Today" is Europe/Sofia so desk staff see local business-day buckets.
+ */
 const { getSofiaIsoDateString } = require('../../utils/date/timezone');
 const { BASE_SELECT, BASE_FROM, querySection } = require('./reservationOpsRowSql');
 
 const DEFAULT_LIMIT = 20;
 
+/**
+ * Parallel widget queries for the ops home screen.
+ * @param {{limit?: number}} [opts]
+ */
 async function getOpsDashboard({ limit = DEFAULT_LIMIT } = {}) {
   const sectionLimit = Math.min(50, Math.max(1, Number(limit) || DEFAULT_LIMIT));
   const todaySofia = getSofiaIsoDateString(new Date());
@@ -17,6 +26,7 @@ async function getOpsDashboard({ limit = DEFAULT_LIMIT } = {}) {
     cancelled,
     failedPayments,
   ] = await Promise.all([
+    // Confirmed/prepared pickups scheduled for Sofia today; overdue flag if past NOW.
     querySection(
       `
       SELECT ${BASE_SELECT},
@@ -73,6 +83,7 @@ async function getOpsDashboard({ limit = DEFAULT_LIMIT } = {}) {
       `,
       [sectionLimit]
     ),
+    // Paid but not yet confirmed — needs desk follow-up.
     querySection(
       `
       SELECT ${BASE_SELECT}

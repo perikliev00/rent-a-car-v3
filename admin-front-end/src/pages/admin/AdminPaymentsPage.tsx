@@ -1,3 +1,6 @@
+/**
+ * Payment events/failures monitor, reconcile, and refund queue.
+ */
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -34,6 +37,7 @@ const REFUND_STATE_OPTIONS = [
   { value: 'failed', label: 'failed' },
 ];
 
+/** Format When. */
 function formatWhen(value?: string | null) {
   if (!value) return '—';
   try {
@@ -43,10 +47,12 @@ function formatWhen(value?: string | null) {
   }
 }
 
+/** Empty Filters. */
 function emptyFilters(): PaymentRefundQueueFilters {
   return { q: '', status: '', refundState: '', pickupFrom: '', pickupTo: '' };
 }
 
+/** Refund Queue Actions. */
 function RefundQueueActions({
   row,
   onChanged,
@@ -96,6 +102,7 @@ function RefundQueueActions({
   );
 }
 
+/** Refundable Table. */
 function RefundableTable({
   rows,
   onChanged,
@@ -148,6 +155,7 @@ function RefundableTable({
   );
 }
 
+/** Recent Refunds Table. */
 function RecentRefundsTable({ rows }: { rows: OpsReservationRow[] }) {
   if (!rows.length) {
     return <p className="mt-4 text-sm text-[var(--color-muted)]">No recent refunds</p>;
@@ -188,6 +196,7 @@ function RecentRefundsTable({ rows }: { rows: OpsReservationRow[] }) {
   );
 }
 
+/** Payment events/failures monitor, reconcile, and refund queue. */
 export function AdminPaymentsPage() {
   const { user } = useAuth();
   const canRefund = hasPermission(user, 'can_refund_payments');

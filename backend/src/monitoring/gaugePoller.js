@@ -1,3 +1,7 @@
+/**
+ * Periodic poller that refreshes Prometheus gauges from DB counts, readiness, and disk stats.
+ */
+
 const fs = require('fs');
 const path = require('path');
 const logger = require('../utils/logger');
@@ -10,6 +14,15 @@ const PRIVATE_UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads', 'private
 const PUBLIC_UPLOADS_DIR = path.join(__dirname, '..', 'public', 'images', 'uploads');
 const DEFAULT_PGDATA_MONITOR_PATH = '/mnt/pgdata';
 
+/**
+ * Read free/total bytes for a filesystem path via `statfs` (when available).
+ *
+ * @param {string} targetPath
+ * @param {string} label
+ * @param {{ ensureDir?: boolean }} [options]
+ * @returns {Promise<{ label: string, freeBytes: number, sizeBytes: number } | null>}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 async function collectStoragePathSizes(targetPath, label, { ensureDir = false } = {}) {
   try {
     if (ensureDir) {
@@ -35,10 +48,21 @@ async function collectStoragePathSizes(targetPath, label, { ensureDir = false } 
   }
 }
 
+/**
+ * Resolve the Postgres data directory path used for disk gauges.
+ *
+ * @returns {string}
+ * @throws {never}
+ */
 function resolvePostgresMonitorPath() {
   return process.env.POSTGRES_DATA_MONITOR_PATH || DEFAULT_PGDATA_MONITOR_PATH;
 }
 
+/**
+ * Parse `DISK_MONITOR_PATHS` as `label=path,label2=path2`.
+ * @returns {Array<{ label: string, path: string }>}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function parseExtraDiskMonitorPaths() {
   const raw = process.env.DISK_MONITOR_PATHS || '';
   if (!raw.trim()) {
@@ -62,6 +86,13 @@ function parseExtraDiskMonitorPaths() {
     .filter((entry) => entry && entry.label && entry.path);
 }
 
+/**
+ * Query operational counts and push them into Prometheus gauges.
+ *
+ * @param {import('pg').Pool} pool
+ * @returns {Promise<*>}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 async function collectGaugeValues(pool) {
   const pgdataPath = resolvePostgresMonitorPath();
   const extraPaths = parseExtraDiskMonitorPaths();
@@ -131,6 +162,14 @@ async function collectGaugeValues(pool) {
   });
 }
 
+/**
+ * Start the interval poller; returns the timer handle for shutdown.
+ *
+ * @param {import('pg').Pool} pool
+ * @param {number} [intervalMs]
+ * @returns {NodeJS.Timeout}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function startGaugePoller(pool, intervalMs = DEFAULT_INTERVAL_MS) {
   const poll = async () => {
     try {

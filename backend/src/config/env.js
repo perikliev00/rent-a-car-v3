@@ -1,3 +1,9 @@
+/**
+ * Environment validation and typed config access for the LuxRide backend.
+ * Call `validateEnv()` once at process bootstrap before reading `config`.
+ *
+ * Side effects: reads `process.env`; successful validation caches `validatedConfig`.
+ */
 const { URL } = require('node:url');
 
 const SMTP_VARS = ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS', 'MAIL_FROM'];
@@ -8,6 +14,7 @@ const PRIVATE_S3_VARS = ['PRIVATE_S3_BUCKET'];
 const STRIPE_VARS = ['STRIPE_SECRET', 'STRIPE_WEBHOOK_SECRET'];
 const { parseCorsOrigins } = require('./cors');
 
+/** Known-weak placeholders rejected even if length requirements are met. */
 const WEAK_SESSION_SECRETS = new Set([
   'secret',
   'change-me',
@@ -26,27 +33,48 @@ const WEAK_STRIPE_WEBHOOK_SECRETS = new Set([
 
 const DEV_HOST_RE = /^(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)$/i;
 
+/** Cached result of the last successful `validateEnv()` call. */
 let validatedConfig = null;
 
+/**
+ * Treat common truthy string forms as enabled flags.
+ * @param {*} value - Raw env value (string, number, boolean, etc.)
+ * @returns {boolean} True for `true` / `1` / `yes` (case-insensitive)
+ */
 function isTruthy(value) {
   return ['true', '1', 'yes'].includes(String(value || '').toLowerCase());
 }
 
+/**
+ * Whether an env value is missing or only whitespace.
+ * @param {*} value - Raw env value
+ * @returns {boolean}
+ */
 function isEmpty(value) {
   return value === undefined || value === null || String(value).trim() === '';
 }
 
 const DEFAULT_FRONTEND_BASE_URL = 'http://localhost:5173';
 
+/**
+ * Strip trailing slashes so redirect URLs compose cleanly.
+ * @param {string} value - Absolute or relative base URL string
+ * @returns {string} Trimmed URL without trailing `/`
+ */
 function normalizeFrontendBaseUrl(value) {
   return String(value).trim().replace(/\/+$/, '');
 }
 
+/**
+ * Resolve the SPA base URL: env override, required in production, localhost default otherwise.
+ * @returns {string|null} Normalized base URL, or `null` when missing in production
+ */
 function resolveFrontendBaseUrl() {
   if (!isEmpty(process.env.FRONTEND_BASE_URL)) {
     return normalizeFrontendBaseUrl(process.env.FRONTEND_BASE_URL);
   }
 
+  // Production must set FRONTEND_BASE_URL explicitly (validated later).
   if (process.env.NODE_ENV === 'production') {
     return null;
   }
@@ -54,10 +82,21 @@ function resolveFrontendBaseUrl() {
   return DEFAULT_FRONTEND_BASE_URL;
 }
 
+/**
+ * List which of the given keys are unset or blank in `process.env`.
+ * @param {string[]} keys - Env var names to check
+ * @returns {string[]} Missing key names
+ */
 function missingKeys(keys) {
   return keys.filter((key) => isEmpty(process.env[key]));
 }
 
+/**
+ * Throw if any listed env var is missing or blank.
+ * @param {string[]} keys - Required env var names
+ * @returns {void}
+ * @throws {Error} When any listed env var is missing or blank
+ */
 function requireEnv(keys) {
   const missing = missingKeys(keys);
   if (missing.length > 0) {
@@ -65,6 +104,12 @@ function requireEnv(keys) {
   }
 }
 
+/**
+ * Enforce minimum length and reject known default secrets.
+ * Side effects: reads `SESSION_SECRET` from `process.env`.
+ * @returns {void}
+ * @throws {Error} When secret is too short or a known weak placeholder
+ */
 function assertSessionSecretStrength() {
   const secret = process.env.SESSION_SECRET.trim();
   const minLength = 32;
@@ -78,10 +123,23 @@ function assertSessionSecretStrength() {
   }
 }
 
+/**
+ * Detect localhost-style hosts that must not appear in production URLs.
+ * @param {string} hostname - Hostname portion of a URL
+ * @returns {boolean}
+ */
 function isDevelopmentHost(hostname) {
   return DEV_HOST_RE.test(String(hostname || '').trim());
 }
 
+/**
+ * Production URLs must be absolute HTTPS and not point at localhost-style hosts.
+ * @param {string} label - Human-readable name used in error messages
+ * @param {string} value - Absolute URL string to validate
+ * @param {{ allowPath?: boolean }} [options] - When `allowPath` is false, only origin is allowed
+ * @returns {void}
+ * @throws {Error} When URL is invalid, non-HTTPS, or uses a development host
+ */
 function assertProductionUrl(label, value, { allowPath = true } = {}) {
   let parsed;
   try {
@@ -98,11 +156,18 @@ function assertProductionUrl(label, value, { allowPath = true } = {}) {
     throw new Error(`${label} must not use a development host in production`);
   }
 
+  // CORS origins must be scheme+host[+port] only (no path/query/hash).
   if (!allowPath && (parsed.pathname !== '/' || parsed.search || parsed.hash)) {
     throw new Error(`${label} must be an origin (scheme + host[+port]) in production`);
   }
 }
 
+/**
+ * Ensure DATABASE_URL is a real postgres URL not pointing at localhost in production.
+ * @param {string} databaseUrl - Connection string from env
+ * @returns {void}
+ * @throws {Error} When URL is invalid, wrong scheme, or development host
+ */
 function assertProductionDatabaseUrl(databaseUrl) {
   let parsed;
   try {
@@ -121,6 +186,11 @@ function assertProductionDatabaseUrl(databaseUrl) {
   }
 }
 
+/**
+ * Reject placeholder or too-short Stripe webhook secrets in production.
+ * @returns {void}
+ * @throws {Error} When secret format or strength fails
+ */
 function assertProductionStripeWebhookSecret() {
   const secret = process.env.STRIPE_WEBHOOK_SECRET.trim();
 
@@ -133,6 +203,12 @@ function assertProductionStripeWebhookSecret() {
   }
 }
 
+/**
+ * When email is enabled, all SMTP vars are required; partial SMTP config is always rejected.
+ * @param {{ requireEnabled?: boolean }} [options] - If true, EMAIL_ENABLED must be on (production)
+ * @returns {void}
+ * @throws {Error} When email requirements are not met
+ */
 function validateEmailConfig({ requireEnabled = false } = {}) {
   const emailEnabled = isTruthy(process.env.EMAIL_ENABLED);
   const configuredSmtpVars = SMTP_VARS.filter((key) => !isEmpty(process.env[key]));
@@ -141,11 +217,13 @@ function validateEmailConfig({ requireEnabled = false } = {}) {
     throw new Error('EMAIL_ENABLED must be true with full SMTP configuration in production');
   }
 
+  // Fully enabled: every SMTP field must be present.
   if (emailEnabled) {
     requireEnv(SMTP_VARS);
     return;
   }
 
+  // Partial SMTP without EMAIL_ENABLED=true is a common misconfiguration.
   if (configuredSmtpVars.length > 0 && configuredSmtpVars.length < SMTP_VARS.length) {
     const missing = SMTP_VARS.filter((key) => isEmpty(process.env[key]));
     throw new Error(
@@ -154,6 +232,11 @@ function validateEmailConfig({ requireEnabled = false } = {}) {
   }
 }
 
+/**
+ * Additional production-only checks: live Stripe, CORS, durable storage, email, cookies.
+ * @returns {void}
+ * @throws {Error} On any production hardening failure
+ */
 function validateProductionSecurity() {
   assertSessionSecretStrength();
 
@@ -177,6 +260,7 @@ function validateProductionSecurity() {
   }
 
   const sessionCookieSameSite = (process.env.SESSION_COOKIE_SAME_SITE || 'lax').toLowerCase();
+  // SameSite=None requires Secure cookies, which imply HTTPS frontend.
   if (sessionCookieSameSite === 'none' && !frontendBaseUrl.startsWith('https://')) {
     throw new Error(
       'SESSION_COOKIE_SAME_SITE=none requires FRONTEND_BASE_URL to use HTTPS in production'
@@ -206,6 +290,7 @@ function validateProductionSecurity() {
   }
 
   const storageDriver = (process.env.STORAGE_DRIVER || 'local').toLowerCase();
+  // Local disk uploads are ephemeral on most PaaS filesystems.
   if (storageDriver !== 's3') {
     throw new Error(
       'STORAGE_DRIVER must be s3 in production (local public uploads are ephemeral without durable object storage)'
@@ -217,10 +302,19 @@ function validateProductionSecurity() {
   validateEmailConfig({ requireEnabled: true });
 }
 
+/**
+ * Resolve private document storage driver (`local` or `s3`).
+ * @returns {string} Lowercased driver name
+ */
 function resolvePrivateStorageDriver() {
   return (process.env.PRIVATE_STORAGE_DRIVER || 'local').toLowerCase();
 }
 
+/**
+ * Local private storage must opt into persistence; S3 requires PRIVATE_S3_BUCKET.
+ * @returns {void}
+ * @throws {Error} When driver is unsupported or local persistence is not affirmed
+ */
 function validatePrivateStorageConfig() {
   const driver = resolvePrivateStorageDriver();
 
@@ -233,6 +327,7 @@ function validatePrivateStorageConfig() {
     throw new Error(`Unsupported PRIVATE_STORAGE_DRIVER: ${driver}`);
   }
 
+  // Force operators to acknowledge ephemeral local private uploads.
   if (!isTruthy(process.env.PRIVATE_STORAGE_PERSISTENT)) {
     throw new Error(
       'Private document storage is local and ephemeral. Mount a persistent volume at uploads/private and set PRIVATE_STORAGE_PERSISTENT=true, or set PRIVATE_STORAGE_DRIVER=s3 with PRIVATE_S3_BUCKET.'
@@ -240,10 +335,15 @@ function validatePrivateStorageConfig() {
   }
 }
 
+/**
+ * Build the runtime config object from process.env (does not re-validate).
+ * @returns {object} Typed config consumed by server, middleware, and services
+ */
 function buildConfig() {
   const sessionCookieSameSite = (process.env.SESSION_COOKIE_SAME_SITE || 'lax').toLowerCase();
   const allowedSameSite = new Set(['lax', 'strict', 'none']);
   const isProd = process.env.NODE_ENV === 'production';
+  // Invalid SameSite values fall back to lax rather than crashing at cookie set.
   const resolvedSameSite = allowedSameSite.has(sessionCookieSameSite)
     ? sessionCookieSameSite
     : 'lax';
@@ -263,12 +363,21 @@ function buildConfig() {
     corsOrigins: parseCorsOrigins(process.env.CORS_ORIGINS),
     frontendBaseUrl: resolveFrontendBaseUrl(),
     sessionCookieSameSite: resolvedSameSite,
+    // Secure cookies in production, or whenever SameSite=None requires Secure.
     sessionCookieSecure: isProd || resolvedSameSite === 'none',
     openApiDocsEnabled: isTruthy(process.env.OPENAPI_DOCS_ENABLED),
   };
 }
 
+/**
+ * Validate required env vars (and production hardening), then cache config.
+ * Test NODE_ENV skips most checks and only builds config.
+ * Side effects: sets module-level `validatedConfig`.
+ * @returns {object} Cached config object
+ * @throws {Error} When required vars or production checks fail
+ */
 function validateEnv() {
+  // Tests supply stubs; avoid requiring real Stripe/DB secrets.
   if (process.env.NODE_ENV === 'test') {
     validatedConfig = buildConfig();
     return validatedConfig;
@@ -287,6 +396,7 @@ function validateEnv() {
   if (isProd) {
     validateProductionSecurity();
   } else {
+    // Still reject partial SMTP in development.
     validateEmailConfig();
   }
 
@@ -294,6 +404,11 @@ function validateEnv() {
   return validatedConfig;
 }
 
+/**
+ * Return the cached config after bootstrap validation.
+ * @returns {object} Same object returned by `validateEnv()`
+ * @throws {Error} If `validateEnv()` has not been called yet
+ */
 function getConfig() {
   if (!validatedConfig) {
     throw new Error('Environment not validated. Call validateEnv() during application bootstrap.');

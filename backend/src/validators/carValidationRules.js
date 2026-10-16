@@ -1,3 +1,6 @@
+/**
+ * express-validator rules for admin car create/update and related fleet payloads.
+ */
 const { body, param } = require('express-validator');
 const {
   TRANSMISSIONS,
@@ -12,14 +15,30 @@ const {
   COMPLIANCE_STATUSES,
 } = require('../constants/carEnums');
 
+/**
+ * Parse an optional price-tier field into a positive float, or null when empty/invalid.
+ *
+ * @param {unknown} value - Raw body field
+ * @returns {number | null} Positive finite tier price, or null when empty/invalid
+ * @throws {never}
+ */
 function parseTier(value) {
+  // Empty / missing → treat as "tier not provided".
   if (value === undefined || value === null || value === '') return null;
   const parsed = parseFloat(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
+/**
+ * Build express-validator rules for car price tiers and their relative constraints.
+ * Longer rentals must not be priced higher per day than shorter tiers.
+ *
+ * @returns {import('express-validator').ValidationChain[]}
+ * @throws {never} Returns rule chains; custom validators throw Error on invalid configs at request time
+ */
 function buildPriceTierRules() {
   return [
+    // Individual optional tier fields (must be > 0 when present).
     body('priceTier_1_3')
       .optional({ checkFalsy: true })
       .toFloat()
@@ -35,6 +54,7 @@ function buildPriceTierRules() {
       .toFloat()
       .isFloat({ gt: 0 })
       .withMessage('Tier 31+ must be a number greater than 0'),
+    // Cross-field: require at least one tier and enforce non-increasing prices with duration.
     body()
       .custom((_, { req }) => {
         const tier1 = parseTier(req.body.priceTier_1_3);
@@ -64,6 +84,12 @@ function buildPriceTierRules() {
   ];
 }
 
+/**
+ * Build express-validator rules for fleet metadata fields on a car.
+ *
+ * @returns {import('express-validator').ValidationChain[]}
+ * @throws {never}
+ */
 function buildFleetFieldRules() {
   return [
     body('registrationNumber')
@@ -107,8 +133,15 @@ function buildFleetFieldRules() {
   ];
 }
 
+/**
+ * Build shared create/update car field rules (name, tiers, fleet fields).
+ *
+ * @returns {import('express-validator').ValidationChain[]}
+ * @throws {never}
+ */
 function buildSharedCarFieldRules() {
   return [
+    // Core catalog fields required on create/update.
     body('name')
       .trim()
       .isLength({ min: 2, max: CAR_NAME_MAX_LENGTH })
@@ -130,6 +163,7 @@ function buildSharedCarFieldRules() {
       .toInt()
       .isInt({ min: 1 })
       .withMessage('Invalid category id.'),
+    // Compose tier + fleet rule groups.
     ...buildPriceTierRules(),
     ...buildFleetFieldRules(),
   ];

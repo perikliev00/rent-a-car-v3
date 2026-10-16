@@ -1,3 +1,6 @@
+/**
+ * Fleet calendar page wiring filters, views, modals, and permissions.
+ */
 import { useEffect, useState } from 'react';
 import { formatISO } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
@@ -28,6 +31,7 @@ import {
 import { opsReservationUrl } from './calendar/reservationDeepLink';
 import type { CalendarEvent } from './calendar/calendar.types';
 
+/** Use Prefer Agenda Default. */
 function usePreferAgendaDefault() {
   const [preferAgenda, setPreferAgenda] = useState(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
@@ -45,6 +49,7 @@ function usePreferAgendaDefault() {
   return [preferAgenda, setPreferAgenda] as const;
 }
 
+/** Fleet calendar page wiring filters, views, modals, and permissions. */
 export function AdminCalendarPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -92,6 +97,7 @@ export function AdminCalendarPage() {
   const modals = useCalendarModals();
   const schedule = useCalendarSchedule();
 
+  /** Apply Preset. */
   function applyPreset(preset: CalendarPreset) {
     const next = new URLSearchParams();
     next.set('view', preset.view || view);

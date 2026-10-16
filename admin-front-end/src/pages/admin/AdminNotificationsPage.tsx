@@ -1,3 +1,6 @@
+/**
+ * Outbound notification delivery log browser.
+ */
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getNotifications } from '../../api/admin/notifications';
@@ -5,6 +8,7 @@ import { Card, CardBody } from '../../components/ui/Card';
 import { PageLoader } from '../../components/ui/Loading';
 import { Select } from '../../components/ui/Select';
 
+/** Status Class. */
 function statusClass(status: string) {
   if (status === 'sent') return 'text-[var(--color-success)]';
   if (status === 'failed') return 'text-[var(--color-danger)]';
@@ -12,6 +16,7 @@ function statusClass(status: string) {
   return 'text-[var(--color-muted)]';
 }
 
+/** Outbound notification delivery log browser. */
 export function AdminNotificationsPage() {
   const [status, setStatus] = useState('');
 

@@ -1,18 +1,38 @@
+/**
+ * Admin pricing configuration and quote preview handlers.
+ */
 const pricingAdminService = require('../../../services/admin/pricingAdminService');
 const { logAdminAction } = require('../../../services/admin/adminAuditService');
 const apiResponse = require('../../../utils/apiResponse');
 const asyncHandler = require('../../../utils/asyncHandler');
 
+/**
+ * Return full pricing configuration. /
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.getPricing = asyncHandler(async (_req, res) => {
   const pricing = await pricingAdminService.getPricingBundle();
   return apiResponse.success(res, { pricing });
 });
 
+/**
+ * Update delivery fee configuration. /
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.updateDeliveryFees = asyncHandler(async (req, res) => {
   const fees = Array.isArray(req.body?.fees) ? req.body.fees : [];
   const updated = await pricingAdminService.saveDeliveryFees(
     fees.map((f) => ({ locationId: f.locationId, fee: Number(f.fee) || 0 }))
   );
+  // Record an admin audit entry for this mutation.
   await logAdminAction(req, {
     action: 'admin.updated_pricing_delivery_fees',
     entityType: 'pricing',
@@ -21,6 +41,14 @@ exports.updateDeliveryFees = asyncHandler(async (req, res) => {
   return apiResponse.success(res, { deliveryFees: updated });
 });
 
+/**
+ * Update a single global fee by key. /
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.updateGlobalFee = asyncHandler(async (req, res) => {
   const feeKey = req.params.feeKey;
   const updated = await pricingAdminService.saveGlobalFee(feeKey, {
@@ -29,6 +57,7 @@ exports.updateGlobalFee = asyncHandler(async (req, res) => {
     mode: req.body.mode || 'flat',
     active: req.body.active !== false,
   });
+  // Record an admin audit entry for this mutation.
   await logAdminAction(req, {
     action: 'admin.updated_pricing_global_fee',
     entityType: 'pricing',
@@ -37,6 +66,14 @@ exports.updateGlobalFee = asyncHandler(async (req, res) => {
   return apiResponse.success(res, { globalFee: updated });
 });
 
+/**
+ * Create a pricing season. /
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.createSeason = asyncHandler(async (req, res) => {
   const season = await pricingAdminService.createSeason({
     name: req.body.name,
@@ -48,6 +85,7 @@ exports.createSeason = asyncHandler(async (req, res) => {
     adjValue: Number(req.body.adjValue) || 0,
     active: req.body.active !== false,
   });
+  // Record an admin audit entry for this mutation.
   await logAdminAction(req, {
     action: 'admin.created_pricing_season',
     entityType: 'pricing_season',
@@ -56,6 +94,14 @@ exports.createSeason = asyncHandler(async (req, res) => {
   return apiResponse.success(res, { season }, 201);
 });
 
+/**
+ * Update a pricing season. /
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.updateSeason = asyncHandler(async (req, res) => {
   const season = await pricingAdminService.updateSeason(Number(req.params.id), {
     name: req.body.name,
@@ -70,6 +116,7 @@ exports.updateSeason = asyncHandler(async (req, res) => {
   if (!season) {
     return apiResponse.error(res, 'NOT_FOUND', 'Season not found', 404);
   }
+  // Record an admin audit entry for this mutation.
   await logAdminAction(req, {
     action: 'admin.updated_pricing_season',
     entityType: 'pricing_season',
@@ -78,11 +125,20 @@ exports.updateSeason = asyncHandler(async (req, res) => {
   return apiResponse.success(res, { season });
 });
 
+/**
+ * Delete a pricing season. /
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.deleteSeason = asyncHandler(async (req, res) => {
   const ok = await pricingAdminService.deleteSeason(Number(req.params.id));
   if (!ok) {
     return apiResponse.error(res, 'NOT_FOUND', 'Season not found', 404);
   }
+  // Record an admin audit entry for this mutation.
   await logAdminAction(req, {
     action: 'admin.deleted_pricing_season',
     entityType: 'pricing_season',
@@ -91,6 +147,14 @@ exports.deleteSeason = asyncHandler(async (req, res) => {
   return apiResponse.success(res, { deleted: true });
 });
 
+/**
+ * Update weekend pricing multipliers. /
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.updateWeekend = asyncHandler(async (req, res) => {
   const id = req.body.id ? Number(req.body.id) : null;
   const rule = await pricingAdminService.saveWeekendRule(id, {
@@ -100,6 +164,7 @@ exports.updateWeekend = asyncHandler(async (req, res) => {
     adjValue: Number(req.body.adjValue) || 0,
     active: req.body.active !== false,
   });
+  // Record an admin audit entry for this mutation.
   await logAdminAction(req, {
     action: 'admin.updated_pricing_weekend',
     entityType: 'pricing_weekend',
@@ -108,6 +173,14 @@ exports.updateWeekend = asyncHandler(async (req, res) => {
   return apiResponse.success(res, { weekendRule: rule });
 });
 
+/**
+ * Update a discount rule. /
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.updateDiscount = asyncHandler(async (req, res) => {
   const rule = await pricingAdminService.updateDiscount(Number(req.params.id), {
     name: req.body.name,
@@ -119,6 +192,7 @@ exports.updateDiscount = asyncHandler(async (req, res) => {
   if (!rule) {
     return apiResponse.error(res, 'NOT_FOUND', 'Discount rule not found', 404);
   }
+  // Record an admin audit entry for this mutation.
   await logAdminAction(req, {
     action: 'admin.updated_pricing_discount',
     entityType: 'pricing_discount',
@@ -127,6 +201,14 @@ exports.updateDiscount = asyncHandler(async (req, res) => {
   return apiResponse.success(res, { discountRule: rule });
 });
 
+/**
+ * Update deposit configuration. /
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.updateDeposit = asyncHandler(async (req, res) => {
   const id = req.body.id ? Number(req.body.id) : null;
   const rule = await pricingAdminService.saveDeposit(id, {
@@ -134,6 +216,7 @@ exports.updateDeposit = asyncHandler(async (req, res) => {
     defaultAmount: Number(req.body.defaultAmount) || 0,
     active: req.body.active !== false,
   });
+  // Record an admin audit entry for this mutation.
   await logAdminAction(req, {
     action: 'admin.updated_pricing_deposit',
     entityType: 'pricing_deposit',
@@ -142,6 +225,14 @@ exports.updateDeposit = asyncHandler(async (req, res) => {
   return apiResponse.success(res, { depositRule: rule });
 });
 
+/**
+ * Create a bookable extra. /
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.createExtra = asyncHandler(async (req, res) => {
   const extra = await pricingAdminService.createExtra({
     code: req.body.code,
@@ -151,6 +242,7 @@ exports.createExtra = asyncHandler(async (req, res) => {
     active: req.body.active !== false,
     sortOrder: Number(req.body.sortOrder) || 0,
   });
+  // Record an admin audit entry for this mutation.
   await logAdminAction(req, {
     action: 'admin.created_pricing_extra',
     entityType: 'pricing_extra',
@@ -159,6 +251,14 @@ exports.createExtra = asyncHandler(async (req, res) => {
   return apiResponse.success(res, { extra }, 201);
 });
 
+/**
+ * Update a bookable extra. /
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.updateExtra = asyncHandler(async (req, res) => {
   const extra = await pricingAdminService.updateExtra(Number(req.params.id), {
     label: req.body.label,
@@ -170,6 +270,7 @@ exports.updateExtra = asyncHandler(async (req, res) => {
   if (!extra) {
     return apiResponse.error(res, 'NOT_FOUND', 'Extra not found', 404);
   }
+  // Record an admin audit entry for this mutation.
   await logAdminAction(req, {
     action: 'admin.updated_pricing_extra',
     entityType: 'pricing_extra',
@@ -178,11 +279,20 @@ exports.updateExtra = asyncHandler(async (req, res) => {
   return apiResponse.success(res, { extra });
 });
 
+/**
+ * Delete a bookable extra. /
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.deleteExtra = asyncHandler(async (req, res) => {
   const ok = await pricingAdminService.deleteExtra(Number(req.params.id));
   if (!ok) {
     return apiResponse.error(res, 'NOT_FOUND', 'Extra not found', 404);
   }
+  // Record an admin audit entry for this mutation.
   await logAdminAction(req, {
     action: 'admin.deleted_pricing_extra',
     entityType: 'pricing_extra',
@@ -191,6 +301,14 @@ exports.deleteExtra = asyncHandler(async (req, res) => {
   return apiResponse.success(res, { deleted: true });
 });
 
+/**
+ * Preview a price quote for given inputs. /
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.preview = asyncHandler(async (req, res) => {
   const result = await pricingAdminService.previewPricing(req.body);
   if (!result.ok) {

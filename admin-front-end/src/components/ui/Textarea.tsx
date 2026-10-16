@@ -1,3 +1,6 @@
+/**
+ * Labeled multiline input primitive with error/tone styling.
+ */
 import type { TextareaHTMLAttributes } from 'react';
 
 interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -5,6 +8,15 @@ interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
   error?: string;
 }
 
+/**
+ * Multiline field with optional label and inline error message.
+ * When `id` is omitted, derives one from the label (lowercased, spaces → hyphens).
+ *
+ * @param label - Optional visible label
+ * @param error - Optional error text (also tints the border)
+ * @param id - Explicit textarea id; otherwise derived from label
+ * @param className - Extra classes on the `<textarea>`
+ */
 export function Textarea({ label, error, id, className = '', ...props }: TextareaProps) {
   const textareaId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
   return (

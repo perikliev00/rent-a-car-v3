@@ -1,3 +1,6 @@
+/**
+ * Fleet alert inbox with severity filters and reconcile action.
+ */
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -10,6 +13,7 @@ import { Card, CardBody } from '../../components/ui/Card';
 import { PageLoader } from '../../components/ui/Loading';
 import { Button } from '../../components/ui/Button';
 
+/** Severity Class. */
 function severityClass(severity: FleetAlertSeverity) {
   if (severity === 'critical') {
     return 'bg-[var(--color-danger)]/10 text-[var(--color-danger)]';
@@ -20,6 +24,7 @@ function severityClass(severity: FleetAlertSeverity) {
   return 'bg-[var(--color-surface)] text-[var(--color-muted)]';
 }
 
+/** Fleet alert inbox with severity filters and reconcile action. */
 export function AdminFleetAlertsPage() {
   const [severityFilter, setSeverityFilter] = useState<FleetAlertSeverity | 'all'>('all');
 

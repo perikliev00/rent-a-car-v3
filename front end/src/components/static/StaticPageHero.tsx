@@ -1,3 +1,4 @@
+/** Full-bleed hero banner shared by static and utility pages. */
 import { staticHeroImage } from '../../data/marketingAssets';
 
 interface StaticPageHeroProps {
@@ -6,6 +7,14 @@ interface StaticPageHeroProps {
   eyebrow?: string;
 }
 
+/**
+ * Full-bleed photo hero with optional eyebrow and description.
+ *
+ * @param props.title - Primary page heading over the photo.
+ * @param props.description - Optional supporting sentence under the title.
+ * @param props.eyebrow - Small brand/category label; defaults to `"LuxRide"`.
+ * @returns A full-width hero section with overlayed typography.
+ */
 export function StaticPageHero({ title, description, eyebrow = 'LuxRide' }: StaticPageHeroProps) {
   return (
     <section className="relative overflow-hidden text-white">

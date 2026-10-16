@@ -1,3 +1,6 @@
+/**
+ * Outbound notification delivery log (email/etc.) for admin inspection.
+ */
 import { api } from '../client';
 
 export type NotificationRow = {
@@ -16,11 +19,20 @@ export type NotificationRow = {
   createdAt: string;
 };
 
+/**
+ * Paginated notification delivery log with optional status filter.
+ * Unset filters are omitted so the API applies its defaults.
+ *
+ * @param params.limit - Page size
+ * @param params.offset - Row offset
+ * @param params.status - Optional delivery status filter
+ */
 export async function getNotifications(params?: {
   limit?: number;
   offset?: number;
   status?: string;
 }): Promise<{ rows: NotificationRow[]; total: number; limit: number; offset: number }> {
+  // Build query only from provided fields (`!= null` keeps limit/offset `0` valid).
   const q = new URLSearchParams();
   if (params?.limit != null) q.set('limit', String(params.limit));
   if (params?.offset != null) q.set('offset', String(params.offset));

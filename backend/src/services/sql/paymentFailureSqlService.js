@@ -1,6 +1,15 @@
+/**
+ * SQL for payment_failures (list unresolved + counts for admin monitoring).
+ */
 const { clientQuery } = require('../../db/transaction');
 
+/**
+ * Normalize reservation id before persistence or comparison.
+ * @param {*} value
+ * @returns {*}
+ */
 function normalizeReservationId(value) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (value == null || value === '') {
     return null;
   }
@@ -8,6 +17,13 @@ function normalizeReservationId(value) {
   return Number.isInteger(id) && id > 0 ? id : null;
 }
 
+/**
+ * Record a payment failure for ops dashboards (reason required).
+ * @param {object} params
+ * @param {object|null} [client]
+ * @returns {Promise<object|null>}
+ * @throws {Error} when reason is missing
+ */
 async function insertPaymentFailure(
   { reason, correlationId, stripeSessionId, reservationId, eventId, context = null },
   client = null
@@ -43,6 +59,12 @@ async function insertPaymentFailure(
   return result.rows[0] || null;
 }
 
+/**
+ * List payment failures from SQL.
+ * @param {object} params
+ * @param {object|null} [client] Optional DB client/transaction
+ * @returns {Promise<*>}
+ */
 async function listPaymentFailures({ limit = 50, offset = 0, unresolvedOnly = false } = {}, client = null) {
   const params = [limit, offset];
   let whereClause = '';
@@ -76,7 +98,14 @@ async function listPaymentFailures({ limit = 50, offset = 0, unresolvedOnly = fa
   return result.rows;
 }
 
+/**
+ * mark failures resolved by stripe session — mutates persisted state when applicable.
+ * @param {string|number} stripeSessionId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function markFailuresResolvedByStripeSession(stripeSessionId, client = null) {
+  // Stripe / payment-related branch.
   if (!stripeSessionId) {
     return 0;
   }
@@ -96,6 +125,11 @@ async function markFailuresResolvedByStripeSession(stripeSessionId, client = nul
   return result.rowCount || 0;
 }
 
+/**
+ * count unresolved payment failures.
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function countUnresolvedPaymentFailures(client = null) {
   const result = await clientQuery(
     client,

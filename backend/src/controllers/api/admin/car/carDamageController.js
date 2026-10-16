@@ -1,3 +1,6 @@
+/**
+ * Admin car damage report list/create/resolve/delete handlers.
+ */
 const { validationResult } = require('express-validator');
 const carAdminService = require('../../../../services/admin/carAdminService');
 const { logAdminAction } = require('../../../../services/admin/adminAuditService');
@@ -9,6 +12,14 @@ const {
   notFoundOrForward,
 } = require('./carControllerHelpers');
 
+/**
+ * List damage reports for a car.
+ * Side effects: none beyond DB reads.
+ * @param {import('express').Request} req - Params: id (car id)
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 const listDamageReports = asyncHandler(async (req, res, next) => {
   try {
     const reports = await carAdminService.listDamageReports(req.params.id);
@@ -18,6 +29,14 @@ const listDamageReports = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Create a damage report with optional photos.
+ * Side effects: persists photos + report; audits; cleans temps on validation/service failure.
+ * @param {import('express').Request} req - Params: id; body + `req.files` photos
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 const createDamageReport = asyncHandler(async (req, res, next) => {
   try {
     if (req.fileValidationError) {
@@ -51,6 +70,14 @@ const createDamageReport = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Mark a damage report as resolved and audit the action.
+ * Side effects: updates report status; writes admin audit log.
+ * @param {import('express').Request} req - Params: id, reportId
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 const resolveDamageReport = asyncHandler(async (req, res, next) => {
   try {
     const report = await carAdminService.resolveDamageReport(req.params.id, req.params.reportId);
@@ -66,6 +93,14 @@ const resolveDamageReport = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Delete a damage report.
+ * Side effects: deletes report (and associated photos per service rules).
+ * @param {import('express').Request} req - Params: id, reportId
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 const deleteDamageReport = asyncHandler(async (req, res, next) => {
   try {
     await carAdminService.deleteDamageReport(req.params.id, req.params.reportId);

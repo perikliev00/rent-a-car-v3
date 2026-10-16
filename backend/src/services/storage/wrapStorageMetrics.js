@@ -1,3 +1,7 @@
+/**
+ * Wrap storage driver async methods to increment storage error metrics on failure.
+ * Non-async exports pass through unchanged.
+ */
 const metrics = require('../../monitoring/metrics');
 
 const ASYNC_OPS = new Set([
@@ -16,6 +20,11 @@ const ASYNC_OPS = new Set([
   'ensurePrivateDir',
 ]);
 
+/**
+ * op name.
+ * @param {string} methodName
+ * @returns {*}
+ */
 function opName(methodName) {
   if (/delete/i.test(methodName)) return 'delete';
   if (/open|list|exists|read/i.test(methodName)) return 'read';
@@ -23,7 +32,12 @@ function opName(methodName) {
   return 'write';
 }
 
+/**
+ * @param {object} driverModule - Storage driver exports
+ * @returns {object} Proxy-like wrapped module
+ */
 function wrapStorageMetrics(driverModule) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!driverModule || typeof driverModule !== 'object') {
     return driverModule;
   }
@@ -32,6 +46,7 @@ function wrapStorageMetrics(driverModule) {
   const wrapped = Object.create(Object.getPrototypeOf(driverModule));
 
   for (const [key, value] of Object.entries(driverModule)) {
+    // Guard: early-return or throw when required input is missing/invalid.
     if (typeof value !== 'function' || !ASYNC_OPS.has(key)) {
       wrapped[key] = value;
       continue;

@@ -1,3 +1,8 @@
+/**
+ * Enumerations for fleet cars: transmission, fuel, status, compliance, and fleet alerts.
+ * Values are aligned with the admin car form and the `cars` table.
+ */
+
 /** Values aligned with admin car form and cars table usage. */
 const TRANSMISSIONS = ['Automatic', 'Manual'];
 const FUEL_TYPES = ['Petrol', 'Diesel', 'Hybrid', 'Electric'];

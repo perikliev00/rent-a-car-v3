@@ -1,3 +1,11 @@
+/**
+ * Maps calendar_tasks DB rows to camelCase API task DTOs.
+ */
+
+/**
+ * @param {object|null|undefined} row
+ * @returns {object|null}
+ */
 function mapTask(row) {
   if (!row) return null;
   return {

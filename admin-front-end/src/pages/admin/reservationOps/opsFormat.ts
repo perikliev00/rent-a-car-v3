@@ -1,5 +1,13 @@
+/**
+ * Display formatters for reservation ops tables/panels.
+ */
 import type { ReservationStatusHistoryEntry } from '../../../api/admin/reservations';
 
+/**
+ * Format a date (and optional time string) for ops table cells.
+ * @param value - ISO date/datetime
+ * @param time - Optional HH:MM appended after the localized date
+ */
 export function formatWhen(value?: string | null, time?: string | null) {
   if (!value) return '—';
   try {
@@ -11,6 +19,10 @@ export function formatWhen(value?: string | null, time?: string | null) {
   }
 }
 
+/**
+ * Localized date+time for history timestamps.
+ * @param value - ISO datetime
+ */
 export function formatTimestamp(value?: string | null) {
   if (!value) return '—';
   try {
@@ -20,6 +32,10 @@ export function formatTimestamp(value?: string | null) {
   }
 }
 
+/**
+ * Heuristic status chip colors from status substring keywords.
+ * @param status - Raw status string
+ */
 export function statusChipClass(status: string) {
   const s = status.toLowerCase();
   if (s.includes('active') || s.includes('confirm') || s.includes('return') || s.includes('pickup')) {
@@ -34,6 +50,10 @@ export function statusChipClass(status: string) {
   return 'bg-[var(--color-surface)] text-[var(--color-muted)]';
 }
 
+/**
+ * Human label for who changed a status history entry.
+ * @param entry - Status history row
+ */
 export function formatChangedBy(entry: ReservationStatusHistoryEntry) {
   if (entry.changedBySystem) return 'System';
   if (entry.changedByEmail) return entry.changedByEmail;

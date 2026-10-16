@@ -1,3 +1,6 @@
+/**
+ * Public facade for admin pickup/return checklists and cancellation reviews.
+ */
 const { submitPickupChecklist } = require('./checklist/checklistPickupService');
 const { submitReturnChecklist } = require('./checklist/checklistReturnService');
 const {

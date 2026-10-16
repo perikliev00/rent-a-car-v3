@@ -1,3 +1,8 @@
+/**
+ * Drive Stripe refund API for a pending ledger operation: create or retrieve,
+ * apply success, mark failure, or leave pending. Retries with a new attempt
+ * only after Stripe confirms the previous refund failed/canceled.
+ */
 const reservationRepository = require('../../../repositories/reservationRepository');
 const refundOpSql = require('../../sql/refundOperationSqlService');
 const { createRefund, retrieveRefund } = require('../stripeRefundService');
@@ -16,6 +21,12 @@ const {
 const { applySucceededRefund } = require('./applyRefundService');
 const { succeededResponse, lockAndCreateAttempt } = require('./refundAttemptLock');
 
+/**
+ * persist pending from stripe.
+ * @param {*} op
+ * @param {*} stripeRefund
+ * @returns {Promise<*>}
+ */
 async function persistPendingFromStripe(op, stripeRefund) {
   const updated = await refundOpSql.updateRefundOperation(op.id, {
     stripeRefundId: stripeRefund.id,
@@ -27,10 +38,21 @@ async function persistPendingFromStripe(op, stripeRefund) {
   return resolveUpdatedRefundOperation(op, updated);
 }
 
+/**
+ * audit succeeded refund.
+ * @param {*} req
+ * @param {object} { reservation
+ * @param {*} applied
+ * @param {*} stripeRefund
+ * @param {number} amountCents }
+ * @returns {Promise<*>}
+ */
 async function auditSucceededRefund(req, { reservation, applied, stripeRefund, amountCents }) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!req) {
     return;
   }
+  // Protected block: isolate failure modes.
   try {
     await logAdminAction(req, {
       action: 'admin.refunded_reservation',
@@ -47,10 +69,14 @@ async function auditSucceededRefund(req, { reservation, applied, stripeRefund, a
   }
 }
 
+/**
+ * Map a Stripe refund object onto local ledger + domain (succeeded / failed / pending).
+ */
 async function finishWithStripeRefund(
   req,
   { op, reservation, stripeRefund, reason, requestedByUserId, amountCents }
 ) {
+  // Status / lifecycle guard before mutating domain state.
   if (stripeRefund.status === 'succeeded') {
     const applied = await applySucceededRefund({
       refundOperation: op,
@@ -67,6 +93,7 @@ async function finishWithStripeRefund(
     return applied;
   }
 
+  // Status / lifecycle guard before mutating domain state.
   if (stripeRefund.status === 'failed' || stripeRefund.status === 'canceled') {
     await markRefundFailed(op, {
       code: stripeRefund.status,
@@ -76,6 +103,7 @@ async function finishWithStripeRefund(
   }
 
   const pendingOp = await persistPendingFromStripe(op, stripeRefund);
+  // Status / lifecycle guard before mutating domain state.
   if (pendingOp.status === 'succeeded') {
     return applySucceededRefund({
       refundOperation: pendingOp,
@@ -97,7 +125,12 @@ async function finishWithStripeRefund(
   };
 }
 
+/**
+ * Call Stripe createRefund using the op's idempotency key.
+ * Indeterminate errors leave the op usable for retry (do not mark failed).
+ */
 async function createRefundForOperation(op, { paymentIntentId, amountCents }) {
+  // Protected block: isolate failure modes.
   try {
     return await createRefund({
       paymentIntentId,
@@ -105,6 +138,7 @@ async function createRefundForOperation(op, { paymentIntentId, amountCents }) {
       idempotencyKey: op.idempotencyKey,
     });
   } catch (err) {
+    // Stripe / payment-related branch.
     if (isIndeterminateStripeError(err)) {
       throw refundError(
         'REFUND_INDETERMINATE',
@@ -117,6 +151,7 @@ async function createRefundForOperation(op, { paymentIntentId, amountCents }) {
   }
 }
 
+/** After confirmed Stripe failure, open a new attempt with a bumped idempotency key. */
 async function startNextAttemptAfterConfirmedFailure(failedOp, stripeCtx) {
   const nextAttempt = parseAttemptFromIdempotencyKey(failedOp.idempotencyKey) + 1;
   if (nextAttempt > 5) {
@@ -141,8 +176,12 @@ async function startNextAttemptAfterConfirmedFailure(failedOp, stripeCtx) {
   return driveStripeForOperation(reserved.op, stripeCtx);
 }
 
+/**
+ * Resume when the ledger already has a stripeRefundId (retrieve rather than create).
+ */
 async function retrieveExistingRefund(op, stripeCtx) {
   let existingRefund;
+  // Protected block: isolate failure modes.
   try {
     existingRefund = await retrieveRefund(op.stripeRefundId);
   } catch (err) {
@@ -160,6 +199,7 @@ async function retrieveExistingRefund(op, stripeCtx) {
     );
   }
 
+  // Idempotency guard: return early when work was already applied.
   if (existingRefund.status === 'succeeded') {
     return applySucceededRefund({
       refundOperation: op,
@@ -174,6 +214,7 @@ async function retrieveExistingRefund(op, stripeCtx) {
     });
   }
 
+  // Idempotency guard: return early when work was already applied.
   if (existingRefund.status === 'failed' || existingRefund.status === 'canceled') {
     await markRefundFailed(op, {
       code: existingRefund.status,
@@ -193,7 +234,13 @@ async function retrieveExistingRefund(op, stripeCtx) {
   };
 }
 
+/**
+ * Entry for a locked pending op: retrieve if Stripe id known, else create.
+ * @param {object} op - Refund operation ledger row
+ * @param {object} stripeCtx - Reservation, PI, amount, actor context
+ */
 async function driveStripeForOperation(op, stripeCtx) {
+  // Stripe / payment-related branch.
   if (op.stripeRefundId) {
     return retrieveExistingRefund(op, stripeCtx);
   }

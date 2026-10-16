@@ -1,9 +1,13 @@
+/**
+ * Audit-style status transition history for a reservation.
+ */
 import { useQuery } from '@tanstack/react-query';
 import { getReservationDetail } from '../../../api/admin/reservations';
 import { Button } from '../../../components/ui/Button';
 import { Card, CardBody } from '../../../components/ui/Card';
 import { formatChangedBy, formatTimestamp, statusChipClass } from './opsFormat';
 
+/** Audit-style status transition history for a reservation. */
 export function StatusHistoryPanel({
   reservationId,
   onClose,

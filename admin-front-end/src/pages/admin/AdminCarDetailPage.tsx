@@ -1,3 +1,6 @@
+/**
+ * Car detail tabs host: overview, service, damage, docs, compliance, performance.
+ */
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PageLoader } from '../../components/ui/Loading';
@@ -13,6 +16,7 @@ import { CarServiceTab } from './carDetail/CarServiceTab';
 import { statusChipClass, type Tab } from './carDetail/carDetailTypes';
 import { useAdminCarDetailData } from './carDetail/useAdminCarDetailData';
 
+/** Car detail tabs host: overview, service, damage, docs, compliance, performance. */
 export function AdminCarDetailPage() {
   const { id = '' } = useParams();
   const { user } = useAuth();

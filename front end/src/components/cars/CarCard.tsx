@@ -1,3 +1,7 @@
+/**
+ * Fleet card for home/search grids.
+ * Search results show trip `totalPrice`; catalog cards fall back to day/tier list price.
+ */
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Car, SearchCar } from '../../types/api';
@@ -12,17 +16,34 @@ interface CarCardProps {
   showPricing?: boolean;
 }
 
+/**
+ * Narrow to {@link SearchCar} when the API returned trip-scoped totals.
+ *
+ * @param car - Catalog or search car payload.
+ * @returns Type predicate for search-priced cars.
+ */
 function hasSearchPricing(car: Car | SearchCar): car is SearchCar {
   return 'totalPrice' in car && typeof car.totalPrice === 'number';
 }
 
+/**
+ * Compact car teaser with image, specs, and optional price CTA.
+ *
+ * @param props.car - Car or search-car record to display.
+ * @param props.detailUrl - Optional “View” link target.
+ * @param props.showPricing - When false, hides the price/CTA row (defaults true).
+ * @returns Fleet card article.
+ * @remarks Side effect: swaps to the placeholder image on load error.
+ */
 export function CarCard({ car, detailUrl, showPricing = true }: CarCardProps) {
   const [imgSrc, setImgSrc] = useState(() => imageUrl(car.image));
 
+  // Keep the resolved src in sync when the car identity/image changes.
   useEffect(() => {
     setImgSrc(imageUrl(car.image));
   }, [car.image]);
 
+  // Prefer trip total from search; otherwise show the best available list day rate.
   const price = hasSearchPricing(car)
     ? car.totalPrice
     : car.pricePerDay ?? car.priceTier_1_3 ?? car.price ?? 0;
@@ -36,6 +57,7 @@ export function CarCard({ car, detailUrl, showPricing = true }: CarCardProps) {
           className="h-full w-full object-cover transition-transform duration-500 ease-[var(--ease-out)] motion-safe-zoom group-hover:scale-[1.04]"
           loading="lazy"
           onError={() => {
+            // Avoid infinite onError loops once we are already on the placeholder.
             if (imgSrc !== PLACEHOLDER_IMAGE) setImgSrc(PLACEHOLDER_IMAGE);
           }}
         />

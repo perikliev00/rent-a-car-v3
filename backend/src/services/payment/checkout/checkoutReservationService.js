@@ -1,3 +1,7 @@
+/**
+ * Resolve or create the pending reservation hold used during Stripe Checkout.
+ * Enforces one active hold per browse session and refreshes hold expiry on retry.
+ */
 const { getSessionId, buildExistingReservationSummary } = require('../../../utils/reservationHelpers');
 const { normalizeContactDetails } = require('../../paymentService');
 
@@ -11,6 +15,13 @@ const {
 const { changeStatus } = require('../../reservation/reservationStatusService');
 const { buildRenderOrderPageResponse } = require('./checkoutResponseFactory');
 
+/**
+ * Guest-facing response when the car is already booked for the selected range.
+ * @param {object} car
+ * @param {object} formData
+ * @param {object} pricing
+ * @returns {{ ok: false, response: object }}
+ */
 function bookedUnavailableResponse(car, formData, pricing) {
   return {
     ok: false,
@@ -28,6 +39,13 @@ function bookedUnavailableResponse(car, formData, pricing) {
   };
 }
 
+/**
+ * Find/create the reservation for this checkout attempt.
+ * Sets createdReservationThisStep so Stripe failure can cancel only new holds.
+ *
+ * @param {object} params
+ * @returns {Promise<{ ok: true, reservationDoc: object, createdReservationThisStep: boolean } | { ok: false, response: object }>}
+ */
 async function resolveCheckoutReservation({ req, car, formData, startDate, endDate, pricing }) {
   const trimmedContact = normalizeContactDetails(formData);
   const sessionId = getSessionId(req);
@@ -40,6 +58,7 @@ async function resolveCheckoutReservation({ req, car, formData, startDate, endDa
 
   let createdReservationThisStep = false;
 
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!reservationDoc) {
     const {
       reservation: createdReservation,
@@ -63,6 +82,7 @@ async function resolveCheckoutReservation({ req, car, formData, startDate, endDa
       req
     );
 
+    // Concurrent create may have lost to another request with the same session.
     if (existingActiveReservation) {
       reservationDoc = await attachCarNameToReservation(existingActiveReservation);
     } else if (overlappingReservation) {
@@ -88,6 +108,7 @@ async function resolveCheckoutReservation({ req, car, formData, startDate, endDa
     }
   }
 
+  // Existing hold: must match car/dates; otherwise require complete or release first.
   if (reservationDoc && !createdReservationThisStep) {
     const sameCar =
       String(reservationDoc.carId?.id || reservationDoc.carId) === String(car.id);
@@ -98,6 +119,7 @@ async function resolveCheckoutReservation({ req, car, formData, startDate, endDa
       reservationDoc.returnDate instanceof Date &&
       reservationDoc.returnDate.getTime() === endDate.getTime();
 
+    // Guard: early-return or throw when required input is missing/invalid.
     if (!sameCar || !sameStart || !sameEnd) {
       return {
         ok: false,
@@ -123,10 +145,12 @@ async function resolveCheckoutReservation({ req, car, formData, startDate, endDa
       endDate,
       now,
     });
+    // Concurrency / overlap guard (race-sensitive).
     if (bookedOverlap || openPhysicalRental) {
       return bookedUnavailableResponse(car, formData, pricing);
     }
 
+    // Refresh hold TTL and sync contact/pricing before starting payment.
     extendReservationHold(reservationDoc);
 
     const { reservation: updated } = await changeStatus({

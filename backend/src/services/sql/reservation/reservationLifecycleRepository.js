@@ -1,8 +1,18 @@
+/**
+ * Reservation create/update/status lifecycle SQL (confirmed, cancelled, etc.).
+ */
 const { clientQuery } = require('../../../db/transaction');
 const { mapSqlReservation, normalizeCarId } = require('./reservationMapper');
 
+/**
+ * Update or upsert row; returns null when not found.
+ * @param {object} reservation
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function update(reservation, client = null) {
   const reservationId = Number(reservation.id);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(reservationId) || reservationId <= 0) {
     throw new Error('Invalid reservation id');
   }
@@ -78,8 +88,15 @@ async function update(reservation, client = null) {
   return mapSqlReservation(result.rows[0]);
 }
 
+/**
+ * apply status change with domain side effects as documented by callers.
+ * @param {object} params
+ * @param {object|null} [client] Optional DB client/transaction
+ * @returns {Promise<*>}
+ */
 async function applyStatusChange({ reservationId, newStatus, patch = null }, client = null) {
   const id = Number(reservationId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(id) || id <= 0) {
     throw new Error('Invalid reservation id');
   }
@@ -185,6 +202,7 @@ async function reserveCheckoutAttempt(
   { forceIncrement = false, client = null } = {}
 ) {
   const id = Number(reservationId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(id) || id <= 0) {
     throw new Error('Invalid reservation id');
   }
@@ -207,6 +225,7 @@ async function reserveCheckoutAttempt(
     [id, Boolean(forceIncrement)]
   );
 
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!result.rowCount) {
     const err = new Error('Reservation not found');
     err.code = 'NOT_FOUND';
@@ -222,6 +241,7 @@ async function reserveCheckoutAttempt(
  */
 async function createConfirmedReservation(payload, client = null) {
   const normalizedCarId = normalizeCarId(payload.carId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId) {
     throw new Error('Invalid car id');
   }

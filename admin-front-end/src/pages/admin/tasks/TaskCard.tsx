@@ -1,3 +1,6 @@
+/**
+ * Card UI for a single staff task in role task boards.
+ */
 import { Link } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { updateCalendarTaskStatus } from '../../../api/admin/calendar';
@@ -14,6 +17,7 @@ import {
   type TaskType,
 } from './taskDomain';
 
+/** Fmt. */
 function fmt(iso: string | null | undefined) {
   if (!iso) return '—';
   try {
@@ -32,6 +36,7 @@ const ACTION_LABELS: Partial<Record<TaskStatus, string>> = {
   assigned: 'Reopen assigned',
 };
 
+/** Card UI for a single staff task in role task boards. */
 export function TaskCard({
   task,
   showDocsLink = false,

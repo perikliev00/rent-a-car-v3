@@ -1,3 +1,7 @@
+/**
+ * Staff routes for notification management (requires can_manage_notifications).
+ */
+
 const express = require('express');
 const notificationsController = require('./notifications.controller');
 const { requireStaffApi, requirePermission } = require('../../middleware/auth');

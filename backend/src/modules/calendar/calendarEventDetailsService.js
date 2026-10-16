@@ -1,3 +1,10 @@
+/**
+ * Event detail drawer + calendar-initiated reservation cancel.
+ *
+ * Redacts phone/docs/revenue/audit by permission. VIEW_OWN may only open
+ * reservations they have an assigned task on, or their own tasks.
+ */
+
 const repo = require('./calendar.repository');
 const mapper = require('./calendar.eventMapper');
 const { CALENDAR_PERMISSIONS, isOwnTasksOnly } = require('./calendar.permissions');
@@ -9,16 +16,23 @@ const { changeStatus } = require('../../services/reservation/reservationStatusSe
 const { canTransition } = require('../../domain/reservationStatus');
 const { createHttpError, emitCalendarUpdated } = require('./calendar.shared');
 
+/**
+ * Load detail payload for a `type:id` calendar event.
+ * @param {object} access
+ * @param {string} eventId
+ */
 async function getEventDetails(access, eventId) {
   const parsed = mapper.parseEventId(eventId);
   if (!parsed) throw createHttpError('VALIDATION_ERROR', 'Invalid event id.', 422);
 
+  // Reservation-family events share one detail payload (markers include pickup/return).
   if (
     ['reservation', 'pickup', 'return', 'manual_review', 'payment_issue'].includes(parsed.type)
   ) {
     const reservation = await repo.findReservationById(parsed.id);
     if (!reservation) throw createHttpError('NOT_FOUND', 'Not found.', 404);
 
+    // VIEW_OWN: only reservations where the caller has an assigned task.
     if (isOwnTasksOnly(access)) {
       const allowed = await repo.hasAssignedTask(access.userId, reservation.id);
       if (!allowed) {
@@ -26,11 +40,13 @@ async function getEventDetails(access, eventId) {
       }
     }
 
+    // Field-level redaction flags for the drawer.
     const canPhone = rbacService.userHasPermission(access, CALENDAR_PERMISSIONS.VIEW_PHONE);
     const canDocs = rbacService.userHasPermission(access, CALENDAR_PERMISSIONS.VIEW_DOCS);
     const canRevenue = rbacService.userHasPermission(access, 'can_view_revenue');
     const canAudit = rbacService.userHasPermission(access, 'can_view_audit_logs');
 
+    // Optional customer documents (best-effort if table/query fails).
     let documents = [];
     if (canDocs) {
       try {
@@ -122,6 +138,7 @@ async function getEventDetails(access, eventId) {
     };
   }
 
+  // Task detail — VIEW_OWN may only open their own assignee.
   if (parsed.type === 'task') {
     const row = await repo.findTaskById(parsed.id);
     if (!row) throw createHttpError('NOT_FOUND', 'Not found.', 404);
@@ -133,6 +150,7 @@ async function getEventDetails(access, eventId) {
     return { eventId, type: 'task', task: repo.mapTask(row) };
   }
 
+  // Block detail — fleet managers only (not VIEW_OWN).
   if (parsed.type === 'blocked') {
     if (isOwnTasksOnly(access)) {
       throw createHttpError('FORBIDDEN', 'Not allowed.', 403);
@@ -145,6 +163,12 @@ async function getEventDetails(access, eventId) {
   throw createHttpError('NOT_FOUND', 'Not found.', 404);
 }
 
+/**
+ * Cancel via reservation status service (reason calendar_cancel) and notify UI.
+ * @param {object} access
+ * @param {string|number} reservationId
+ * @param {object} req
+ */
 async function cancelReservationFromCalendar(access, reservationId, req) {
   if (!rbacService.userHasPermission(access, 'can_cancel_orders')) {
     throw createHttpError('FORBIDDEN', 'Not allowed.', 403);
@@ -155,6 +179,7 @@ async function cancelReservationFromCalendar(access, reservationId, req) {
     throw createHttpError('NOT_FOUND', 'Reservation not found.', 404);
   }
 
+  // Domain status machine must allow cancelled from the current status.
   if (!canTransition(existing.status, 'cancelled')) {
     throw createHttpError(
       'INVALID_STATUS_TRANSITION',
@@ -163,6 +188,7 @@ async function cancelReservationFromCalendar(access, reservationId, req) {
     );
   }
 
+  // Route through reservationStatusService so side effects/listeners stay consistent.
   const result = await changeStatus({
     reservationId,
     newStatus: 'cancelled',

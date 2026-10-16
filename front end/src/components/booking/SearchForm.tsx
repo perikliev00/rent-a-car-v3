@@ -1,3 +1,8 @@
+/**
+ * Controlled trip search form (dates, times, locations).
+ * Loads location options from the API; clamping return date when pickup moves forward
+ * prevents invalid ranges before submit.
+ */
 import { useQuery } from '@tanstack/react-query';
 import { getLocations } from '../../api/locations';
 import type { LocationId, SearchParams } from '../../types/api';
@@ -16,6 +21,18 @@ interface SearchFormProps {
   submitLabel?: string;
 }
 
+/**
+ * Trip criteria form used on home and search results.
+ *
+ * @param props.values - Current search params (controlled).
+ * @param props.onChange - Called with the next full {@link SearchParams} object.
+ * @param props.onSubmit - Called after the form passes native validation.
+ * @param props.loading - Disables the submit button with a spinner when true.
+ * @param props.compact - Tighter grid for embedding beside results.
+ * @param props.tone - Label tone for light panels vs dark hero.
+ * @param props.submitLabel - Primary button text.
+ * @returns Controlled search form.
+ */
 export function SearchForm({
   values,
   onChange,
@@ -31,11 +48,13 @@ export function SearchForm({
     staleTime: 1000 * 60 * 30,
   });
 
+  // Fall back to a single Office option until locations load.
   const locationOptions =
     locationsData?.locations.map((l) => ({ value: l.id, label: l.label })) ?? [
       { value: 'office', label: 'Office' },
     ];
 
+  /** Patch a single search field while preserving the rest. */
   const set = <K extends keyof SearchParams>(key: K, val: SearchParams[K]) => {
     onChange({ ...values, [key]: val });
   };
@@ -57,6 +76,7 @@ export function SearchForm({
         min={new Date().toISOString().split('T')[0]}
         onChange={(next) => {
           const nextValues: SearchParams = { ...values, pickupDate: next };
+          // Keep return on/after pickup when the pickup date moves forward.
           if (nextValues.returnDate < next) {
             nextValues.returnDate = next;
           }

@@ -1,11 +1,23 @@
+/**
+ * SQL repository for calendar_tasks (timeline range, board filters, CRUD).
+ *
+ * Range overlap treats starts_at/due_at flexibly; tasks without starts use due_at
+ * (or created_at on the board list) so undated work still appears.
+ */
+
 const { clientQuery } = require('../../../db/transaction');
 const { mapTask } = require('./calendarTaskMapper');
 
+/**
+ * Tasks overlapping a calendar viewport (excludes cancelled by default).
+ * @param {{ from: Date|string, to: Date|string, carIds?: Array|null, assignedToUserId?: number|null, includeUnassigned?: boolean }} opts
+ */
 async function listTasksInRange(
   { from, to, carIds = null, assignedToUserId = null, includeUnassigned = true },
   client = null
 ) {
   const params = [from, to];
+  // Overlap: dated tasks use starts/due; undated-with-due use due-only window.
   const where = [
     `(
       (t.starts_at IS NOT NULL AND t.starts_at < $2 AND COALESCE(t.due_at, t.starts_at) > $1)
@@ -14,10 +26,12 @@ async function listTasksInRange(
     `t.status <> 'cancelled'`,
   ];
 
+  // Optional assignee filter (VIEW_OWN / staff filter).
   if (assignedToUserId != null) {
     params.push(Number(assignedToUserId));
     where.push(`t.assigned_to_user_id = $${params.length}`);
   }
+  // Car-scoped timeline: include fleet-wide tasks (null car_id) plus matching cars.
   if (Array.isArray(carIds) && carIds.length > 0) {
     params.push(carIds.map(Number).filter((n) => Number.isInteger(n) && n > 0));
     where.push(`(t.car_id IS NULL OR t.car_id = ANY($${params.length}::bigint[]))`);
@@ -121,6 +135,7 @@ async function listTasks(
   }));
 }
 
+/** @param {string|number} taskId */
 async function findTaskById(taskId, client = null) {
   const id = Number(taskId);
   if (!Number.isInteger(id) || id <= 0) return null;
@@ -132,6 +147,9 @@ async function findTaskById(taskId, client = null) {
   return result.rows[0] || null;
 }
 
+/**
+ * Whether the user has any task on this reservation (VIEW_OWN detail gate).
+ */
 async function hasAssignedTask(userId, reservationId, client = null) {
   const uid = Number(userId);
   const rid = Number(reservationId);
@@ -152,6 +170,7 @@ async function hasAssignedTask(userId, reservationId, client = null) {
   return result.rows.length > 0;
 }
 
+/** Insert and return mapped task DTO. */
 async function createTask(payload, client = null) {
   const result = await clientQuery(
     client,
@@ -180,6 +199,9 @@ async function createTask(payload, client = null) {
   return mapTask(result.rows[0]);
 }
 
+/**
+ * Set status; stamps completed_at on completed, clears it otherwise.
+ */
 async function updateTaskStatus(taskId, status, client = null) {
   const id = Number(taskId);
   const next = String(status);
@@ -198,6 +220,7 @@ async function updateTaskStatus(taskId, status, client = null) {
   return mapTask(result.rows[0]);
 }
 
+/** Drag-move schedule fields only. */
 async function updateTaskSchedule(taskId, { startsAt, dueAt, carId }, client = null) {
   const id = Number(taskId);
   const result = await clientQuery(
@@ -221,6 +244,9 @@ async function updateTaskSchedule(taskId, { startsAt, dueAt, carId }, client = n
   return mapTask(result.rows[0]);
 }
 
+/**
+ * Partial update using boolean flags so null clears nullable columns intentionally.
+ */
 async function updateTask(taskId, fields, client = null) {
   const id = Number(taskId);
   const result = await clientQuery(
@@ -271,6 +297,7 @@ async function updateTask(taskId, fields, client = null) {
   return result.rows[0] ? mapTask(result.rows[0]) : null;
 }
 
+/** Hard-delete task row. */
 async function deleteTask(taskId, client = null) {
   const id = Number(taskId);
   const result = await clientQuery(
@@ -281,6 +308,9 @@ async function deleteTask(taskId, client = null) {
   return result.rows[0] ? mapTask(result.rows[0]) : null;
 }
 
+/**
+ * Distinct car ids with assigned tasks in range — scopes VIEW_OWN calendars.
+ */
 async function listAssignedCarIdsForUser(userId, from, to, client = null) {
   const uid = Number(userId);
   if (!Number.isInteger(uid) || uid <= 0) return [];

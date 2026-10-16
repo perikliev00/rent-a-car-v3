@@ -1,3 +1,6 @@
+/**
+ * Body validation for Stripe checkout customer contact fields.
+ */
 const { body } = require('express-validator');
 
 const checkoutBodyValidationRules = [

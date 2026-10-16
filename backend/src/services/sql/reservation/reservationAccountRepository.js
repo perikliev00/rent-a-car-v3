@@ -1,8 +1,19 @@
+/**
+ * Reservation queries scoped to customer accounts (my bookings).
+ */
 const { clientQuery } = require('../../../db/transaction');
 const { mapSqlReservation, RESERVATION_SELECT } = require('./reservationMapper');
 
+/**
+ * List by user id from SQL.
+ * @param {string|number} userId
+ * @param {number} [{ limit]
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function listByUserId(userId, { limit = 50 } = {}, client = null) {
   const id = Number(userId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(id) || id <= 0) {
     return [];
   }
@@ -25,9 +36,17 @@ async function listByUserId(userId, { limit = 50 } = {}, client = null) {
   return result.rows.map(mapSqlReservation);
 }
 
+/**
+ * Find by id for user via SQL; returns null when missing.
+ * @param {string|number} reservationId
+ * @param {string|number} userId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findByIdForUser(reservationId, userId, client = null) {
   const rid = Number(reservationId);
   const uid = Number(userId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(rid) || rid <= 0 || !Number.isInteger(uid) || uid <= 0) {
     return null;
   }
@@ -49,9 +68,18 @@ async function findByIdForUser(reservationId, userId, client = null) {
   return mapSqlReservation(result.rows[0]) || null;
 }
 
+/**
+ * Update or upsert travel details; returns null when not found.
+ * @param {string|number} reservationId
+ * @param {string|number} userId
+ * @param {*} travel
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function updateTravelDetails(reservationId, userId, travel, client = null) {
   const rid = Number(reservationId);
   const uid = Number(userId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(rid) || rid <= 0 || !Number.isInteger(uid) || uid <= 0) {
     return null;
   }
@@ -79,6 +107,7 @@ async function updateTravelDetails(reservationId, userId, travel, client = null)
     ]
   );
 
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!result.rows[0]) {
     return null;
   }
@@ -86,9 +115,17 @@ async function updateTravelDetails(reservationId, userId, travel, client = null)
   return findByIdForUser(rid, uid, client);
 }
 
+/**
+ * claim by email.
+ * @param {string|number} userId
+ * @param {string} email
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function claimByEmail(userId, email, client = null) {
   const uid = Number(userId);
   const normalizedEmail = String(email || '').trim().toLowerCase();
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(uid) || uid <= 0 || !normalizedEmail) {
     return { reservations: 0, orders: 0 };
   }

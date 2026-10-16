@@ -1,3 +1,6 @@
+/**
+ * Public contact form that posts to `/api/contacts` and surfaces API errors inline.
+ */
 import { useMutation } from '@tanstack/react-query';
 import { type FormEvent, useState } from 'react';
 import { createContact } from '../../api/contacts';
@@ -6,6 +9,7 @@ import { Input } from '../ui/Input';
 import { Textarea } from '../ui/Textarea';
 import { toast } from '../ui/toastStore';
 
+/** Simple email shape check used before the API call. */
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type ContactFormFields = {
@@ -18,6 +22,7 @@ type ContactFormFields = {
 
 type ContactFormErrors = Partial<Record<keyof ContactFormFields, string>>;
 
+/** Empty form used for initial state and post-success reset. */
 const emptyContactForm: ContactFormFields = {
   name: '',
   email: '',
@@ -26,6 +31,12 @@ const emptyContactForm: ContactFormFields = {
   message: '',
 };
 
+/**
+ * Client-side validation mirroring common server constraints.
+ *
+ * @param values - Current form field values.
+ * @returns Sparse error map keyed by field; empty when valid.
+ */
 function validateContactForm(values: ContactFormFields): ContactFormErrors {
   const errors: ContactFormErrors = {};
   const name = values.name.trim();
@@ -55,6 +66,12 @@ function validateContactForm(values: ContactFormFields): ContactFormErrors {
   return errors;
 }
 
+/**
+ * Public contact form that posts to `/api/contacts`.
+ *
+ * @returns Controlled form with field errors and toast feedback.
+ * @remarks Side effects: creates a contact via the API; shows success/error toasts.
+ */
 export function ContactForm() {
   const [form, setForm] = useState<ContactFormFields>(emptyContactForm);
   const [errors, setErrors] = useState<ContactFormErrors>({});
@@ -69,6 +86,12 @@ export function ContactForm() {
     onError: (err) => toast((err as Error).message || 'Failed to send message.', 'error'),
   });
 
+  /**
+   * Update one field and clear its error once the user edits it.
+   *
+   * @param key - Field name.
+   * @param value - Next field value.
+   */
   function updateField<K extends keyof ContactFormFields>(key: K, value: ContactFormFields[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
     if (errors[key]) {
@@ -80,6 +103,11 @@ export function ContactForm() {
     }
   }
 
+  /**
+   * Validate, then submit a trimmed payload (omitting empty phone).
+   *
+   * @param event - Form submit event.
+   */
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextErrors = validateContactForm(form);
@@ -91,6 +119,7 @@ export function ContactForm() {
       email: form.email.trim(),
       subject: form.subject.trim(),
       message: form.message.trim(),
+      // Phone is optional — omit rather than send an empty string.
       ...(form.phone.trim() ? { phone: form.phone.trim() } : {}),
     };
     mutation.mutate(payload);

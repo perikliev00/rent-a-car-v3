@@ -1,6 +1,15 @@
+/**
+ * Shared SQL fragments and row mapper for reservation ops / payment queues.
+ * Soft-deleted orders are excluded so ops never latches onto a tombstoned order.
+ */
 const { clientQuery } = require('../../db/transaction');
 
+/**
+ * Map a raw ops SQL row to the camelCase API shape (incl. latest refund op).
+ * @param {object|null} row
+ */
 function mapOpsRow(row) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) return null;
   return {
     id: String(row.id),
@@ -32,6 +41,7 @@ function mapOpsRow(row) {
   };
 }
 
+/** Core reservation + car + non-deleted order + latest refund_operation columns. */
 const BASE_SELECT = `
   r.id,
   r.status,
@@ -55,6 +65,10 @@ const BASE_SELECT = `
   refund_op.updated_at AS refund_op_updated_at
 `;
 
+/**
+ * Shared FROM/JOIN: car name, active order, and latest refund_operation via
+ * LATERAL (ORDER BY id DESC LIMIT 1) so multi-refund history stays deterministic.
+ */
 const BASE_FROM = `
   FROM reservations r
   LEFT JOIN cars c ON c.id = r.car_id
@@ -68,6 +82,11 @@ const BASE_FROM = `
   ) refund_op ON TRUE
 `;
 
+/**
+ * Run a widget/section query and map rows to ops DTOs.
+ * @param {string} sql
+ * @param {unknown[]} [params]
+ */
 async function querySection(sql, params = []) {
   const result = await clientQuery(null, sql, params);
   return result.rows.map(mapOpsRow).filter(Boolean);

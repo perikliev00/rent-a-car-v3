@@ -1,3 +1,6 @@
+/**
+ * Document query/mutation hooks for a car.
+ */
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -9,6 +12,12 @@ import {
 import { toast } from '../../../components/ui/toastStore';
 import type { Tab } from './carDetailTypes';
 
+/**
+ * Document list/upload/download/delete for a car (active on the Documents tab).
+ *
+ * @param id - Car id
+ * @param tab - Active detail tab
+ */
 export function useCarDocuments(id: string, tab: Tab) {
   const queryClient = useQueryClient();
   const [docName, setDocName] = useState('');
@@ -37,6 +46,7 @@ export function useCarDocuments(id: string, tab: Tab) {
     onError: (err) => toast((err as Error).message, 'error'),
   });
 
+  /** Authenticated document download; toasts on failure. */
   async function downloadDocument(docId: number, filename: string) {
     try {
       await downloadCarDocument(id, docId, filename);
@@ -45,6 +55,7 @@ export function useCarDocuments(id: string, tab: Tab) {
     }
   }
 
+  /** Delete a document and invalidate the documents query. */
   async function deleteDocument(docId: number) {
     try {
       await deleteCarDocument(id, docId);

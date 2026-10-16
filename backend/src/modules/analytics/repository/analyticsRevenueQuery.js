@@ -1,7 +1,18 @@
+/**
+ * Order revenue analytics SQL (Sofia calendar day of order.created_at).
+ * Only orders linked to reservations in REVENUE_STATUSES are included.
+ */
+
 const { clientQuery } = require('../../../db/transaction');
 const { REVENUE_STATUSES } = require('../analytics.domain');
 
+/**
+ * Aggregate revenue, rental days, and order count for the period.
+ * @param {{ from: string, to: string }} range Inclusive Sofia date bounds
+ * @param {import('pg').PoolClient|null} [client]
+ */
 async function getRevenueTotals({ from, to }, client = null) {
+  // Single-row SUM/COUNT over revenue-eligible orders in the Sofia day range.
   const result = await clientQuery(
     client,
     `
@@ -21,7 +32,13 @@ async function getRevenueTotals({ from, to }, client = null) {
   return result.rows[0];
 }
 
+/**
+ * Daily revenue series keyed by Sofia order-create day.
+ * @param {{ from: string, to: string }} range
+ * @param {import('pg').PoolClient|null} [client]
+ */
 async function getRevenueSeries({ from, to }, client = null) {
+  // Group by Sofia calendar day for chart series.
   const result = await clientQuery(
     client,
     `
@@ -43,7 +60,13 @@ async function getRevenueSeries({ from, to }, client = null) {
   return result.rows;
 }
 
+/**
+ * Revenue breakdown per car for the period.
+ * @param {{ from: string, to: string }} range
+ * @param {import('pg').PoolClient|null} [client]
+ */
 async function getRevenueByCar({ from, to }, client = null) {
+  // Join cars for display fields; order by highest revenue first.
   const result = await clientQuery(
     client,
     `
@@ -69,7 +92,13 @@ async function getRevenueByCar({ from, to }, client = null) {
   return result.rows;
 }
 
+/**
+ * Revenue breakdown per pickup location for the period.
+ * @param {{ from: string, to: string }} range
+ * @param {import('pg').PoolClient|null} [client]
+ */
 async function getRevenueByLocation({ from, to }, client = null) {
+  // Group by order.pickup_location string as stored at checkout.
   const result = await clientQuery(
     client,
     `

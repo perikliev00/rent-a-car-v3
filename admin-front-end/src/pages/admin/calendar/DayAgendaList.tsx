@@ -1,7 +1,19 @@
+/**
+ * Day-density agenda list of pickups/returns/tasks.
+ */
 import { format, parseISO } from 'date-fns';
 import type { CalendarCar, CalendarEvent } from './calendar.types';
 import { EVENT_TYPE_STYLE } from './eventStyles';
 
+/**
+ * Day-density agenda: events overlapping `day`, grouped by car.
+ *
+ * @param cars - Fleet cars for labels/order
+ * @param events - All loaded calendar events
+ * @param day - Calendar day to list
+ * @param onEventClick - Open event details
+ * @param onCarClick - Optional car-row action
+ */
 export function DayAgendaList({
   cars,
   events,
@@ -15,8 +27,10 @@ export function DayAgendaList({
   onEventClick: (event: CalendarEvent) => void;
   onCarClick?: (carId: string) => void;
 }) {
+  // Local midnight window for the selected day.
   const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate()).getTime();
   const dayEnd = dayStart + 24 * 60 * 60 * 1000;
+  // Overlap test (not “starts on day”) so multi-day bars still appear.
   const dayEvents = events
     .filter((ev) => {
       const start = parseISO(ev.start).getTime();
@@ -25,6 +39,7 @@ export function DayAgendaList({
     })
     .sort((a, b) => parseISO(a.start).getTime() - parseISO(b.start).getTime());
 
+  // Group by car; events without a car go under `__none__`.
   const byCar = new Map<string, CalendarEvent[]>();
   for (const ev of dayEvents) {
     const key = ev.carId || '__none__';
@@ -33,6 +48,7 @@ export function DayAgendaList({
     byCar.set(key, list);
   }
 
+  // Cars with events first (fleet order), then orphan `__none__` if needed.
   const orderedCars = [
     ...cars.filter((c) => byCar.has(c.id)),
     ...cars.filter((c) => !byCar.has(c.id)),

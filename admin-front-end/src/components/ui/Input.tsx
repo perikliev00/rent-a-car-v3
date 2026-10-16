@@ -1,3 +1,6 @@
+/**
+ * Labeled text input primitive with error/tone styling.
+ */
 import type { InputHTMLAttributes } from 'react';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -5,7 +8,17 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   error?: string;
 }
 
+/**
+ * Text field with optional label and inline error message.
+ * When `id` is omitted, derives one from the label (lowercased, spaces → hyphens).
+ *
+ * @param label - Optional visible label
+ * @param error - Optional error text (also tints the border)
+ * @param id - Explicit input id; otherwise derived from label
+ * @param className - Extra classes on the `<input>`
+ */
 export function Input({ label, error, id, className = '', ...props }: InputProps) {
+  // Stable htmlFor/id pairing when callers only pass a label.
   const inputId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
   return (
     <div className="min-w-0 space-y-1.5">

@@ -1,3 +1,8 @@
+/**
+ * Loading skeleton matching the timeline grid layout.
+ */
+
+/** Five placeholder car rows shown while calendar events load. */
 export function TimelineSkeleton() {
   return (
     <div className="overflow-hidden rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)]">

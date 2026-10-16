@@ -1,6 +1,8 @@
 /**
  * Shared Stripe checkout session reconcile used by admin API and CLI.
- * Uses stub-aware retrieve so STRIPE_STUB=1 e2e works in-process.
+ * Bridges gaps when webhooks were missed: finds processing reservations that
+ * already have a Stripe session, verifies payment with Stripe, and finalizes
+ * when paid. Uses stub-aware retrieve so STRIPE_STUB=1 e2e works in-process.
  */
 const reservationRepository = require('../../repositories/reservationRepository');
 const { findOrderByStripeSessionId } = require('../sql/orderSqlService');
@@ -10,6 +12,14 @@ const {
 const paymentFailureSql = require('../sql/paymentFailureSqlService');
 const { retrieveStripeCheckoutSession } = require('./stripeCheckoutService');
 
+/**
+ * Reconcile a single reservation against its linked Stripe Checkout session.
+ * Skips work when an order already exists (idempotent re-run safety).
+ *
+ * @param {object} reservation - Reservation with stripeSessionId and related fields
+ * @param {{ dryRun?: boolean }} [options]
+ * @returns {Promise<object>} Summary of action taken (or that would be taken)
+ */
 async function reconcileOneSession(reservation, { dryRun = false } = {}) {
   const stripeSessionId = reservation.stripeSessionId;
   const summary = {
@@ -20,14 +30,18 @@ async function reconcileOneSession(reservation, { dryRun = false } = {}) {
     finalized: false,
   };
 
+  // Stripe / payment-related branch.
   if (!stripeSessionId) {
     summary.reason = 'missing_stripe_session_id';
     return summary;
   }
 
+  // Order already linked to this session ⇒ booking was confirmed; clear failure rows.
   const existingOrder = await findOrderByStripeSessionId(stripeSessionId);
+  // Idempotency guard: return early when work was already applied.
   if (existingOrder) {
     summary.action = 'already_confirmed';
+    // Guard: early-return or throw when required input is missing/invalid.
     if (!dryRun) {
       await paymentFailureSql.markFailuresResolvedByStripeSession(stripeSessionId);
     }
@@ -35,6 +49,7 @@ async function reconcileOneSession(reservation, { dryRun = false } = {}) {
   }
 
   let session;
+  // Protected block: isolate failure modes.
   try {
     session = await retrieveStripeCheckoutSession(stripeSessionId);
   } catch (err) {
@@ -42,6 +57,7 @@ async function reconcileOneSession(reservation, { dryRun = false } = {}) {
     return summary;
   }
 
+  // Only finalize when Stripe reports paid; unpaid/open sessions stay processing.
   if (session.payment_status !== 'paid') {
     summary.reason = `payment_status_${session.payment_status}`;
     return summary;
@@ -66,6 +82,7 @@ async function reconcileOneSession(reservation, { dryRun = false } = {}) {
   summary.action = result.reason || 'unknown';
   summary.finalized = !!result.finalized;
 
+  // Idempotency guard: return early when work was already applied.
   if (result.finalized || result.reason === 'already_confirmed') {
     await paymentFailureSql.markFailuresResolvedByStripeSession(stripeSessionId);
   }
@@ -73,6 +90,12 @@ async function reconcileOneSession(reservation, { dryRun = false } = {}) {
   return summary;
 }
 
+/**
+ * Batch-reconcile processing reservations that have a Stripe session id.
+ *
+ * @param {{ dryRun?: boolean, limit?: number }} [options]
+ * @returns {Promise<{ dryRun: boolean, processed: number, finalizedOrReady: number, skipped: number, results: object[] }>}
+ */
 async function reconcileStripeSessions({ dryRun = false, limit = 50 } = {}) {
   const reservations = await reservationRepository.findProcessingWithStripeSession();
   const candidates = reservations.slice(0, limit);

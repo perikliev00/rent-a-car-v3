@@ -1,3 +1,6 @@
+/**
+ * Staff user management and role assignment UI.
+ */
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createAdminUser, getAdminUsers, putUserRoles } from '../../api/admin/users';
@@ -8,6 +11,7 @@ import { Card, CardBody } from '../../components/ui/Card';
 import { PageLoader } from '../../components/ui/Loading';
 import { toast } from '../../components/ui/toastStore';
 
+/** Staff user management and role assignment UI. */
 export function AdminUsersPage() {
   const queryClient = useQueryClient();
   const { data: usersData, isLoading: usersLoading } = useQuery({
@@ -55,6 +59,7 @@ export function AdminUsersPage() {
     [roles]
   );
 
+  /** Toggle Role. */
   function toggleRole(list: string[], roleId: string): string[] {
     return list.includes(roleId) ? list.filter((id) => id !== roleId) : [...list, roleId];
   }

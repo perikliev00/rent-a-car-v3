@@ -1,3 +1,6 @@
+/**
+ * Body validation for customer/admin login credentials.
+ */
 const { body } = require('express-validator');
 
 const authLoginValidationRules = [

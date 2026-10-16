@@ -1,8 +1,19 @@
+/**
+ * Admin pickup/return checklists, PDF download, and cancellation-request review.
+ */
 const checklistAdminService = require('../../../services/admin/checklistAdminService');
 const apiResponse = require('../../../utils/apiResponse');
 const asyncHandler = require('../../../utils/asyncHandler');
 const { forwardControllerError } = require('../../../utils/controllerError');
 
+/**
+ * Submit a pickup checklist with optional photos/signatures. /
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.submitPickupChecklist = asyncHandler(async (req, res, next) => {
   try {
     const data = await checklistAdminService.submitPickupChecklist(
@@ -25,6 +36,14 @@ exports.submitPickupChecklist = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Submit a return checklist with optional photos/signatures. /
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.submitReturnChecklist = asyncHandler(async (req, res, next) => {
   try {
     const data = await checklistAdminService.submitReturnChecklist(
@@ -44,6 +63,14 @@ exports.submitReturnChecklist = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Return checklists for a reservation. /
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.getChecklists = asyncHandler(async (req, res, next) => {
   try {
     const data = await checklistAdminService.getChecklists(req.params.id);
@@ -56,6 +83,14 @@ exports.getChecklists = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Download an admin reservation PDF of the requested kind. /
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.downloadPdf = asyncHandler(async (req, res, next) => {
   try {
     const { buffer, filename, contentType } =
@@ -71,6 +106,14 @@ exports.downloadPdf = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * List pending cancellation requests. /
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.listCancellationRequests = asyncHandler(async (req, res, next) => {
   try {
     const requests = await checklistAdminService.listCancellationRequests();
@@ -83,6 +126,14 @@ exports.listCancellationRequests = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Approve or reject a cancellation request. /
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.reviewCancellationRequest = asyncHandler(async (req, res, next) => {
   try {
     const approve = req.body.approve === true || req.body.approve === 'true';

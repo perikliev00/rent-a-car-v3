@@ -17,6 +17,13 @@ if (!fs.existsSync(resultsPath)) {
 const report = JSON.parse(fs.readFileSync(resultsPath, 'utf8'));
 const flaky = [];
 
+/**
+ * Recursively walk Playwright suite nodes while checking flake heuristics.
+ *
+ * @param {*} [suites] - suites = []
+ * @returns {*}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function walkSuites(suites = []) {
   for (const suite of suites) {
     for (const spec of suite.specs || []) {

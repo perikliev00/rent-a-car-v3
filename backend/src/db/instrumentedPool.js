@@ -1,6 +1,18 @@
+/**
+ * pg Pool wrapper that records query latency metrics for Prometheus / in-process stats.
+ */
+
 const { Pool } = require('pg');
 const metrics = require('../monitoring/metrics');
 
+/**
+ * Wrap `query` to measure duration and record the SQL verb (SELECT/INSERT/…).
+ *
+ * @param {Function} originalQuery
+ * @param {object} context - `this` for the bound query (pool or client)
+ * @returns {Function}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function wrapQuery(originalQuery, context) {
   return function instrumentedQuery(text, params, callback) {
     const start = process.hrtime.bigint();
@@ -44,12 +56,24 @@ function wrapQuery(originalQuery, context) {
   };
 }
 
+/**
+ * @param {import('pg').PoolClient} client
+ * @returns {import('pg').PoolClient}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function wrapClientQuery(client) {
   const clientQuery = client.query.bind(client);
   client.query = wrapQuery(clientQuery, client);
   return client;
 }
 
+/**
+ * Create a Pool whose `query` and `connect` paths emit DB duration metrics.
+ *
+ * @param {import('pg').PoolConfig} options
+ * @returns {import('pg').Pool}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function createInstrumentedPool(options) {
   const pool = new Pool(options);
   const originalQuery = pool.query.bind(pool);

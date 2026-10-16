@@ -1,3 +1,6 @@
+/**
+ * Expire stale reservation holds and release related calendar pressure.
+ */
 const { clientQuery } = require('../../../db/transaction');
 const { ACTIVE_RESERVATION_STATUSES } = require('../../../utils/reservationHelpers');
 const { normalizeCarId } = require('./reservationMapper');
@@ -5,6 +8,7 @@ const { normalizeCarId } = require('./reservationMapper');
 /** Marks expired holds for one car so they leave the partial exclusion constraint. */
 async function expireStaleHoldsForCar(carId, now = new Date(), client = null) {
   const normalizedCarId = normalizeCarId(carId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId) {
     return 0;
   }
@@ -43,7 +47,14 @@ async function expireStaleHoldsForCar(carId, now = new Date(), client = null) {
   return result.rowCount || 0;
 }
 
+/**
+ * Same as expireStaleHoldsForCar but scoped to one browser/checkout session_id.
+ * @param {string} sessionId
+ * @param {Date} [now]
+ * @param {object|null} [client]
+ */
 async function expireStaleHoldsForSession(sessionId, now = new Date(), client = null) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!sessionId) {
     return 0;
   }
@@ -82,6 +93,12 @@ async function expireStaleHoldsForSession(sessionId, now = new Date(), client = 
   return result.rowCount || 0;
 }
 
+/**
+ * mark reservation expired — mutates persisted state when applicable.
+ * @param {string|number} reservationId
+ * @param {*} [now]
+ * @returns {Promise<*>}
+ */
 async function markReservationExpired(reservationId, now = new Date(), client = null) {
   const result = await clientQuery(
     client,
@@ -115,6 +132,12 @@ async function markReservationExpired(reservationId, now = new Date(), client = 
   return (result.rowCount || 0) > 0;
 }
 
+/**
+ * mark abandoned reservations — mutates persisted state when applicable.
+ * @param {Array<*>} activeSessionIds
+ * @param {*} [now]
+ * @returns {Promise<*>}
+ */
 async function markAbandonedReservations(activeSessionIds, now = new Date(), client = null) {
   const params = [ACTIVE_RESERVATION_STATUSES, now];
   const abandonConditions = ['r.hold_expires_at <= $2', 'r.session_id IS NULL'];

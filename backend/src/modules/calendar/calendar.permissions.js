@@ -1,3 +1,10 @@
+/**
+ * Calendar RBAC permission constants and session helpers.
+ *
+ * VIEW vs VIEW_OWN drives full-fleet vs assignee-scoped calendars;
+ * OVERRIDE gates soft conflict force-writes.
+ */
+
 const CALENDAR_PERMISSIONS = Object.freeze({
   VIEW: 'can_view_calendar',
   VIEW_OWN: 'can_view_own_calendar_tasks',
@@ -13,6 +20,11 @@ const CALENDAR_PERMISSIONS = Object.freeze({
   OVERRIDE: 'can_override_calendar_conflicts',
 });
 
+/**
+ * Normalize session user into an access object for RBAC checks.
+ * @param {import('express').Request} req
+ * @returns {{ roles: string[], permissions: string[], userId: string|null }}
+ */
 function sessionAccess(req) {
   const user = req.session?.user || {};
   return {
@@ -22,6 +34,10 @@ function sessionAccess(req) {
   };
 }
 
+/**
+ * True if the user may open any calendar view (full or own-tasks).
+ * @param {object} access
+ */
 function canViewCalendar(access) {
   const rbac = require('../../services/rbac/rbacService');
   return (
@@ -30,6 +46,10 @@ function canViewCalendar(access) {
   );
 }
 
+/**
+ * True when the user only has VIEW_OWN (no full VIEW) — scope to assigned cars.
+ * @param {object} access
+ */
 function isOwnTasksOnly(access) {
   const rbac = require('../../services/rbac/rbacService');
   return (

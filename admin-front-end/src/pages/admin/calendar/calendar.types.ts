@@ -1,3 +1,6 @@
+/**
+ * Shared TypeScript types for fleet calendar cars, events, and day ops.
+ */
 export type CalendarViewMode = 'day' | 'week' | 'month';
 
 export type CalendarEventType =

@@ -1,3 +1,6 @@
+/**
+ * Admin checklist, cancellation-review, and PDF kind validation rules.
+ */
 const { body, param } = require('express-validator');
 
 const adminChecklistValidationRules = [

@@ -1,3 +1,8 @@
+/**
+ * Pickup/return location ids, display labels, and default delivery fees (EUR).
+ * Keep ALLOWED_LOCATIONS in sync with DELIVERY_FEES and frontend EJS selects.
+ */
+
 /** Canonical pickup/return location ids – keep in sync with FEES and EJS selects. */
 const ALLOWED_LOCATIONS = [
   'office',

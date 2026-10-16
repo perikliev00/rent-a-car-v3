@@ -1,3 +1,6 @@
+/**
+ * Re-export of display date/location formatting helpers.
+ */
 const {
   formatDateForDisplay,
   formatLocationName,

@@ -1,3 +1,6 @@
+/**
+ * RBAC catalog and role-permission matrix APIs for the Roles admin page.
+ */
 import type {
   PermissionSummary,
   RolePermissionMatrixEntry,
@@ -5,6 +8,9 @@ import type {
 } from '../../types/api';
 import { api } from '../client';
 
+/**
+ * Full roles + permissions + matrix used to render the RBAC editor.
+ */
 export async function getRbacCatalog(): Promise<{
   roles: RoleSummary[];
   permissions: PermissionSummary[];
@@ -13,6 +19,12 @@ export async function getRbacCatalog(): Promise<{
   return api('/api/admin/rbac');
 }
 
+/**
+ * Replaces a role's permission set (full PUT, not a patch merge).
+ *
+ * @param roleId - Role id
+ * @param permissionKeys - Complete replacement list of permission keys
+ */
 export async function updateRolePermissions(
   roleId: string,
   permissionKeys: string[]

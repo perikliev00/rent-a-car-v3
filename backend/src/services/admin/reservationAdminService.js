@@ -1,3 +1,7 @@
+/**
+ * Admin reservation status ops: manual-review confirmation, allowed status
+ * transitions, and detail + history for the ops console.
+ */
 const orderSql = require('../sql/orderSqlService');
 const { addRange } = require('../sql/bookingSyncSqlService');
 const {
@@ -12,11 +16,20 @@ const {
   assertNoOpenPhysicalRental,
 } = require('./order/orderConflictService');
 
+/**
+ * Promote manual_review → confirmed: lock the car, check holds/rentals,
+ * block calendar range, create the order, then change status.
+ * Advisory locks prevent concurrent confirmations double-booking the car.
+ * @param {import('express').Request} req
+ * @param {object} reservation
+ * @param {string} [reason]
+ */
 async function confirmManualReviewReservation(req, reservation, reason) {
   return runWithTransaction(async (client) => {
     const carId = reservation.carId?.id || reservation.carId;
 
     await acquireCarAdvisoryLocks(client, [carId]);
+    // Protected block: isolate failure modes.
     try {
       await assertNoActiveReservationHold(
         carId,
@@ -39,6 +52,7 @@ async function confirmManualReviewReservation(req, reservation, reason) {
 
     await addRange(carId, reservation.pickupDate, reservation.returnDate, client);
 
+    // Synthetic stripeSessionId when admin confirms without a Checkout session.
     const order = await orderSql.createOrderFromReservation(
       {
         ...reservation,
@@ -72,7 +86,13 @@ async function confirmManualReviewReservation(req, reservation, reason) {
   });
 }
 
+/**
+ * Change reservation status via admin ops (whitelist + refund guard).
+ * @param {import('express').Request} req
+ * @param {{reservationId: number|string, status: string, reason?: string}} params
+ */
 async function changeReservationStatus(req, { reservationId, status, reason }) {
+  // Status / lifecycle guard before mutating domain state.
   if (!isValidStatus(status)) {
     const err = new Error('Invalid reservation status');
     err.code = 'VALIDATION_ERROR';
@@ -80,6 +100,7 @@ async function changeReservationStatus(req, { reservationId, status, reason }) {
     throw err;
   }
 
+  // Status / lifecycle guard before mutating domain state.
   if (!ADMIN_OPS_STATUSES.includes(status)) {
     const err = new Error('Status is not allowed for admin ops transitions');
     err.code = 'VALIDATION_ERROR';
@@ -98,6 +119,7 @@ async function changeReservationStatus(req, { reservationId, status, reason }) {
   }
 
   const existing = await reservationRepository.findById(reservationId);
+  // Idempotency guard: return early when work was already applied.
   if (!existing) {
     const err = new Error('Reservation not found');
     err.code = 'NOT_FOUND';
@@ -105,6 +127,7 @@ async function changeReservationStatus(req, { reservationId, status, reason }) {
     throw err;
   }
 
+  // Idempotency guard: return early when work was already applied.
   if (existing.status === 'manual_review' && status === 'confirmed') {
     return confirmManualReviewReservation(req, existing, reason);
   }
@@ -124,8 +147,13 @@ async function changeReservationStatus(req, { reservationId, status, reason }) {
   return result;
 }
 
+/**
+ * Reservation detail with recent status history for the admin drawer.
+ * @param {number|string} reservationId
+ */
 async function getReservationDetail(reservationId) {
   const reservation = await reservationRepository.findById(reservationId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!reservation) {
     const err = new Error('Reservation not found');
     err.code = 'NOT_FOUND';

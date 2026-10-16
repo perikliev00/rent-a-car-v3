@@ -1,7 +1,15 @@
+/**
+ * Analytics application service: KPIs, series, utilization, car performance, CSV.
+ *
+ * Monetary fields are null/omitted without can_view_revenue. Occupancy treats
+ * maintenance block days as unavailable capacity subtracted from fleet days.
+ */
+
 const repo = require('./analytics.repository');
 const { periodDayCount } = require('./analytics.domain');
 const rbacService = require('../../services/rbac/rbacService');
 
+/** Enforce from <= to and max 366-day window. */
 function assertValidRange(from, to) {
   if (!from || !to || from > to) {
     const err = new Error('Invalid date range: from must be on or before to');
@@ -9,6 +17,7 @@ function assertValidRange(from, to) {
     err.code = 'INVALID_DATE_RANGE';
     throw err;
   }
+  // Cap at one leap-year length to keep SQL aggregates bounded.
   const days = periodDayCount(from, to);
   if (days > 366) {
     const err = new Error('Date range cannot exceed 366 days');
@@ -18,15 +27,25 @@ function assertValidRange(from, to) {
   }
 }
 
+/** @param {object} access @returns {boolean} */
 function canViewRevenue(access) {
   return rbacService.userHasPermission(access, 'can_view_revenue');
 }
 
+/** Hide money when the caller lacks revenue permission. */
 function maskMoney(value, allowed) {
   return allowed ? value : null;
 }
 
+/**
+ * Derive utilization and profitability for one car over the period.
+ * availableDays = periodDays - maintenanceDays; rate = booked / available.
+ * @param {object} raw Raw performance row from repository
+ * @param {number} periodDays Inclusive day count of the report window
+ * @param {boolean} canMoney Whether revenue/cost fields may be exposed
+ */
 function buildPerformanceRow(raw, periodDays, canMoney) {
+  // Maintenance days reduce available capacity for utilization.
   const availableDays = Math.max(periodDays - Number(raw.maintenanceDays || 0), 0);
   const utilizationRate =
     availableDays > 0 ? Number(raw.bookedDays || 0) / availableDays : 0;
@@ -52,11 +71,16 @@ function buildPerformanceRow(raw, periodDays, canMoney) {
   };
 }
 
+/**
+ * Dashboard overview: KPI cards + revenue/bookings series + most-rented cars.
+ * @param {{ from: string, to: string, access: object }} args
+ */
 async function getOverview({ from, to, access }) {
   assertValidRange(from, to);
   const canMoney = canViewRevenue(access);
   const periodDays = periodDayCount(from, to);
 
+  // Parallel fetch of all overview query slices.
   const [
     revenueTotals,
     revenueSeries,
@@ -79,15 +103,18 @@ async function getOverview({ from, to, access }) {
     repo.getMostRentedCars({ from, to, limit: 10 }),
   ]);
 
+  // ADR = revenue / rental_days from orders (not calendar overlap days).
   const revenue = Number(revenueTotals.revenue || 0);
   const rentalDays = Number(revenueTotals.rental_days || 0);
   const adr = rentalDays > 0 ? revenue / rentalDays : 0;
 
+  // Occupancy: rented overlap / (fleet capacity − maintenance days).
   const fleetCapacity = occupancy.activeCars * periodDays;
   const availableDays = Math.max(fleetCapacity - occupancy.maintenanceDays, 0);
   const occupancyRate =
     availableDays > 0 ? occupancy.rentedDays / availableDays : 0;
 
+  // Conversion: confirmed / checkout starts (history + stripe session funnel).
   const checkoutStarts = Number(conversion.checkout_starts || 0);
   const successful = Number(conversion.successful_bookings || 0);
   const conversionRate = checkoutStarts > 0 ? successful / checkoutStarts : 0;
@@ -136,10 +163,15 @@ async function getOverview({ from, to, access }) {
   };
 }
 
+/**
+ * Revenue breakdown by car for the date range.
+ * @param {{ from: string, to: string, access: object }} args
+ */
 async function getRevenueByCar({ from, to, access }) {
   assertValidRange(from, to);
   const canMoney = canViewRevenue(access);
   const rows = await repo.getRevenueByCar({ from, to });
+  // Mask revenue when caller lacks can_view_revenue; counts stay visible.
   return {
     from,
     to,
@@ -154,6 +186,10 @@ async function getRevenueByCar({ from, to, access }) {
   };
 }
 
+/**
+ * Revenue breakdown by pickup location.
+ * @param {{ from: string, to: string, access: object }} args
+ */
 async function getRevenueByLocation({ from, to, access }) {
   assertValidRange(from, to);
   const canMoney = canViewRevenue(access);
@@ -169,6 +205,10 @@ async function getRevenueByLocation({ from, to, access }) {
   };
 }
 
+/**
+ * Per-car utilization (no money fields).
+ * @param {{ from: string, to: string }} args
+ */
 async function getUtilization({ from, to }) {
   assertValidRange(from, to);
   const periodDays = periodDayCount(from, to);
@@ -178,6 +218,7 @@ async function getUtilization({ from, to }) {
     to,
     periodDays,
     rows: rows.map((r) => {
+      // Same availableDays formula as performance rows (period − maintenance).
       const maintenanceDays = Number(r.maintenance_days || 0);
       const bookedDays = Number(r.booked_days || 0);
       const availableDays = Math.max(periodDays - maintenanceDays, 0);
@@ -195,6 +236,10 @@ async function getUtilization({ from, to }) {
   };
 }
 
+/**
+ * Fleet performance table including costs and profitability when allowed.
+ * @param {{ from: string, to: string, access: object }} args
+ */
 async function getCarsPerformance({ from, to, access }) {
   assertValidRange(from, to);
   const canMoney = canViewRevenue(access);
@@ -208,6 +253,10 @@ async function getCarsPerformance({ from, to, access }) {
   };
 }
 
+/**
+ * Single-car performance detail.
+ * @param {{ carId: number, from: string, to: string, access: object }} args
+ */
 async function getCarPerformance({ carId, from, to, access }) {
   assertValidRange(from, to);
   const canMoney = canViewRevenue(access);
@@ -227,6 +276,11 @@ async function getCarPerformance({ carId, from, to, access }) {
   };
 }
 
+/**
+ * Minimal CSV serializer with quote escaping.
+ * @param {object[]} rows
+ * @param {{ key: string, label: string }[]} columns
+ */
 function toCsv(rows, columns) {
   const header = columns.map((c) => c.label).join(',');
   const lines = rows.map((row) =>
@@ -235,6 +289,7 @@ function toCsv(rows, columns) {
         const val = row[c.key];
         if (val == null) return '';
         const str = String(val);
+        // RFC-style escaping when value contains comma or quote.
         return str.includes(',') || str.includes('"')
           ? `"${str.replace(/"/g, '""')}"`
           : str;
@@ -244,6 +299,11 @@ function toCsv(rows, columns) {
   return [header, ...lines].join('\n');
 }
 
+/**
+ * Export car performance as CSV; requires can_export_reports.
+ * Money columns omitted without can_view_revenue.
+ * @param {{ from: string, to: string, access: object }} args
+ */
 async function exportCsv({ from, to, access }) {
   assertValidRange(from, to);
   if (!rbacService.userHasPermission(access, 'can_export_reports')) {
@@ -254,6 +314,7 @@ async function exportCsv({ from, to, access }) {
   }
   const canMoney = canViewRevenue(access);
   const { rows } = await getCarsPerformance({ from, to, access });
+  // Drop money columns when revenue permission is missing.
   return toCsv(rows, [
     { key: 'carId', label: 'car_id' },
     { key: 'carName', label: 'car_name' },

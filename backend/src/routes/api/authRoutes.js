@@ -1,3 +1,6 @@
+/**
+ * Public auth routes: login, signup, email verification, logout, CSRF, and current user.
+ */
 const express = require('express');
 const authController = require('../../controllers/api/authController');
 const { requireAuthApi } = require('../../middleware/auth');
@@ -16,6 +19,7 @@ const { apiLoginAttemptGuard } = require('../../middleware/apiLoginAttemptGuard'
 
 const router = express.Router();
 
+// Session login; rate-limited + lockout guard before password check.
 router.post(
   '/login',
   loginLimiter,
@@ -24,6 +28,7 @@ router.post(
   authController.postLogin
 );
 
+// Create customer account (unverified until email confirm).
 router.post(
   '/signup',
   signupLimiter,
@@ -31,6 +36,7 @@ router.post(
   authController.postSignup
 );
 
+// Confirm email with token from signup / resend mail.
 router.post(
   '/verify-email',
   emailVerificationLimiter,
@@ -39,6 +45,7 @@ router.post(
   authController.postVerifyEmail
 );
 
+// Authenticated user requests another verification email.
 router.post(
   '/resend-verification',
   emailVerificationLimiter,
@@ -46,8 +53,11 @@ router.post(
   authController.postResendVerification
 );
 
+// Destroy session cookie / store row.
 router.post('/logout', authController.postLogout);
+// Return CSRF token for SPA double-submit header.
 router.get('/csrf', authController.getCsrf);
+// Current session user payload (or anonymous).
 router.get('/me', authController.getMe);
 
 module.exports = router;

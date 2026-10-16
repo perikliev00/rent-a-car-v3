@@ -1,11 +1,29 @@
+/**
+ * Maps DB rows to unified calendar event DTOs for the UI timeline.
+ *
+ * Event ids use `type:id` so move/resize/detail handlers can parse identity.
+ * Reservations expand into bar + optional pickup/return markers and alerts.
+ */
+
 const { TERMINAL_STATUSES } = require('../../domain/reservationStatus');
 
+/** Hours required between one rental's return and the next pickup. */
 const CLEANING_BUFFER_HOURS = 2;
 
+/**
+ * Compose a stable client event id.
+ * @param {string} type
+ * @param {string|number} id
+ */
 function eventId(type, id) {
   return `${type}:${id}`;
 }
 
+/**
+ * Parse `type:id` event ids from the client.
+ * @param {string} raw
+ * @returns {{ type: string, id: string }|null}
+ */
 function parseEventId(raw) {
   const value = String(raw || '');
   const idx = value.indexOf(':');
@@ -16,6 +34,13 @@ function parseEventId(raw) {
   return { type, id };
 }
 
+/**
+ * Map a reservation row to one or more calendar events (bar, markers, alerts).
+ * Terminal statuses produce no events.
+ * @param {object} row
+ * @param {{ includeMarkers?: boolean }} [opts]
+ * @returns {object[]}
+ */
 function mapReservationEvents(row, { includeMarkers = true } = {}) {
   if (!row || TERMINAL_STATUSES.includes(row.status)) {
     return [];
@@ -69,6 +94,7 @@ function mapReservationEvents(row, { includeMarkers = true } = {}) {
     );
   }
 
+  // Surface ops attention states as separate overlay events.
   if (row.status === 'manual_review') {
     events.push({
       id: eventId('manual_review', row.id),
@@ -100,6 +126,11 @@ function mapReservationEvents(row, { includeMarkers = true } = {}) {
   return events;
 }
 
+/**
+ * Map a car_date_blocks row. Booking-type blocks are omitted (derived from reservations).
+ * @param {object} row
+ * @returns {object|null}
+ */
 function mapBlockEvent(row) {
   if (!row || row.block_type === 'booking') return null;
   return {
@@ -117,6 +148,11 @@ function mapBlockEvent(row) {
   };
 }
 
+/**
+ * Map an ops task row; cancelled tasks are hidden from the calendar.
+ * @param {object} row
+ * @returns {object|null}
+ */
 function mapTaskEvent(row) {
   if (!row || row.status === 'cancelled') return null;
   return {
@@ -137,6 +173,13 @@ function mapTaskEvent(row) {
   };
 }
 
+/**
+ * Full-range maintenance band when car status is in_maintenance.
+ * @param {object} car
+ * @param {Date|string} rangeFrom
+ * @param {Date|string} rangeTo
+ * @returns {object|null}
+ */
 function mapMaintenanceEvent(car, rangeFrom, rangeTo) {
   if (!car || car.status !== 'in_maintenance') return null;
   return {
@@ -151,6 +194,13 @@ function mapMaintenanceEvent(car, rangeFrom, rangeTo) {
   };
 }
 
+/**
+ * Full-range cleaning band when car status is needs_cleaning.
+ * @param {object} car
+ * @param {Date|string} rangeFrom
+ * @param {Date|string} rangeTo
+ * @returns {object|null}
+ */
 function mapCleaningStatusEvent(car, rangeFrom, rangeTo) {
   if (!car || car.status !== 'needs_cleaning') return null;
   return {

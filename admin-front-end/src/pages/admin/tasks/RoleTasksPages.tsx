@@ -1,3 +1,6 @@
+/**
+ * Role-scoped My Tasks pages for driver/cleaner/receptionist.
+ */
 import { useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -43,6 +46,12 @@ const CONFIG: Record<
   },
 };
 
+/**
+ * Shared role task board: loads tasks for a role-specific type set and date window.
+ * Receptionists see today only; drivers/cleaners see a 7-day window.
+ *
+ * @param role - Which staff role view to render
+ */
 function RoleTasksPage({ role }: { role: RoleView }) {
   const { user } = useAuth();
   const cfg = CONFIG[role];
@@ -51,6 +60,7 @@ function RoleTasksPage({ role }: { role: RoleView }) {
     hasPermission(user, 'can_view_calendar') ||
     hasPermission(user, 'can_create_calendar_tasks');
 
+  // Reception desk focuses on today; field roles get a week lookahead.
   const range = useMemo(() => {
     const from = startOfDay(new Date());
     const days = role === 'receptionist' ? 1 : 7;
@@ -98,14 +108,17 @@ function RoleTasksPage({ role }: { role: RoleView }) {
   );
 }
 
+/** Role-scoped My Tasks pages for driver/cleaner/receptionist. */
 export function DriverTasksPage() {
   return <RoleTasksPage role="driver" />;
 }
 
+/** Role-scoped My Tasks pages for driver/cleaner/receptionist. */
 export function CleanerTasksPage() {
   return <RoleTasksPage role="cleaner" />;
 }
 
+/** Role-scoped My Tasks pages for driver/cleaner/receptionist. */
 export function ReceptionistTasksPage() {
   return <RoleTasksPage role="receptionist" />;
 }

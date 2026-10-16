@@ -1,3 +1,7 @@
+/**
+ * Happy-path paid finalization: mark paid → block calendar range → create order → confirm.
+ * Callers must send confirmation emails only after the surrounding transaction commits.
+ */
 const orderSql = require('../sql/orderSqlService');
 const paymentFailureSql = require('../sql/paymentFailureSqlService');
 const { addRange } = require('../sql/bookingSyncSqlService');
@@ -9,6 +13,12 @@ const metrics = require('../../monitoring/metrics');
 const { logSystemAction } = require('../admin/adminAuditService');
 const { paidAmountPatch } = require('../payment/stripeSessionValidation');
 
+/**
+ * Whether the active hold's TTL has elapsed.
+ * @param {object} reservation
+ * @param {Date} [now]
+ * @returns {boolean}
+ */
 function isHoldExpired(reservation, now = new Date()) {
   const holdExpiresAt = reservation.holdExpiresAt ? new Date(reservation.holdExpiresAt) : null;
   return (
@@ -18,6 +28,12 @@ function isHoldExpired(reservation, now = new Date()) {
   );
 }
 
+/**
+ * Complete domain finalization for a paid Stripe session (order + confirmed status).
+ *
+ * @param {object} params
+ * @returns {Promise<object>} Result with finalized: true and order
+ */
 async function completeReservationFinalization({
   reservation,
   stripeSessionId,
@@ -39,6 +55,7 @@ async function completeReservationFinalization({
     actor: { type: 'system' },
     patch: {
       stripeSessionId,
+      // Clear hold TTL once payment is received.
       holdExpiresAt: new Date(),
       ...(paymentIntentId ? { stripePaymentIntentId: paymentIntentId } : {}),
       ...paidAmountPatch(paidAmountCents, paidCurrency),
@@ -46,6 +63,7 @@ async function completeReservationFinalization({
     client,
   });
 
+  // Block the car's calendar for the rental window (availability sync).
   await addRange(resolvedCarId, paidReservation.pickupDate, paidReservation.returnDate, client);
 
   const order = await orderSql.createOrderFromReservation(

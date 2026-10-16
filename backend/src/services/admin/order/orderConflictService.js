@@ -1,3 +1,7 @@
+/**
+ * Conflict checks for admin order booking: calendar overlaps, active holds,
+ * and open physical rentals (picked_up / active_rental).
+ */
 const reservationRepository = require('../../../repositories/reservationRepository');
 const { fetchDateBlocksForCar } = require('../../sql/bookingSyncSqlService');
 const { extractStoredRange } = require('./orderMapper');
@@ -6,10 +10,12 @@ const { OrderFormError } = require('./orderErrors');
 const RESERVATION_CONFLICT_MESSAGE =
   'Selected car currently has an active online reservation in this period. Please choose different dates or wait until the hold expires.';
 
+/** @param {string|number} carId @param {Date} start @param {Date} end @param {object|null} [client] */
 async function findBookedOverlap(carId, start, end, client) {
   return reservationRepository.findBookedDateOverlap(carId, start, end, client);
 }
 
+/** Active (non-expired) online hold overlapping the requested range. */
 async function findActiveReservationHold(carId, start, end, client) {
   return reservationRepository.findOverlappingHold(
     {
@@ -22,6 +28,14 @@ async function findActiveReservationHold(carId, start, end, client) {
   );
 }
 
+/**
+ * Throw OVERLAP if another booking already owns these dates.
+ * @param {string|number} carId
+ * @param {Date} start
+ * @param {Date} end
+ * @param {object|null} client
+ * @param {string} [message]
+ */
 async function assertNoBookedOverlap(
   carId,
   start,
@@ -30,18 +44,30 @@ async function assertNoBookedOverlap(
   message = 'Selected car is already booked in the specified period. Please choose different dates or a different car.'
 ) {
   const overlap = await findBookedOverlap(carId, start, end, client);
+  // Concurrency / overlap guard (race-sensitive).
   if (overlap) {
     throw new OrderFormError('OVERLAP', message);
   }
 }
 
+/**
+ * Throw RESERVATION_CONFLICT if a checkout hold still covers this range.
+ * Prevents admin walk-in orders from stealing a customer's pending hold.
+ */
 async function assertNoActiveReservationHold(carId, start, end, client) {
   const conflict = await findActiveReservationHold(carId, start, end, client);
+  // Concurrency / overlap guard (race-sensitive).
   if (conflict) {
     throw new OrderFormError('RESERVATION_CONFLICT', RESERVATION_CONFLICT_MESSAGE);
   }
 }
 
+/**
+ * Block new bookings while the car is physically out (picked_up / active_rental).
+ * @param {string|number} carId
+ * @param {object|null} client
+ * @param {object} [options] May excludeReservationId when confirming that rental
+ */
 async function assertNoOpenPhysicalRental(carId, client, options = {}) {
   const open = await reservationRepository.findOpenPhysicalRental(carId, client, options);
   if (open) {
@@ -52,7 +78,12 @@ async function assertNoOpenPhysicalRental(carId, client, options = {}) {
   }
 }
 
+/**
+ * Locate the stored calendar block for an order's previous range (for removeRange).
+ * Falls back to prevStart/prevEnd if date blocks cannot be loaded.
+ */
 async function resolveStoredDateRange(carId, prevStart, prevEnd, client) {
+  // Protected block: isolate failure modes.
   try {
     const blocks = await fetchDateBlocksForCar(carId, client);
     return extractStoredRange(blocks, prevStart, prevEnd);
@@ -61,6 +92,12 @@ async function resolveStoredDateRange(carId, prevStart, prevEnd, client) {
   }
 }
 
+/**
+ * Non-throwing conflict probe for the availability UI (open rental or date blocks).
+ * @param {string|number} carId
+ * @param {Date} start
+ * @param {Date} end
+ */
 async function getAvailabilityConflicts(carId, start, end) {
   const openPhysical = await reservationRepository.findOpenPhysicalRental(carId);
   if (openPhysical) {
@@ -74,6 +111,7 @@ async function getAvailabilityConflicts(carId, start, end) {
   }
 
   const overlap = await findBookedOverlap(carId, start, end);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!overlap) {
     return [];
   }

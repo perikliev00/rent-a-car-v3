@@ -1,6 +1,10 @@
+/**
+ * Fallback 404 page for unknown admin SPA routes.
+ */
 import { Link } from 'react-router-dom';
 import { Button } from '../components/ui/Button';
 
+/** Simple 404 with a link back to the admin dashboard. */
 export function NotFoundPage() {
   return (
     <div className="mx-auto max-w-lg px-4 py-20 text-center">

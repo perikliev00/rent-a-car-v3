@@ -1,3 +1,8 @@
+/**
+ * Collects customer contact details and starts Stripe Checkout.
+ * Reloads order pricing via `createOrder` so the summary stays aligned with
+ * the current URL add-ons; on success, navigates away to the hosted Checkout URL.
+ */
 import { useMemo, useState } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -12,6 +17,12 @@ import { parseSearchFromUrl, searchParamsToQuery } from '../../utils/searchParam
 import { createOrder } from '../../api/orders';
 import { PageLoader } from '../../components/ui/Loading';
 
+/**
+ * Checkout form that creates a Stripe session and redirects to payment.
+ *
+ * @returns Checkout form + order summary, or missing/error fallbacks.
+ * @remarks Side effects: refreshes hold via {@link createOrder}; redirects to Stripe on success.
+ */
 export function CheckoutPage() {
   const { carId } = useParams<{ carId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -29,6 +40,7 @@ export function CheckoutPage() {
   });
   const [error, setError] = useState('');
 
+  // Reuse createOrder so the summary reflects the same hold/pricing as the order step.
   const { data: orderData, isLoading, isError, error: orderError } = useQuery({
     queryKey: ['order-preview', carId, search, extras, hotelDelivery],
     queryFn: () =>
@@ -57,10 +69,12 @@ export function CheckoutPage() {
         pickupTime: search!.pickupTime,
         returnTime: search!.returnTime,
         extras,
+        // Hotel name implies hotel delivery even if the toggle was left off.
         hotelDelivery: hotelDelivery || Boolean(form.hotelName),
         ...form,
       }),
     onSuccess: (data) => {
+      // Full navigation leaves the SPA for Stripe's hosted page.
       window.location.href = data.checkoutUrl;
     },
     onError: (err) => {
@@ -72,6 +86,7 @@ export function CheckoutPage() {
     },
   });
 
+  /** Persist add-on choices into the URL so pricing stays in sync on refresh. */
   const updateAddOns = (next: { extras: string[]; hotelDelivery: boolean }) => {
     if (!search) return;
     setSearchParams(

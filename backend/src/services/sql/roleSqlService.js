@@ -1,6 +1,15 @@
+/**
+ * SQL for RBAC roles (find by ids, list).
+ */
 const { clientQuery } = require('../../db/transaction');
 
+/**
+ * Map a DB/API row into the domain shape used by callers (mapRole).
+ * @param {object} row
+ * @returns {*}
+ */
 function mapRole(row) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) return null;
   return {
     id: String(row.id),
@@ -13,6 +22,11 @@ function mapRole(row) {
   };
 }
 
+/**
+ * List roles from SQL.
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function listRoles(client = null) {
   const result = await clientQuery(
     client,
@@ -36,8 +50,15 @@ async function listRoles(client = null) {
   return result.rows.map(mapRole);
 }
 
+/**
+ * Find role by id via SQL; returns null when missing.
+ * @param {string|number} roleId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findRoleById(roleId, client = null) {
   const id = Number(roleId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(id) || id <= 0) return null;
   const result = await clientQuery(
     client,
@@ -52,8 +73,15 @@ async function findRoleById(roleId, client = null) {
   return mapRole(result.rows[0]);
 }
 
+/**
+ * Find role by slug via SQL; returns null when missing.
+ * @param {string} slug
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findRoleBySlug(slug, client = null) {
   const normalized = String(slug || '').trim().toLowerCase();
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalized) return null;
   const result = await clientQuery(
     client,
@@ -68,6 +96,12 @@ async function findRoleBySlug(slug, client = null) {
   return mapRole(result.rows[0]);
 }
 
+/**
+ * Find roles by ids via SQL; returns null when missing.
+ * @param {Array<*>} roleIds
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findRolesByIds(roleIds, client = null) {
   const ids = (roleIds || [])
     .map((v) => Number(v))

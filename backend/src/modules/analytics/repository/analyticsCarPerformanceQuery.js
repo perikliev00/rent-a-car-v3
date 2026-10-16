@@ -1,3 +1,10 @@
+/**
+ * Per-car performance SQL: revenue, booked days, maintenance, repair/service costs.
+ *
+ * Combines order revenue (by order create day) with rental overlap days and
+ * maintenance blocks so utilization and profitability can be derived in the service.
+ */
+
 const { clientQuery } = require('../../../db/transaction');
 const {
   REVENUE_STATUSES,
@@ -5,9 +12,16 @@ const {
   overlapDaysSql,
 } = require('../analytics.domain');
 
+/**
+ * Performance metrics for one car; returns null if car missing/deleted.
+ * @param {{ carId: number, from: string, to: string }} args
+ * @param {import('pg').PoolClient|null} [client]
+ */
 async function getCarPerformance({ carId, from, to }, client = null) {
+  // Overlap params: $2=from, $3=to (carId is $1).
   const overlap = overlapDaysSql('r.pickup_date', 'r.return_date', 2, 3);
 
+  // Step 1: resolve car identity; null means missing/deleted.
   const carResult = await clientQuery(
     client,
     `
@@ -20,6 +34,7 @@ async function getCarPerformance({ carId, from, to }, client = null) {
   const car = carResult.rows[0];
   if (!car) return null;
 
+  // Step 2: order revenue for revenue-eligible reservations (by Sofia order day).
   const revenue = await clientQuery(
     client,
     `
@@ -38,6 +53,7 @@ async function getCarPerformance({ carId, from, to }, client = null) {
     [carId, from, to, REVENUE_STATUSES]
   );
 
+  // Step 3: booked overlap days (calendar utilization, not order rental_days).
   const util = await clientQuery(
     client,
     `
@@ -51,6 +67,7 @@ async function getCarPerformance({ carId, from, to }, client = null) {
     [carId, from, to, OCCUPANCY_STATUSES]
   );
 
+  // Step 4: maintenance block overlap days for this car.
   const maintenance = await clientQuery(
     client,
     `
@@ -72,6 +89,7 @@ async function getCarPerformance({ carId, from, to }, client = null) {
     [carId, from, to]
   );
 
+  // Step 5: damage repair costs created in the Sofia day range.
   const repair = await clientQuery(
     client,
     `
@@ -84,6 +102,7 @@ async function getCarPerformance({ carId, from, to }, client = null) {
     [carId, from, to]
   );
 
+  // Step 6: service record costs by service_date (date column, not timestamp).
   const service = await clientQuery(
     client,
     `
@@ -110,7 +129,13 @@ async function getCarPerformance({ carId, from, to }, client = null) {
   };
 }
 
+/**
+ * Fleet-wide performance rows for the period (same metrics as getCarPerformance).
+ * @param {{ from: string, to: string }} range
+ * @param {import('pg').PoolClient|null} [client]
+ */
 async function listCarPerformance({ from, to }, client = null) {
+  // Load active fleet ids, then reuse per-car query for consistent metrics.
   const cars = await clientQuery(
     client,
     `
@@ -125,6 +150,7 @@ async function listCarPerformance({ from, to }, client = null) {
     const perf = await getCarPerformance({ carId: row.id, from, to }, client);
     if (perf) rows.push(perf);
   }
+  // Highest revenue first for fleet performance tables.
   rows.sort((a, b) => b.revenue - a.revenue);
   return rows;
 }

@@ -1,3 +1,8 @@
+/**
+ * Optional extras, insurance packages, and hotel delivery for the booking flow.
+ * Insurance codes are mutually exclusive (radio); other extras are checkboxes.
+ * Catalog comes from `/api/pricing-info` so amounts stay server-sourced.
+ */
 import { useQuery } from '@tanstack/react-query';
 import { getPricingInfo } from '../../api/locations';
 import { formatPrice } from '../../utils/format';
@@ -11,10 +16,25 @@ type BookingAddOnsProps = {
   disabled?: boolean;
 };
 
+/**
+ * True for insurance package codes that must not be combined.
+ *
+ * @param code - Extra code from the pricing catalog.
+ * @returns Whether the code belongs to the insurance radio group.
+ */
 function isInsuranceCode(code: string) {
   return code.startsWith('insurance_');
 }
 
+/**
+ * Add-ons panel that writes extras/hotelDelivery back into the URL-driven booking state.
+ *
+ * @param props.extras - Currently selected extra codes.
+ * @param props.hotelDelivery - Whether hotel delivery is selected.
+ * @param props.onChange - Called with the next extras/hotelDelivery pair.
+ * @param props.disabled - When true, all controls are non-interactive.
+ * @returns Add-ons card, a loading placeholder, or `null` when nothing is available.
+ */
 export function BookingAddOns({ extras, hotelDelivery, onChange, disabled }: BookingAddOnsProps) {
   const { data: pricingInfo, isLoading } = useQuery({
     queryKey: ['pricing-info'],
@@ -23,12 +43,20 @@ export function BookingAddOns({ extras, hotelDelivery, onChange, disabled }: Boo
   });
 
   const availableExtras = pricingInfo?.extras || [];
+  // Hotel delivery is modeled as a global fee rather than an extra code.
   const hotelFee = pricingInfo?.globalFees?.find((f) => f.feeKey === 'hotel_delivery');
   const deposit = pricingInfo?.deposit ?? 0;
 
+  /**
+   * Toggle an extra on/off; insurance codes displace other insurance selections.
+   *
+   * @param code - Extra code being toggled.
+   * @param checked - Desired checked state from the input.
+   */
   const toggleExtra = (code: string, checked: boolean) => {
     let next = checked ? [...extras, code] : extras.filter((c) => c !== code);
 
+    // Radio semantics: selecting one insurance package clears the others.
     if (checked && isInsuranceCode(code)) {
       next = next.filter((c) => !isInsuranceCode(c) || c === code);
     }
@@ -49,6 +77,7 @@ export function BookingAddOns({ extras, hotelDelivery, onChange, disabled }: Boo
     );
   }
 
+  // Nothing to show — avoid an empty card shell.
   if (!availableExtras.length && !hotelFee && !(deposit > 0)) {
     return null;
   }

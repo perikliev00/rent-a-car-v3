@@ -1,3 +1,7 @@
+/**
+ * Single reservation detail for the signed-in customer: travel details, PDFs,
+ * and cancellation request UI.
+ */
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
@@ -16,6 +20,7 @@ import { Textarea } from '../../components/ui/Textarea';
 import { toast } from '../../components/ui/toastStore';
 import { ApiError } from '../../api/client';
 
+/** Human labels for downloadable reservation PDF kinds. */
 const PDF_LABELS: Record<PdfKind, string> = {
   rental_agreement: 'Rental agreement',
   invoice: 'Invoice',
@@ -25,6 +30,13 @@ const PDF_LABELS: Record<PdfKind, string> = {
   return_checklist: 'Return checklist',
 };
 
+/**
+ * Format a reservation date (and optional time) for detail rows.
+ *
+ * @param value - ISO date string or nullish.
+ * @param time - Optional HH:MM time to append.
+ * @returns Locale date string, optionally with time; `—` when missing.
+ */
 function formatWhen(value?: string | null, time?: string | null) {
   if (!value) return '—';
   try {
@@ -35,6 +47,12 @@ function formatWhen(value?: string | null, time?: string | null) {
   }
 }
 
+/**
+ * Account reservation detail page with travel edits, PDFs, and cancel request.
+ *
+ * @returns Detail UI for `/account/reservations/:id`, or a loader/error state.
+ * @remarks Side effects: patches travel details, requests cancellation, downloads PDFs.
+ */
 export function AccountReservationDetailPage() {
   const { id = '' } = useParams();
   const queryClient = useQueryClient();
@@ -51,6 +69,7 @@ export function AccountReservationDetailPage() {
   const [specialRequests, setSpecialRequests] = useState('');
   const [cancelReason, setCancelReason] = useState('');
 
+  // Seed editable travel fields whenever the reservation payload arrives/changes.
   useEffect(() => {
     if (!reservation) return;
     setFlightNumber(reservation.flightNumber || '');

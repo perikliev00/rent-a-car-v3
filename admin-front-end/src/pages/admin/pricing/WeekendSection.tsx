@@ -1,3 +1,6 @@
+/**
+ * Weekend/weekday surcharge rule editor.
+ */
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   updateWeekend,
@@ -7,6 +10,12 @@ import { Input } from '../../../components/ui/Input';
 import { toast } from '../../../components/ui/toastStore';
 import { PricingSection } from './PricingSection';
 
+/**
+ * Editor for the weekend/weekday surcharge rule.
+ * Field blur/change persists via {@link updateWeekend}.
+ *
+ * @param rule - Current weekend rule from the pricing bundle
+ */
 export function WeekendSection({ rule }: { rule: PricingWeekendRule | undefined }) {
   const queryClient = useQueryClient();
 

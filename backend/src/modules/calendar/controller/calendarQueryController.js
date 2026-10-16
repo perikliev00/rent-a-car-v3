@@ -1,9 +1,14 @@
+/**
+ * HTTP handlers for calendar read endpoints (events, day, car, availability, conflicts, details).
+ */
+
 const calendarService = require('../calendar.service');
 const apiResponse = require('../../../utils/apiResponse');
 const asyncHandler = require('../../../utils/asyncHandler');
 const { forwardControllerError } = require('../../../utils/controllerError');
 const { mapServiceError, requireCalendarView } = require('./calendarControllerHelpers');
 
+/** GET /events — timeline/month payload for a from/to range. */
 const getEvents = asyncHandler(async (req, res, next) => {
   try {
     const access = requireCalendarView(req, res);
@@ -35,6 +40,7 @@ const getEvents = asyncHandler(async (req, res, next) => {
   }
 });
 
+/** GET /day/:date — day-ops board for a Sofia calendar date. */
 const getDay = asyncHandler(async (req, res, next) => {
   try {
     const access = requireCalendarView(req, res);
@@ -51,6 +57,7 @@ const getDay = asyncHandler(async (req, res, next) => {
   }
 });
 
+/** GET /cars/:carId — single-car timeline for from/to. */
 const getCar = asyncHandler(async (req, res, next) => {
   try {
     const access = requireCalendarView(req, res);
@@ -72,6 +79,7 @@ const getCar = asyncHandler(async (req, res, next) => {
   }
 });
 
+/** GET /availability — conflict preview for one car/range. */
 const getAvailability = asyncHandler(async (req, res, next) => {
   try {
     const access = requireCalendarView(req, res);
@@ -93,6 +101,7 @@ const getAvailability = asyncHandler(async (req, res, next) => {
   }
 });
 
+/** GET /conflicts — fleet-wide conflict scan for a range. */
 const getConflicts = asyncHandler(async (req, res, next) => {
   try {
     const access = requireCalendarView(req, res);
@@ -109,6 +118,7 @@ const getConflicts = asyncHandler(async (req, res, next) => {
   }
 });
 
+/** GET /events/:id — detail drawer payload for a composite event id. */
 const getEventDetails = asyncHandler(async (req, res, next) => {
   try {
     const access = requireCalendarView(req, res);

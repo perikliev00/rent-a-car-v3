@@ -1,3 +1,10 @@
+/**
+ * Calendar application service facade.
+ *
+ * Delegates to query, manual-block, task, move, and event-details services
+ * so controllers depend on one module.
+ */
+
 const {
   getEvents,
   getDay,

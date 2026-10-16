@@ -1,6 +1,6 @@
 /**
- * Booking confirmation emails — delegates to notifications module
- * (persist + send with idempotency).
+ * Booking confirmation emails — thin facade over the notifications module
+ * (persist + send with idempotency so duplicate finalizations do not spam guests).
  */
 const {
   sendBookingConfirmationEmails,

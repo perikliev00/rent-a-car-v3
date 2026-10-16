@@ -3,6 +3,14 @@
  * Formula: PG_POOL_MAX × (API replicas + worker) < managed max_connections − ~10 reserve.
  */
 
+/**
+ * Parse a non-negative integer from env, or return `fallback` when missing/invalid.
+ *
+ * @param {unknown} value
+ * @param {number} fallback
+ * @returns {number}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function parsePositiveInt(value, fallback) {
   if (value === undefined || value === null || String(value).trim() === '') {
     return fallback;
@@ -14,6 +22,13 @@ function parsePositiveInt(value, fallback) {
   return parsed;
 }
 
+/**
+ * Resolve pg Pool options and session timeout ms from environment.
+ *
+ * @param {NodeJS.ProcessEnv} [env=process.env]
+ * @returns {object}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function resolvePoolOptions(env = process.env) {
   const isTest = env.NODE_ENV === 'test';
   const isProd = env.NODE_ENV === 'production';
@@ -44,6 +59,14 @@ function resolvePoolOptions(env = process.env) {
   };
 }
 
+/**
+ * Apply statement / idle-in-transaction / lock timeouts on a freshly checked-out client.
+ *
+ * @param {import('pg').PoolClient} client
+ * @param {{ statementTimeoutMs: number, idleInTransactionTimeoutMs: number, lockTimeoutMs: number }} timeouts
+ * @returns {Promise<unknown>}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function applySessionTimeouts(client, timeouts) {
   const statements = [];
   if (timeouts.statementTimeoutMs > 0) {

@@ -1,9 +1,14 @@
+/**
+ * HTTP handlers for manual calendar block create / update / delete.
+ */
+
 const calendarService = require('../calendar.service');
 const apiResponse = require('../../../utils/apiResponse');
 const asyncHandler = require('../../../utils/asyncHandler');
 const { forwardControllerError } = require('../../../utils/controllerError');
 const { mapServiceError, requireCalendarView } = require('./calendarControllerHelpers');
 
+/** POST /manual-events */
 const createManualEvent = asyncHandler(async (req, res, next) => {
   try {
     const access = requireCalendarView(req, res);
@@ -20,6 +25,7 @@ const createManualEvent = asyncHandler(async (req, res, next) => {
   }
 });
 
+/** PATCH /manual-events/:id */
 const updateManualEvent = asyncHandler(async (req, res, next) => {
   try {
     const access = requireCalendarView(req, res);
@@ -36,6 +42,7 @@ const updateManualEvent = asyncHandler(async (req, res, next) => {
   }
 });
 
+/** DELETE /manual-events/:id */
 const deleteManualEvent = asyncHandler(async (req, res, next) => {
   try {
     const access = requireCalendarView(req, res);

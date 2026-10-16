@@ -1,8 +1,12 @@
+/**
+ * Shared table for ops widget reservation rows.
+ */
 import type { OpsReservationRow } from '../../../api/admin/reservations';
 import { RefundLedgerBadge } from '../refund/RefundLedgerBadge';
 import { formatWhen, statusChipClass } from './opsFormat';
 import { StatusActions } from './StatusActions';
 
+/** Shared table for ops widget reservation rows. */
 export function OpsTable({
   rows,
   onChanged,

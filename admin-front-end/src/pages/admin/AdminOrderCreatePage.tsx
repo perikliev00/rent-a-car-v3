@@ -1,3 +1,6 @@
+/**
+ * Manual admin order creation with availability/pricing checks.
+ */
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -10,6 +13,7 @@ import { Card, CardBody } from '../../components/ui/Card';
 import { PageLoader } from '../../components/ui/Loading';
 import { toast } from '../../components/ui/toastStore';
 
+/** Manual admin order creation with availability/pricing checks. */
 export function AdminOrderCreatePage() {
   const navigate = useNavigate();
   const { data, isLoading } = useQuery({ queryKey: ['admin', 'orders', 'new'], queryFn: getNewOrderForm });

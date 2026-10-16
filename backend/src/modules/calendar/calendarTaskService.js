@@ -1,3 +1,10 @@
+/**
+ * Calendar ops-task application service.
+ *
+ * Encodes create/update/delete/status rules, assignee scoping for VIEW_OWN,
+ * and realtime/audit side effects. Status transitions use calendar.taskDomain.
+ */
+
 const repo = require('./calendar.repository');
 const mapper = require('./calendar.eventMapper');
 const { CALENDAR_PERMISSIONS, isOwnTasksOnly } = require('./calendar.permissions');
@@ -8,17 +15,26 @@ const userRoleSql = require('../../services/sql/userRoleSqlService');
 const { createHttpError, emitCalendarUpdated } = require('./calendar.shared');
 const { canMutateTask } = require('./calendarAccessPolicy');
 
+/** Coerce common truthy query string forms to boolean. */
 function parseBoolQuery(value) {
   return value === true || value === 'true' || value === '1';
 }
 
+/**
+ * Create a calendar task; assignment requires ASSIGN_STAFF.
+ * @param {object} access
+ * @param {object} body
+ * @param {object} req
+ */
 async function createTask(access, body, req) {
+  // Gate: CREATE_TASKS required for any create.
   if (!rbacService.userHasPermission(access, CALENDAR_PERMISSIONS.CREATE_TASKS)) {
     throw createHttpError('FORBIDDEN', 'Not allowed.', 403);
   }
   if (!taskDomain.isValidTaskType(body.taskType)) {
     throw createHttpError('VALIDATION_ERROR', 'Invalid task type.', 422);
   }
+  // Assigning on create needs ASSIGN_STAFF in addition to CREATE_TASKS.
   if (
     body.assignedToUserId &&
     !rbacService.userHasPermission(access, CALENDAR_PERMISSIONS.ASSIGN_STAFF)
@@ -42,6 +58,7 @@ async function createTask(access, body, req) {
     createdByUserId: access.userId,
   });
 
+  // Audit + live calendar fan-out after successful insert.
   await logAdminAction(req, {
     action: 'calendar.task.create',
     entityType: 'calendar_task',
@@ -70,16 +87,26 @@ async function createTask(access, body, req) {
   });
 }
 
+/**
+ * Transition task status. Assignees and CREATE_TASKS managers may update;
+ * manager reopen coerces pending/assigned based on whether an assignee exists.
+ * @param {object} access
+ * @param {string|number} taskId
+ * @param {string} status
+ * @param {object} req
+ */
 async function updateTaskStatus(access, taskId, status, req) {
   const row = await repo.findTaskById(taskId);
   if (!row) throw createHttpError('NOT_FOUND', 'Task not found.', 404);
 
+  // Assignees may advance their own tasks; managers with CREATE_TASKS may act on any.
   const isAssignee = String(row.assigned_to_user_id) === String(access.userId);
   const canManage = rbacService.userHasPermission(access, CALENDAR_PERMISSIONS.CREATE_TASKS);
   if (!isAssignee && !canManage) {
     throw createHttpError('FORBIDDEN', 'Not allowed.', 403);
   }
 
+  // Domain machine: workers use TRANSITIONS; managers may reopen failed/cancelled.
   try {
     taskDomain.assertTransition(row.status, status, { isManager: canManage });
   } catch (err) {
@@ -89,7 +116,7 @@ async function updateTaskStatus(access, taskId, status, req) {
     throw err;
   }
 
-  // Reopen to assigned only when assignee still present
+  // Reopen coercion: assigned without assignee → pending; pending with assignee → assigned.
   let nextStatus = status;
   if (
     canManage &&
@@ -123,23 +150,31 @@ async function updateTaskStatus(access, taskId, status, req) {
   return task;
 }
 
+/**
+ * Patch task fields; assignee changes require ASSIGN_STAFF and may adjust status.
+ * @param {object} access
+ * @param {string|number} taskId
+ * @param {object} body
+ * @param {object} req
+ */
 async function updateTask(access, taskId, body, req) {
   const existing = await repo.findTaskById(taskId);
   if (!existing) throw createHttpError('NOT_FOUND', 'Task not found.', 404);
   if (!canMutateTask(access, existing)) {
     throw createHttpError('FORBIDDEN', 'Not allowed.', 403);
   }
+  // Changing assignee (including clear) always requires ASSIGN_STAFF.
   if (
     body.assignedToUserId !== undefined &&
     !rbacService.userHasPermission(access, CALENDAR_PERMISSIONS.ASSIGN_STAFF)
   ) {
-    // Allow clearing assignee only with assign permission as well
     throw createHttpError('FORBIDDEN', 'Cannot assign staff.', 403);
   }
   if (body.taskType != null && !taskDomain.isValidTaskType(body.taskType)) {
     throw createHttpError('VALIDATION_ERROR', 'Invalid task type.', 422);
   }
 
+  // Derive pending/assigned from assignee presence when assignee field is patched.
   let nextStatus;
   if (body.assignedToUserId !== undefined) {
     nextStatus = taskDomain.statusAfterAssigneeChange(existing.status, body.assignedToUserId);
@@ -175,6 +210,12 @@ async function updateTask(access, taskId, body, req) {
   return task;
 }
 
+/**
+ * Soft-delete gate: CREATE_TASKS or assignee via canMutateTask.
+ * @param {object} access
+ * @param {string|number} taskId
+ * @param {object} req
+ */
 async function deleteTask(access, taskId, req) {
   const existing = await repo.findTaskById(taskId);
   if (!existing) throw createHttpError('NOT_FOUND', 'Task not found.', 404);
@@ -200,6 +241,11 @@ async function deleteTask(access, taskId, req) {
   return { id: String(taskId), deleted: true };
 }
 
+/**
+ * List tasks with filters; VIEW_OWN forces assignee = current user.
+ * @param {object} access
+ * @param {object} [query]
+ */
 async function listTasks(access, query = {}) {
   const ownOnly = isOwnTasksOnly(access);
   const filters = {
@@ -214,6 +260,7 @@ async function listTasks(access, query = {}) {
     assignedToUserId: null,
   };
 
+  // Assignee scoping: VIEW_OWN locks to self; otherwise honor unassigned / me / id.
   if (ownOnly) {
     filters.assignedToUserId = access.userId;
   } else if (parseBoolQuery(query.unassigned)) {
@@ -236,6 +283,10 @@ async function listTasks(access, query = {}) {
   return { tasks };
 }
 
+/**
+ * Staff users with driver/cleaner/receptionist roles for assignment pickers.
+ * @param {object} access
+ */
 async function listAssignableStaff(access) {
   if (!rbacService.userHasPermission(access, CALENDAR_PERMISSIONS.ASSIGN_STAFF)) {
     throw createHttpError('FORBIDDEN', 'Not allowed.', 403);

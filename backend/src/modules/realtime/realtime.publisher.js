@@ -1,3 +1,9 @@
+/**
+ * Safe publish API for domain callers (booking, payments, calendar, status).
+ *
+ * All helpers swallow errors so realtime never breaks transactional flows.
+ */
+
 const logger = require('../../utils/logger');
 const hub = require('./realtime.hub');
 const {
@@ -11,6 +17,7 @@ const {
 
 /**
  * Fire-and-forget publish — never throws into domain callers.
+ * Accepts a type string + partial, or a pre-built event object.
  */
 function publishLiveEvent(typeOrEvent, partial) {
   try {
@@ -37,6 +44,7 @@ function publishLiveEvent(typeOrEvent, partial) {
   }
 }
 
+/** Expand a reservation status-change into one or more live events and publish. */
 function publishFromStatusChange(statusEvent) {
   try {
     const events = mapStatusChangeToEvents(statusEvent);
@@ -53,6 +61,7 @@ function publishFromStatusChange(statusEvent) {
   }
 }
 
+/** Publish new_booking after confirmation emails enqueue. */
 function publishNewBooking(ctx) {
   try {
     return hub.publish(buildNewBookingEvent(ctx));
@@ -62,6 +71,7 @@ function publishNewBooking(ctx) {
   }
 }
 
+/** Publish payment_failed for Stripe / checkout failures. */
 function publishPaymentFailed(ctx) {
   try {
     return hub.publish(buildPaymentFailedEvent(ctx));
@@ -71,6 +81,7 @@ function publishPaymentFailed(ctx) {
   }
 }
 
+/** Publish calendar_updated so open calendars can refetch. */
 function publishCalendarUpdated(ctx) {
   try {
     return hub.publish(buildCalendarUpdatedEvent(ctx || {}));

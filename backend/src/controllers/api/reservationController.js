@@ -1,3 +1,6 @@
+/**
+ * Customer active-reservation release and release-and-rehold handlers.
+ */
 const { validationResult } = require('express-validator');
 const carRepository = require('../../repositories/carRepository');
 const { computeBookingPriceAsync } = require('../../utils/pricing');
@@ -13,6 +16,14 @@ const { forwardControllerError } = require('../../utils/controllerError');
 const logger = require('../../utils/logger');
 const metrics = require('../../monitoring/metrics');
 
+/**
+ * Release the active session reservation hold.
+ * Side effects: cancels/releases the unpaid hold tied to this session when present.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.releaseActiveReservation = asyncHandler(async (req, res, next) => {
   try {
     const { cancelled } = await releaseActiveReservationForSession(req);
@@ -34,6 +45,14 @@ exports.releaseActiveReservation = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Release the current hold and create a new hold for different dates/car.
+ * Side effects: transactional release+rehold; customer audit log; conflict metrics.
+ * @param {import('express').Request} req - Body: carId, dates, times, locations, extras?, hotelDelivery?
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.releaseAndReholdReservation = asyncHandler(async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -118,6 +137,7 @@ exports.releaseAndReholdReservation = asyncHandler(async (req, res, next) => {
       if (rehold.reason === 'not_found') {
         return apiResponse.error(res, 'NOT_FOUND', 'No active reservation.', 404);
       }
+      // Payment in flight — do not move the hold out from under Stripe.
       if (rehold.reason === 'rehold_not_allowed') {
         return apiResponse.error(
           res,

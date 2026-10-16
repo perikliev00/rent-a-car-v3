@@ -1,3 +1,6 @@
+/**
+ * Admin order lifecycle handlers (list, create, edit, soft-delete, restore, availability).
+ */
 const { validationResult } = require('express-validator');
 const orderAdminService = require('../../../services/admin/order');
 const { logAdminAction } = require('../../../services/admin/adminAuditService');
@@ -6,6 +9,13 @@ const apiResponse = require('../../../utils/apiResponse');
 const asyncHandler = require('../../../utils/asyncHandler');
 const { forwardControllerError } = require('../../../utils/controllerError');
 
+/**
+ * Respond with 422 VALIDATION_ERROR for validation failures.
+ * Side effects: writes a 422 JSON API error.
+ * @param {import('express').Response} res
+ * @param {import('express-validator').Result} errors
+ * @returns {import('express').Response}
+ */
 function validationErrorResponse(res, errors) {
   return apiResponse.error(
     res,
@@ -15,6 +25,14 @@ function validationErrorResponse(res, errors) {
   );
 }
 
+/**
+ * List admin orders with filters.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.listOrders = asyncHandler(async (req, res, next) => {
   try {
     const data = await orderAdminService.getOrdersList(req.query);
@@ -27,6 +45,14 @@ exports.listOrders = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * List expired unpaid/held orders.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.listExpiredOrders = asyncHandler(async (req, res, next) => {
   try {
     const data = await orderAdminService.getExpiredOrders();
@@ -39,6 +65,14 @@ exports.listExpiredOrders = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * List soft-deleted orders.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.listDeletedOrders = asyncHandler(async (req, res, next) => {
   try {
     const data = await orderAdminService.getDeletedOrders();
@@ -56,8 +90,18 @@ exports.listDeletedOrders = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Permanently purge soft-deleted orders (when confirmed).
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.emptyDeletedOrders = asyncHandler(async (req, res, next) => {
+  // Collect express-validator results for this request.
   const errors = validationResult(req);
+  // Validation failed — respond before running domain logic.
   if (!errors.isEmpty()) {
     return validationErrorResponse(res, errors);
   }
@@ -65,6 +109,7 @@ exports.emptyDeletedOrders = asyncHandler(async (req, res, next) => {
   try {
     const { deletedCount } = await orderAdminService.emptyDeletedOrders();
 
+    // Record an admin audit entry for this mutation.
     await logAdminAction(req, {
       action: 'admin.emptied_deleted_orders',
       entityType: 'order',
@@ -89,6 +134,14 @@ exports.emptyDeletedOrders = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Return form metadata for creating an admin order.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.getCreateOrderForm = asyncHandler(async (req, res, next) => {
   try {
     const data = await orderAdminService.getCreateOrderForm();
@@ -101,6 +154,14 @@ exports.getCreateOrderForm = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Return availability windows for a car.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.getCarAvailability = asyncHandler(async (req, res, next) => {
   try {
     const result = await orderAdminService.getCarAvailability(req.params.id, req.query);
@@ -126,8 +187,18 @@ exports.getCarAvailability = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Create an order from the admin panel.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.createOrder = asyncHandler(async (req, res, next) => {
+  // Collect express-validator results for this request.
   const errors = validationResult(req);
+  // Validation failed — respond before running domain logic.
   if (!errors.isEmpty()) {
     return validationErrorResponse(res, errors);
   }
@@ -136,6 +207,7 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
     const result = await orderAdminService.createOrder(req.body);
 
     if (result.success) {
+      // Record an admin audit entry for this mutation.
       await logAdminAction(req, {
         action: 'admin.created_reservation',
         entityType: 'order',
@@ -162,8 +234,18 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Return an admin order by id.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.getOrderById = asyncHandler(async (req, res, next) => {
+  // Collect express-validator results for this request.
   const errors = validationResult(req);
+  // Validation failed — respond before running domain logic.
   if (!errors.isEmpty()) {
     return validationErrorResponse(res, errors);
   }
@@ -182,8 +264,18 @@ exports.getOrderById = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Return form metadata for editing an admin order.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.getOrderEditForm = asyncHandler(async (req, res, next) => {
+  // Collect express-validator results for this request.
   const errors = validationResult(req);
+  // Validation failed — respond before running domain logic.
   if (!errors.isEmpty()) {
     return validationErrorResponse(res, errors);
   }
@@ -202,8 +294,18 @@ exports.getOrderEditForm = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Update an admin order.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.updateOrder = asyncHandler(async (req, res, next) => {
+  // Collect express-validator results for this request.
   const errors = validationResult(req);
+  // Validation failed — respond before running domain logic.
   if (!errors.isEmpty()) {
     return validationErrorResponse(res, errors);
   }
@@ -213,6 +315,7 @@ exports.updateOrder = asyncHandler(async (req, res, next) => {
 
     if (result.success) {
       const audit = result.audit || {};
+      // Record an admin audit entry for this mutation.
       await logAdminAction(req, {
         action: audit.moved ? 'admin.moved_reservation' : 'admin.updated_reservation',
         entityType: 'order',
@@ -247,14 +350,25 @@ exports.updateOrder = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Soft-delete (cancel) an admin order.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.deleteOrder = asyncHandler(async (req, res, next) => {
+  // Collect express-validator results for this request.
   const errors = validationResult(req);
+  // Validation failed — respond before running domain logic.
   if (!errors.isEmpty()) {
     return validationErrorResponse(res, errors);
   }
 
   try {
     await orderAdminService.deleteOrder(req.params.id);
+    // Record an admin audit entry for this mutation.
     await logAdminAction(req, {
       action: 'admin.cancelled_reservation',
       entityType: 'order',
@@ -269,14 +383,25 @@ exports.deleteOrder = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Restore a soft-deleted admin order.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.restoreOrder = asyncHandler(async (req, res, next) => {
+  // Collect express-validator results for this request.
   const errors = validationResult(req);
+  // Validation failed — respond before running domain logic.
   if (!errors.isEmpty()) {
     return validationErrorResponse(res, errors);
   }
 
   try {
     await orderAdminService.restoreOrder(req.params.id);
+    // Record an admin audit entry for this mutation.
     await logAdminAction(req, {
       action: 'admin.restored_reservation',
       entityType: 'order',

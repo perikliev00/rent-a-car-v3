@@ -1,3 +1,7 @@
+/**
+ * Marketing landing page: hero search form, fleet preview, and content sections.
+ * Submitting search navigates to `/search` with trip criteria in the query string.
+ */
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -23,6 +27,12 @@ import {
 import { defaultSearchParams, searchParamsToQuery } from '../../utils/searchParams';
 import type { SearchParams } from '../../types/api';
 
+/**
+ * Public home page with search entry and featured fleet.
+ *
+ * @returns Marketing landing: hero search, partner strip, content sections, and paginated fleet.
+ * @remarks Side effect: `handleSearch` navigates to `/search` with trip + filter query params.
+ */
 export function HomePage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState<SearchParams>(defaultSearchParams());
@@ -39,11 +49,13 @@ export function HomePage() {
     queryFn: () => getCars({ ...filters, page }),
   });
 
+  /** Apply fleet filters and reset pagination to page 1. */
   const handleFiltersChange = (next: FleetFilterValue) => {
     setFilters(next);
     setPage(1);
   };
 
+  /** Navigate to search results with the current trip criteria and filters. */
   const handleSearch = () => {
     const params = new URLSearchParams(searchParamsToQuery(search));
     applyFleetFiltersToParams(params, filters);

@@ -1,3 +1,6 @@
+/**
+ * Draggable/resizable event bar rendering for the timeline.
+ */
 import { format, parseISO } from 'date-fns';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import type { CalendarEvent } from '../calendar.types';
@@ -5,6 +8,7 @@ import { eventBarClass } from '../eventStyles';
 import { reservationIdFromEvent } from '../reservationDeepLink';
 import { LANE_GAP, LANE_H, leftPct, widthPct } from './timelineLayout';
 
+/** Draggable/resizable event bar rendering for the timeline. */
 export function TimelineEventBar({
   ev,
   lane,

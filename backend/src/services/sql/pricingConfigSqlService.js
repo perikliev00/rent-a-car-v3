@@ -1,11 +1,26 @@
+/**
+ * SQL load/upsert for seasons, fees, extras, deposits, and discount rules.
+ * Delivery fees fall back to static DELIVERY_FEES when the table is empty.
+ */
 const pool = require('../../db/pool');
 const { DELIVERY_FEES } = require('../../constants/locations');
 
+/**
+ * Coerce a DB/numeric value to a finite number.
+ * @param {*} value
+ * @param {number} [fallback=0]
+ * @returns {number}
+ */
 function num(value, fallback = 0) {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
 }
 
+/**
+ * Map a pricing_seasons row to the admin/API shape.
+ * @param {object} row
+ * @returns {object}
+ */
 function mapSeason(row) {
   return {
     id: Number(row.id),
@@ -20,6 +35,11 @@ function mapSeason(row) {
   };
 }
 
+/**
+ * Map a pricing_weekend_rules row; default weekdays Fri–Sun when unset.
+ * @param {object} row
+ * @returns {object}
+ */
 function mapWeekend(row) {
   return {
     id: Number(row.id),
@@ -31,6 +51,11 @@ function mapWeekend(row) {
   };
 }
 
+/**
+ * Map a pricing_discount_rules row (duration / early-bird thresholds).
+ * @param {object} row
+ * @returns {object}
+ */
 function mapDiscount(row) {
   return {
     id: Number(row.id),
@@ -43,6 +68,11 @@ function mapDiscount(row) {
   };
 }
 
+/**
+ * Map a pricing_deposit_rules row.
+ * @param {object} row
+ * @returns {object}
+ */
 function mapDeposit(row) {
   return {
     id: Number(row.id),
@@ -52,6 +82,11 @@ function mapDeposit(row) {
   };
 }
 
+/**
+ * Map a pricing_extras row (add-ons selectable at checkout).
+ * @param {object} row
+ * @returns {object}
+ */
 function mapExtra(row) {
   return {
     id: Number(row.id),
@@ -64,6 +99,11 @@ function mapExtra(row) {
   };
 }
 
+/**
+ * Map a pricing_global_fees row (hotel delivery, late return, etc.).
+ * @param {object} row
+ * @returns {object}
+ */
 function mapGlobalFee(row) {
   return {
     feeKey: row.fee_key,
@@ -74,6 +114,10 @@ function mapGlobalFee(row) {
   };
 }
 
+/**
+ * Static delivery-fee list used when DB has no pricing_delivery_fees rows.
+ * @returns {Array<{ locationId: string, fee: number }>}
+ */
 function fallbackDeliveryFees() {
   return Object.entries(DELIVERY_FEES).map(([locationId, fee]) => ({
     locationId,
@@ -81,7 +125,13 @@ function fallbackDeliveryFees() {
   }));
 }
 
+/**
+ * Load the full pricing config from all pricing_* tables in parallel.
+ * Empty delivery-fee table → static DELIVERY_FEES fallback.
+ * @returns {Promise<object>} Aggregated seasons, rules, fees, extras, and maps
+ */
 async function loadPricingConfig() {
+  // Parallel read of every pricing table; order is stable for admin UI.
   const [seasons, weekends, discounts, deposits, deliveryFees, globalFees, extras] =
     await Promise.all([
       pool.query(`SELECT * FROM pricing_seasons ORDER BY id ASC`),
@@ -93,6 +143,7 @@ async function loadPricingConfig() {
       pool.query(`SELECT * FROM pricing_extras ORDER BY sort_order ASC, id ASC`),
     ]);
 
+  // Prefer DB delivery fees; fall back so checkout still prices locations.
   const delivery =
     deliveryFees.rows.length > 0
       ? deliveryFees.rows.map((r) => ({
@@ -115,6 +166,10 @@ async function loadPricingConfig() {
   };
 }
 
+/**
+ * In-memory defaults when DB is unavailable (health/bootstrap paths).
+ * @returns {object}
+ */
 function buildDefaultConfig() {
   return {
     seasons: [],
@@ -132,7 +187,14 @@ function buildDefaultConfig() {
   };
 }
 
+/**
+ * Insert or update a single location delivery fee.
+ * @param {string} locationId
+ * @param {number} fee
+ * @returns {Promise<{ locationId: string, fee: number }>}
+ */
 async function upsertDeliveryFee(locationId, fee) {
+  // ON CONFLICT keeps location_id unique and refreshes updated_at.
   const result = await pool.query(
     `
     INSERT INTO pricing_delivery_fees (location_id, fee, updated_at)
@@ -146,6 +208,11 @@ async function upsertDeliveryFee(locationId, fee) {
   return { locationId: result.rows[0].location_id, fee: num(result.rows[0].fee) };
 }
 
+/**
+ * Upsert many delivery fees sequentially (admin bulk save).
+ * @param {Array<{ locationId: string, fee: number }>} fees
+ * @returns {Promise<Array<{ locationId: string, fee: number }>>}
+ */
 async function upsertDeliveryFees(fees) {
   const out = [];
   for (const item of fees) {
@@ -154,6 +221,12 @@ async function upsertDeliveryFees(fees) {
   return out;
 }
 
+/**
+ * Insert or update a global fee by fee_key.
+ * @param {string} feeKey
+ * @param {{ label: string, amount: number, mode?: string, active?: boolean }} fields
+ * @returns {Promise<object>}
+ */
 async function upsertGlobalFee(feeKey, { label, amount, mode, active }) {
   const result = await pool.query(
     `
@@ -172,6 +245,11 @@ async function upsertGlobalFee(feeKey, { label, amount, mode, active }) {
   return mapGlobalFee(result.rows[0]);
 }
 
+/**
+ * Create a seasonal price adjustment window.
+ * @param {object} data
+ * @returns {Promise<object>}
+ */
 async function createSeason(data) {
   const result = await pool.query(
     `
@@ -194,6 +272,12 @@ async function createSeason(data) {
   return mapSeason(result.rows[0]);
 }
 
+/**
+ * Update a season by id; returns null if missing.
+ * @param {number|string} id
+ * @param {object} data
+ * @returns {Promise<object|null>}
+ */
 async function updateSeason(id, data) {
   const result = await pool.query(
     `
@@ -225,12 +309,24 @@ async function updateSeason(id, data) {
   return result.rows[0] ? mapSeason(result.rows[0]) : null;
 }
 
+/**
+ * Delete a season by id.
+ * @param {number|string} id
+ * @returns {Promise<boolean>} true when a row was deleted
+ */
 async function deleteSeason(id) {
   const result = await pool.query(`DELETE FROM pricing_seasons WHERE id = $1 RETURNING id`, [id]);
   return result.rowCount > 0;
 }
 
+/**
+ * Update weekend rule when id is set; otherwise insert a new rule.
+ * @param {number|string|null|undefined} id
+ * @param {object} data
+ * @returns {Promise<object|null>}
+ */
 async function upsertWeekendRule(id, data) {
+  // Update path when admin edits an existing weekend rule.
   if (id) {
     const result = await pool.query(
       `
@@ -251,6 +347,7 @@ async function upsertWeekendRule(id, data) {
     return result.rows[0] ? mapWeekend(result.rows[0]) : null;
   }
 
+  // Insert path for first-time weekend rule creation.
   const result = await pool.query(
     `
     INSERT INTO pricing_weekend_rules (name, weekdays, adj_type, adj_value, active)
@@ -268,6 +365,12 @@ async function upsertWeekendRule(id, data) {
   return mapWeekend(result.rows[0]);
 }
 
+/**
+ * Partial update of a discount rule (COALESCE leaves unspecified columns unchanged).
+ * @param {number|string} id
+ * @param {object} data
+ * @returns {Promise<object|null>}
+ */
 async function updateDiscountRule(id, data) {
   const result = await pool.query(
     `
@@ -286,6 +389,12 @@ async function updateDiscountRule(id, data) {
   return result.rows[0] ? mapDiscount(result.rows[0]) : null;
 }
 
+/**
+ * Update deposit rule when id is set; otherwise insert.
+ * @param {number|string|null|undefined} id
+ * @param {object} data
+ * @returns {Promise<object|null>}
+ */
 async function upsertDepositRule(id, data) {
   if (id) {
     const result = await pool.query(
@@ -311,6 +420,11 @@ async function upsertDepositRule(id, data) {
   return mapDeposit(result.rows[0]);
 }
 
+/**
+ * Create a checkout extra (child seat, GPS, etc.).
+ * @param {object} data
+ * @returns {Promise<object>}
+ */
 async function createExtra(data) {
   const result = await pool.query(
     `
@@ -330,6 +444,12 @@ async function createExtra(data) {
   return mapExtra(result.rows[0]);
 }
 
+/**
+ * Partial update of an extra; returns null if id missing.
+ * @param {number|string} id
+ * @param {object} data
+ * @returns {Promise<object|null>}
+ */
 async function updateExtra(id, data) {
   const result = await pool.query(
     `
@@ -348,6 +468,11 @@ async function updateExtra(id, data) {
   return result.rows[0] ? mapExtra(result.rows[0]) : null;
 }
 
+/**
+ * Delete an extra by id.
+ * @param {number|string} id
+ * @returns {Promise<boolean>}
+ */
 async function deleteExtra(id) {
   const result = await pool.query(`DELETE FROM pricing_extras WHERE id = $1 RETURNING id`, [id]);
   return result.rowCount > 0;

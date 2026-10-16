@@ -1,6 +1,15 @@
+/**
+ * SQL for customer-uploaded identity/documents linked to accounts or bookings.
+ */
 const { clientQuery, isUniqueViolation } = require('../../db/transaction');
 
+/**
+ * Map a DB/API row into the domain shape used by callers (mapDocument).
+ * @param {object} row
+ * @returns {*}
+ */
 function mapDocument(row) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) return null;
   return {
     id: Number(row.id),
@@ -15,6 +24,12 @@ function mapDocument(row) {
   };
 }
 
+/**
+ * List by user id from SQL.
+ * @param {string|number} userId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function listByUserId(userId, client = null) {
   const result = await clientQuery(
     client,
@@ -28,6 +43,13 @@ async function listByUserId(userId, client = null) {
   return result.rows.map(mapDocument);
 }
 
+/**
+ * Find by id for user via SQL; returns null when missing.
+ * @param {string|number} docId
+ * @param {string|number} userId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findByIdForUser(docId, userId, client = null) {
   const result = await clientQuery(
     client,
@@ -41,6 +63,12 @@ async function findByIdForUser(docId, userId, client = null) {
   return mapDocument(result.rows[0]);
 }
 
+/**
+ * Find by id via SQL; returns null when missing.
+ * @param {string|number} docId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findById(docId, client = null) {
   const result = await clientQuery(
     client,
@@ -52,7 +80,14 @@ async function findById(docId, client = null) {
   return mapDocument(result.rows[0]);
 }
 
+/**
+ * Update or upsert row; returns null when not found.
+ * @param {*} payload
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function upsert(payload, client = null) {
+  // Protected block: isolate failure modes.
   try {
     if (payload.docType === 'driver_license' || payload.docType === 'passport_id') {
       const existing = await clientQuery(
@@ -125,6 +160,13 @@ async function upsert(payload, client = null) {
   }
 }
 
+/**
+ * Delete row; returns whether a row was affected.
+ * @param {string|number} docId
+ * @param {string|number} userId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function remove(docId, userId, client = null) {
   const result = await clientQuery(
     client,

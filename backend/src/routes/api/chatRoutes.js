@@ -15,7 +15,9 @@ const { FUEL_TYPES, TRANSMISSIONS, CAR_SEATS_MIN, CAR_SEATS_MAX } = require('../
 
 const router = express.Router();
 
+// Compact fleet summary for chatbot grounding.
 router.get('/cars-summary', supportController.getCarsSummary);
+// Filtered car list for chat tool calls.
 router.get(
   '/cars-by-filter',
   [
@@ -43,7 +45,9 @@ router.get(
   validateChatRequest,
   supportController.getCarsByFilter
 );
+// Pricing blurb for chat answers.
 router.get('/pricing-info', supportController.getPricingInfo);
+// Single car detail for chat tool calls.
 router.get(
   '/car-details/:carId',
   [

@@ -1,3 +1,6 @@
+/**
+ * Pickup/return checklist form with photos and signatures.
+ */
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -20,6 +23,7 @@ const FUEL_OPTIONS = [
   { value: 'full', label: 'Full' },
 ];
 
+/** Pickup/return checklist form with photos and signatures. */
 export function ChecklistPanel({
   reservationId,
   onChanged,

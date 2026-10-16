@@ -1,3 +1,7 @@
+/**
+ * Prometheus metric definitions and recording helpers for HTTP, DB, payments, and jobs.
+ */
+
 const client = require('prom-client');
 
 client.collectDefaultMetrics({ register: client.register });
@@ -165,13 +169,32 @@ const pgDatabaseSizeBytes = new client.Gauge({
   help: 'PostgreSQL current database size in bytes',
 });
 
+/**
+ * Collapse numeric path segments to `:id` for low-cardinality Prometheus route labels.
+ *
+ * @param {string} [route] - Raw route or path
+ * @returns {string} Normalized route label (`unknown` when empty)
+ * @throws {never}
+ */
 function normalizeRoute(route) {
   if (!route || route === 'unknown') {
     return 'unknown';
   }
+  // Replace /123 segments so each id does not create a new time series.
   return route.replace(/\/\d+/g, '/:id');
 }
 
+/**
+ * Record one HTTP request (counter + duration histogram).
+ *
+ * @param {string} method
+ * @param {string} path
+ * @param {number|string} statusCode
+ * @param {number} durationMs
+ * @param {string} [route]
+ * @returns {*}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function recordRequest(method, path, statusCode, durationMs, route) {
   const normalizedRoute = normalizeRoute(route || path);
   const labels = {
@@ -184,51 +207,126 @@ function recordRequest(method, path, statusCode, durationMs, route) {
   httpRequestDurationMs.observe(labels, durationMs);
 }
 
+/**
+ * @param {string} operation - SQL verb or logical op name
+ * @param {number} durationMs
+ * @returns {*}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function recordDbQuery(operation, durationMs) {
   dbQueryDurationMs.observe({ operation: operation || 'query' }, durationMs);
 }
 
+/**
+ * Increment the payment-failures counter.
+ *
+ * @returns {*}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function incrementPaymentFailures() {
   paymentFailuresTotal.inc();
 }
 
+/**
+ * Increment the Stripe webhook-failures counter.
+ *
+ * @param {*} [reason] - reason = 'unknown'
+ * @returns {*}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function incrementWebhookFailures(reason = 'unknown') {
   webhookFailuresTotal.inc({ reason });
 }
 
+/**
+ * Increment the application-errors counter.
+ *
+ * @returns {*}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function incrementErrors() {
   errorsTotal.inc();
 }
 
+/**
+ * Increment the checkout-started counter.
+ *
+ * @returns {*}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function incrementCheckoutStarted() {
   checkoutStartedTotal.inc();
 }
 
+/**
+ * Increment the checkout-completed counter.
+ *
+ * @returns {*}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function incrementCheckoutCompleted() {
   checkoutCompletedTotal.inc();
 }
 
+/**
+ * Increment the checkout-abandoned counter.
+ *
+ * @returns {*}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function incrementCheckoutAbandoned() {
   checkoutAbandonedTotal.inc();
 }
 
+/**
+ * Increment the reservation-conflicts counter.
+ *
+ * @param {*} reason
+ * @returns {*}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function incrementReservationConflict(reason) {
   reservationConflictsTotal.inc({ reason: reason || 'unknown' });
 }
 
+/**
+ * Increment the admin-login-failures counter.
+ *
+ * @returns {*}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function incrementAdminLoginFailures() {
   adminLoginFailuresTotal.inc();
 }
 
+/**
+ * Increment the email-confirmation-failures counter.
+ *
+ * @returns {*}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function incrementEmailConfirmationFailures() {
   emailConfirmationFailuresTotal.inc();
 }
 
+/**
+ * Increment a named business-event counter.
+ *
+ * @param {*} event
+ * @returns {*}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function incrementBusinessEvent(event) {
   if (!event) return;
   businessEventsTotal.inc({ event });
 }
 
+/**
+ * Update operational gauges from a polled snapshot object.
+ * @param {Record<string, unknown>} values
+ * @returns {*}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function setGaugeValues(values) {
   if (values.paidNotConfirmed != null) {
     paidNotConfirmedCount.set(values.paidNotConfirmed);
@@ -275,23 +373,59 @@ function setGaugeValues(values) {
   }
 }
 
+/**
+ * Set the worker heartbeat unix-timestamp gauge.
+ *
+ * @param {*} [unixtime] - unixtime = Math.floor(Date.now() / 1000)
+ * @returns {*}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function setWorkerHeartbeat(unixtime = Math.floor(Date.now() / 1000)) {
   workerHeartbeatUnixtime.set(unixtime);
 }
 
+/**
+ * Increment the background-job-failures counter for a job key.
+ *
+ * @param {*} job
+ * @returns {*}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function incrementBackgroundJobFailure(job) {
   backgroundJobFailuresTotal.inc({ job: job || 'unknown' });
 }
 
+/**
+ * Set the last-success unix timestamp for a background job.
+ *
+ * @param {*} job
+ * @param {*} [unixtime] - unixtime = Math.floor(Date.now() / 1000)
+ * @returns {*}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function setBackgroundJobLastSuccess(job, unixtime = Math.floor(Date.now() / 1000)) {
   if (!job) return;
   backgroundJobLastSuccessUnixtime.set({ job }, unixtime);
 }
 
+/**
+ * Increment the storage-errors counter.
+ *
+ * @param {*} [driver] - driver = 'unknown'
+ * @param {*} [op] - op = 'unknown'
+ * @returns {*}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function incrementStorageErrors(driver = 'unknown', op = 'unknown') {
   storageErrorsTotal.inc({ driver, op });
 }
 
+/**
+ * Serialize the default Prometheus registry for the `/metrics` scrape endpoint.
+ *
+ * @returns {Promise<string>} Prometheus text exposition format
+ * @throws {Error} Propagates registry serialization failures
+ */
 async function getMetrics() {
   return client.register.metrics();
 }

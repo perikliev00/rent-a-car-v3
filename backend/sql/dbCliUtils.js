@@ -1,10 +1,20 @@
+/**
+ * Shared helpers for DB CLI tooling (backup, restore, reset, migrate, seed).
+ * Covers DATABASE_URL checks, pg binary resolution, and destructive-action confirmation.
+ */
+
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const { URL } = require('node:url');
 
+/** Directory where plain SQL backups are written by default. */
 const BACKUPS_DIR = path.join(__dirname, '..', 'backups');
 
+/**
+ * @returns {string}
+ * @throws {Error} when DATABASE_URL is unset
+ */
 function requireDatabaseUrl() {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
@@ -13,12 +23,23 @@ function requireDatabaseUrl() {
   return databaseUrl;
 }
 
+/**
+ * Block destructive CLI commands when NODE_ENV=production.
+ * @param {string} command
+ * @returns {*}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function assertDevelopmentOnly(command) {
   if (process.env.NODE_ENV === 'production') {
     throw new Error(`${command} is disabled when NODE_ENV=production`);
   }
 }
 
+/**
+ * @param {string} databaseUrl
+ * @returns {{ host: string, port: string, database: string, user: string, password: string }}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function parseDatabaseUrl(databaseUrl) {
   const parsed = new URL(databaseUrl);
   return {
@@ -30,10 +51,24 @@ function parseDatabaseUrl(databaseUrl) {
   };
 }
 
+/**
+ * Create a directory (and parents) if it does not exist.
+ *
+ * @param {string} dirPath - Absolute or relative directory path
+ * @returns {void}
+ * @throws {Error} When mkdirSync fails (permissions, invalid path, …)
+ */
 function ensureDir(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });
 }
 
+/**
+ * Resolve `pg_dump` / `psql` from PATH (adds `.exe` on Windows).
+ *
+ * @param {string} name
+ * @returns {string} Absolute path to the binary
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function resolvePgBinary(name) {
   const binary = process.platform === 'win32' ? `${name}.exe` : name;
   const pathEntries = (process.env.PATH || '').split(path.delimiter);
@@ -55,6 +90,15 @@ function resolvePgBinary(name) {
   throw err;
 }
 
+/**
+ * Spawn a child process and resolve on exit code 0.
+ *
+ * @param {string} bin
+ * @param {string[]} args
+ * @param {{ inheritStdio?: boolean, env?: NodeJS.ProcessEnv }} [options]
+ * @returns {Promise<{ stdout: string, stderr: string }>}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function runCommand(bin, args, options = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(bin, args, {
@@ -92,6 +136,12 @@ function runCommand(bin, args, options = {}) {
   });
 }
 
+/**
+ * Filename-friendly timestamp: `YYYY-MM-DD_HH-mm-ss`.
+ * @param {Date} [date]
+ * @returns {string}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function formatTimestamp(date = new Date()) {
   const pad = (value) => String(value).padStart(2, '0');
   return [
@@ -101,6 +151,13 @@ function formatTimestamp(date = new Date()) {
   ].join('-') + `_${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}`;
 }
 
+/**
+ * Parse common CLI flags used by backup/restore/reset scripts.
+ *
+ * @param {string[]} argv
+ * @returns {{ confirm: boolean, file: string | null, latest: boolean, out: string | null }}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function parseCliArgs(argv) {
   const options = {
     confirm: false,
@@ -124,6 +181,14 @@ function parseCliArgs(argv) {
   return options;
 }
 
+/**
+ * Require `--confirm` or FORCE_DB_RESET / FORCE_DB_RESTORE env for destructive ops.
+ *
+ * @param {string} command
+ * @param {{ confirm?: boolean }} options
+ * @returns {*}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function requireDestructiveConfirmation(command, options) {
   const forced =
     process.env.FORCE_DB_RESET === '1' ||
@@ -140,6 +205,11 @@ function requireDestructiveConfirmation(command, options) {
   );
 }
 
+/**
+ * Newest `*.sql` file under BACKUPS_DIR by mtime.
+ * @returns {string} Absolute path
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function resolveLatestBackup() {
   ensureDir(BACKUPS_DIR);
 

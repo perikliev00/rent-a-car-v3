@@ -1,3 +1,6 @@
+/**
+ * Query validation for the checkout success callback (session_id).
+ */
 const { query } = require('express-validator');
 
 const checkoutSuccessQueryValidationRules = [

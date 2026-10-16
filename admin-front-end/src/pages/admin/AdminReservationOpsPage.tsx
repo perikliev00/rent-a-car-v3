@@ -1,3 +1,6 @@
+/**
+ * Day-of reservation ops: widgets, status actions, checklists, cancellations.
+ */
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getReservationOpsDashboard } from '../../api/admin/reservations';
@@ -10,6 +13,7 @@ import { OpsTable } from './reservationOps/OpsTable';
 import { StatusHistoryPanel } from './reservationOps/StatusHistoryPanel';
 import { emptyWidgets, WIDGET_META } from './reservationOps/opsWidgets';
 
+/** Day-of reservation ops: widgets, status actions, checklists, cancellations. */
 export function AdminReservationOpsPage() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -29,6 +33,7 @@ export function AdminReservationOpsPage() {
     }
   };
 
+  /** Set Selected Id. */
   function setSelectedId(id: string | null) {
     const next = new URLSearchParams(searchParams);
     if (id) next.set('id', id);

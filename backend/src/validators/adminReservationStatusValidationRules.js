@@ -1,3 +1,6 @@
+/**
+ * Body/param validation for admin reservation status transitions.
+ */
 const { body, param } = require('express-validator');
 
 const adminReservationStatusValidationRules = [

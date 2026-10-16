@@ -63,14 +63,26 @@ export const LEGEND_ITEMS = [
   'manual_review',
 ] as const;
 
+/**
+ * Timeline/month bar classes for an event type (fallback muted).
+ * @param type - Calendar event type key
+ */
 export function eventBarClass(type: string): string {
   return EVENT_TYPE_STYLE[type]?.bar || 'border-l-[var(--color-muted)] bg-[var(--color-muted)] text-white';
 }
 
+/**
+ * Compact chip classes for an event type (fallback surface).
+ * @param type - Calendar event type key
+ */
 export function eventChipClass(type: string): string {
   return EVENT_TYPE_STYLE[type]?.chip || 'border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-muted)]';
 }
 
+/**
+ * Human label for an event type (falls back to the raw type string).
+ * @param type - Calendar event type key
+ */
 export function eventTypeLabel(type: string): string {
   return EVENT_TYPE_STYLE[type]?.label || type;
 }

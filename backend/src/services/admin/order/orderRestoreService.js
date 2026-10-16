@@ -1,3 +1,7 @@
+/**
+ * Restore a soft-deleted order from the recycle bin: re-check conflicts,
+ * re-add the calendar range, clear soft-delete flags, and re-link reservation.
+ */
 const orderSql = require('../../sql/orderSqlService');
 const carRepository = require('../../../repositories/carRepository');
 const reservationRepository = require('../../../repositories/reservationRepository');
@@ -14,7 +18,12 @@ const { ensureLinkedConfirmedReservation } = require('./orderReservationLinkServ
 const { syncLinkedReservationAfterOrderUpdate } = require('./orderReservationSync');
 const { acquireCarAdvisoryLocks } = require('../../../db/transaction');
 
+/**
+ * Restore order by id; maps conflict codes to OrderRestoreError for the UI.
+ * @param {number|string} orderId
+ */
 async function restoreOrder(orderId) {
+  // Protected block: isolate failure modes.
   try {
     await runWithOptionalTransaction(async (client) => {
       const order = await orderSql.findOrderById(orderId, client);
@@ -60,6 +69,7 @@ async function restoreOrder(orderId) {
       order.isDeleted = false;
       order.deletedAt = undefined;
 
+      // Past returns stay expired; cancelled/blank statuses become active again.
       const now = new Date();
       if (range.end <= now) {
         order.status = 'expired';
@@ -75,6 +85,7 @@ async function restoreOrder(orderId) {
         order.expiredAt = undefined;
       }
 
+      // Drop cancelled/missing reservation links so we can create a fresh confirmed one.
       if (order.reservationId) {
         const existing = await reservationRepository.findById(order.reservationId, client);
         if (!existing || existing.status === 'cancelled') {
@@ -98,12 +109,14 @@ async function restoreOrder(orderId) {
     if (err.isOrderRestoreError) {
       throw err;
     }
+    // Concurrency / overlap guard (race-sensitive).
     if (err && err.code === 'OVERLAP') {
       throw new OrderRestoreError(
         'OVERLAP',
         'Cannot restore order: car is already booked in that period.'
       );
     }
+    // Concurrency / overlap guard (race-sensitive).
     if (err && err.code === 'RESERVATION_CONFLICT') {
       throw new OrderRestoreError('RESERVATION_HOLD', RESERVATION_CONFLICT_MESSAGE);
     }

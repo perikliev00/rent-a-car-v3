@@ -1,3 +1,7 @@
+/**
+ * express-rate-limit factories and named limiters for auth, admin, checkout, etc.
+ * Limits are overridable via RATE_LIMIT_* environment variables.
+ */
 const rateLimit = require('express-rate-limit');
 const apiResponse = require('../utils/apiResponse');
 const { TooManyRequestsError } = require('../utils/appError');
@@ -5,11 +9,24 @@ const logger = require('../utils/logger');
 
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
+/**
+ * Default 429 handler using the standard API error envelope.
+ * Side effects: writes a TooManyRequests JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {import('express').Response}
+ */
 function defaultHandler(req, res) {
   const error = new TooManyRequestsError();
   return apiResponse.error(res, error.code, error.message, error.status, req);
 }
 
+/**
+ * Read a non-negative integer from env, or return `fallback` when unset/invalid.
+ * @param {string} envKey - Environment variable name
+ * @param {number} fallback - Default when missing or not a finite ≥ 0 number
+ * @returns {number}
+ */
 function readPositiveInt(envKey, fallback) {
   const raw = process.env[envKey];
   if (raw === undefined || raw === '') {
@@ -19,6 +36,12 @@ function readPositiveInt(envKey, fallback) {
   return Number.isFinite(value) && value >= 0 ? value : fallback;
 }
 
+/**
+ * Rate-limit handler that tags the response with an `X-RateLimit-Policy` header.
+ * Side effects: sets header, logs a warning, then writes the default 429 body.
+ * @param {string} policy - Policy label (e.g. `admin-read`) for ops/debugging
+ * @returns {import('express').RequestHandler}
+ */
 function createPolicyHandler(policy) {
   return function handler(req, res) {
     res.setHeader('X-RateLimit-Policy', policy);
@@ -35,6 +58,11 @@ function createPolicyHandler(policy) {
   };
 }
 
+/**
+ * Build an express-rate-limit middleware with project defaults.
+ * @param {object} options - Options passed through to express-rate-limit
+ * @returns {import('express').RequestHandler}
+ */
 function createLimiter(options) {
   return rateLimit({
     standardHeaders: true,
@@ -44,15 +72,31 @@ function createLimiter(options) {
   });
 }
 
+/**
+ * Whether the request method is considered a read (skippable by write limiters).
+ * @param {import('express').Request} req
+ * @returns {boolean}
+ */
 function isReadMethod(req) {
   return READ_METHODS.has(String(req.method || '').toUpperCase());
 }
 
+/**
+ * Detect the admin SSE realtime stream path (separate limiter bucket).
+ * @param {import('express').Request} req
+ * @returns {boolean}
+ */
 function isAdminRealtimeStream(req) {
   const url = String(req.originalUrl || req.url || '').split('?')[0];
   return url.includes('/admin/realtime/stream');
 }
 
+/**
+ * Prefer staff user id, then session id, then IP for admin limiter keys.
+ * Custom keys disable IP validation because they are not always IPs.
+ * @param {import('express').Request} req
+ * @returns {string} Stable rate-limit bucket key
+ */
 function adminRateLimitKey(req) {
   if (req.session?.user?.id != null && String(req.session.user.id) !== '') {
     return `staff:${req.session.user.id}`;
@@ -63,6 +107,7 @@ function adminRateLimitKey(req) {
   const ip = req.ip || req.socket?.remoteAddress || 'unknown';
   const ipKeyGenerator =
     typeof rateLimit.ipKeyGenerator === 'function' ? rateLimit.ipKeyGenerator : null;
+  // Prefer library IPv6-safe key when available.
   return `ip:${ipKeyGenerator ? ipKeyGenerator(ip) : ip}`;
 }
 
@@ -94,6 +139,7 @@ const adminLimiterShared = {
   validate: { ip: false },
 };
 
+// Applies only to safe methods; realtime SSE is excluded (own bucket).
 const adminReadLimiter = createLimiter({
   ...adminLimiterShared,
   windowMs: DEFAULT_WINDOW_MS,
@@ -102,6 +148,7 @@ const adminReadLimiter = createLimiter({
   handler: createPolicyHandler('admin-read'),
 });
 
+// Applies only to mutating methods.
 const adminWriteLimiter = createLimiter({
   ...adminLimiterShared,
   windowMs: DEFAULT_WINDOW_MS,
@@ -110,6 +157,7 @@ const adminWriteLimiter = createLimiter({
   handler: createPolicyHandler('admin-write'),
 });
 
+// Short window for SSE connect storms on /admin/realtime/stream.
 const adminRealtimeLimiter = createLimiter({
   ...adminLimiterShared,
   windowMs: readPositiveInt('RATE_LIMIT_ADMIN_REALTIME_WINDOW_MS', 60 * 1000),

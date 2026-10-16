@@ -1,3 +1,6 @@
+/**
+ * Fleet inventory list with create/edit entry points.
+ */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -37,6 +40,7 @@ const emptyForm = {
   technicalInspectionExpiry: '',
 };
 
+/** Is Overdue. */
 function isOverdue(dateStr?: string) {
   if (!dateStr) return false;
   const d = new Date(dateStr);
@@ -46,6 +50,7 @@ function isOverdue(dateStr?: string) {
   return d < today;
 }
 
+/** Status Chip Class. */
 function statusChipClass(status?: string) {
   const s = (status || 'available').toLowerCase();
   if (s === 'available') return 'bg-[var(--color-success)]/10 text-[var(--color-success)]';
@@ -56,6 +61,7 @@ function statusChipClass(status?: string) {
   return 'bg-[var(--color-surface)] text-[var(--color-muted)]';
 }
 
+/** Fleet inventory list with create/edit entry points. */
 export function AdminCarsPage() {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<Car | null>(null);

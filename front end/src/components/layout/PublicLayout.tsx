@@ -1,3 +1,7 @@
+/**
+ * Public site chrome: utility bar, sticky header, mobile drawer, footer, and `<Outlet />`.
+ * Account/admin links adapt to the signed-in user’s staff vs customer role.
+ */
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../auth/useAuth';
@@ -5,12 +9,18 @@ import { isStaffUser } from '../../auth/permissions';
 import { Button } from '../ui/Button';
 import { Drawer } from '../ui/Drawer';
 
+/**
+ * Resolve the admin SPA origin from env (trailing slashes stripped).
+ *
+ * @returns Absolute admin frontend URL, or `undefined` when unset.
+ */
 function adminFrontendUrl(): string | undefined {
   const raw = import.meta.env.VITE_ADMIN_FRONTEND_URL;
   if (!raw || !raw.trim()) return undefined;
   return raw.replace(/\/+$/, '');
 }
 
+/** Desktop header NavLink class factory (active underline accent). */
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   `relative text-sm font-semibold uppercase tracking-[0.06em] transition-colors ${
     isActive
@@ -18,6 +28,7 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
       : 'text-[var(--color-muted)] hover:text-[var(--color-navy)]'
   }`;
 
+/** Mobile drawer NavLink class factory (filled active chip). */
 const drawerLinkClass = ({ isActive }: { isActive: boolean }) =>
   `flex min-h-11 items-center rounded-xl px-3 py-2.5 text-sm font-semibold ${
     isActive
@@ -25,11 +36,18 @@ const drawerLinkClass = ({ isActive }: { isActive: boolean }) =>
       : 'bg-[var(--color-surface)] text-[var(--color-ink)]'
   }`;
 
+/**
+ * Shell layout wrapping all public and account routes.
+ *
+ * @returns Header / drawer / main outlet / footer composition.
+ * @remarks Side effect: closes the mobile drawer whenever `location.pathname` changes.
+ */
 export function PublicLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
 
+  // Close the drawer after in-app navigations so it does not stay open on the next page.
   useEffect(() => {
     setMenuOpen(false);
   }, [location.pathname]);

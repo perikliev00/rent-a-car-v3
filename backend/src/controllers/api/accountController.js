@@ -1,3 +1,6 @@
+/**
+ * Authenticated customer account API: dashboard, reservations, travel, documents, and PDFs.
+ */
 const accountReservationService = require('../../services/account/accountReservationService');
 const accountDocumentService = require('../../services/account/accountDocumentService');
 const { generatePdf } = require('../../services/pdf/pdfDocumentService');
@@ -5,10 +8,22 @@ const apiResponse = require('../../utils/apiResponse');
 const asyncHandler = require('../../utils/asyncHandler');
 const { forwardControllerError } = require('../../utils/controllerError');
 
+/**
+ * Extract the authenticated user id from the session.
+ * @param {import('express').Request} req
+ * @returns {number|string}
+ */
 function userIdFromReq(req) {
   return req.session.user.id;
 }
 
+/**
+ * Map known account service errors to API envelope responses.
+ * Side effects: may write an API error response when `err` has status/code.
+ * @param {import('express').Response} res
+ * @param {Error&{status?: number, code?: string}} err
+ * @returns {import('express').Response|null}
+ */
 function respondServiceError(res, err) {
   if (err?.status && err?.code) {
     return apiResponse.error(res, err.code, err.message, err.status);
@@ -16,6 +31,14 @@ function respondServiceError(res, err) {
   return null;
 }
 
+/**
+ * Return the authenticated customer account dashboard payload.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.getDashboard = asyncHandler(async (req, res, next) => {
   try {
     const data = await accountReservationService.getDashboard(userIdFromReq(req));
@@ -30,6 +53,14 @@ exports.getDashboard = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * List reservations for the authenticated customer.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.listReservations = asyncHandler(async (req, res, next) => {
   try {
     const reservations = await accountReservationService.listReservations(userIdFromReq(req));
@@ -44,6 +75,14 @@ exports.listReservations = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Return a single customer reservation by id.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.getReservation = asyncHandler(async (req, res, next) => {
   try {
     const reservation = await accountReservationService.getReservationDetail(
@@ -61,6 +100,14 @@ exports.getReservation = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Update travel details on a customer reservation.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.updateTravel = asyncHandler(async (req, res, next) => {
   try {
     const reservation = await accountReservationService.updateTravel(
@@ -84,6 +131,14 @@ exports.updateTravel = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Submit a cancellation request for a customer reservation.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.requestCancellation = asyncHandler(async (req, res, next) => {
   try {
     const result = await accountReservationService.requestCancellation(
@@ -103,6 +158,14 @@ exports.requestCancellation = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * List private documents for the authenticated customer.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.listDocuments = asyncHandler(async (req, res, next) => {
   try {
     const documents = await accountDocumentService.listDocuments(userIdFromReq(req));
@@ -117,6 +180,14 @@ exports.listDocuments = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Upload a private customer document.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.uploadDocument = asyncHandler(async (req, res, next) => {
   try {
     const document = await accountDocumentService.uploadDocument(userIdFromReq(req), {
@@ -135,6 +206,14 @@ exports.uploadDocument = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Download a document by id.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.downloadDocument = asyncHandler(async (req, res, next) => {
   try {
     const { document, stream } = await accountDocumentService.openDocumentDownload(
@@ -157,6 +236,14 @@ exports.downloadDocument = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Delete a document by id.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.deleteDocument = asyncHandler(async (req, res, next) => {
   try {
     const document = await accountDocumentService.deleteDocument(
@@ -174,6 +261,14 @@ exports.deleteDocument = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Download a customer reservation PDF of the requested kind.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.downloadPdf = asyncHandler(async (req, res, next) => {
   try {
     const reservation = await accountReservationService.getReservationForPdf(

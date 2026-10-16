@@ -1,3 +1,8 @@
+/**
+ * Resolve reservation + Stripe Checkout session details for finalization,
+ * and validate that the incoming session is the active linked one with
+ * matching amount/currency before confirming payment.
+ */
 const reservationRepository = require('../../repositories/reservationRepository');
 const stripe = require('../../config/stripe');
 const logger = require('../../utils/logger');
@@ -11,11 +16,22 @@ const {
 } = require('../payment/stripeSessionValidation');
 const { markPaidReservationConflict } = require('./paidConflictManualReviewService');
 
+/**
+ * @param {string|null|undefined} paymentStatus
+ * @returns {boolean}
+ */
 function isStripeSessionPaid(paymentStatus) {
   return paymentStatus === 'paid';
 }
 
+/**
+ * Prefer caller-supplied session snapshot to avoid redundant Stripe API calls.
+ * @param {string} stripeSessionId
+ * @param {object} [options]
+ * @returns {Promise<object>}
+ */
 async function resolveStripeCheckoutSessionDetails(stripeSessionId, options = {}) {
+  // Stripe / payment-related branch.
   if (options.stripeCheckoutSession) {
     return options.stripeCheckoutSession;
   }
@@ -36,6 +52,9 @@ async function resolveStripeCheckoutSessionDetails(stripeSessionId, options = {}
   return stripe.checkout.sessions.retrieve(stripeSessionId);
 }
 
+/**
+ * Reject finalization; if the session is paid, escalate to manual_review instead of dropping money.
+ */
 async function rejectStripeFinalization({
   reservation,
   stripeSessionId,
@@ -58,6 +77,7 @@ async function rejectStripeFinalization({
     });
   }
 
+  // Status / lifecycle guard before mutating domain state.
   if (conflictReason && isStripeSessionPaid(extraContext.paymentStatus)) {
     return markPaidReservationConflict({
       reservation,
@@ -81,15 +101,24 @@ async function rejectStripeFinalization({
   };
 }
 
+/**
+ * Resolve payment_status from options or live Stripe retrieve.
+ * @param {string} stripeSessionId
+ * @param {object} [options]
+ * @returns {Promise<string>}
+ */
 async function resolveStripePaymentStatus(stripeSessionId, options = {}) {
+  // Status / lifecycle guard before mutating domain state.
   if (options.stripeSessionPaymentStatus) {
     return options.stripeSessionPaymentStatus;
   }
 
+  // Stripe / payment-related branch.
   if (options.isStripeSessionPaid === true) {
     return 'paid';
   }
 
+  // Stripe / payment-related branch.
   if (options.isStripeSessionPaid === false) {
     return 'unpaid';
   }
@@ -98,6 +127,9 @@ async function resolveStripePaymentStatus(stripeSessionId, options = {}) {
   return session.payment_status;
 }
 
+/**
+ * Ensure metadata from the Stripe session matches the reservation row.
+ */
 function reservationMatchesMetadata(reservation, { reservationId, carId, sessionId } = {}) {
   if (reservationId && String(reservation.id) !== String(reservationId)) {
     return false;
@@ -117,6 +149,10 @@ function reservationMatchesMetadata(reservation, { reservationId, carId, session
   return true;
 }
 
+/**
+ * Find reservation by linked Stripe session, then metadata reservationId / browse session.
+ * @returns {Promise<object|null>}
+ */
 async function resolveReservationForStripeSession(
   stripeSessionId,
   metadata = {},
@@ -154,6 +190,10 @@ async function resolveReservationForStripeSession(
   return null;
 }
 
+/**
+ * Validate active session link and amount/currency before confirming payment.
+ * @returns {Promise<{ ok: true, stripeSession: object } | object>}
+ */
 async function validateStripeSessionForFinalization({
   reservation,
   stripeSessionId,
@@ -163,6 +203,7 @@ async function validateStripeSessionForFinalization({
 }) {
   const sessionLink = validateActiveStripeSessionLink(reservation, stripeSessionId);
 
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!sessionLink.ok) {
     logger.warn(
       {
@@ -199,6 +240,7 @@ async function validateStripeSessionForFinalization({
   const stripeSession = await resolveStripeCheckoutSessionDetails(stripeSessionId, options);
   const paymentDetails = validateStripePaymentDetails(stripeSession, reservation);
 
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!paymentDetails.ok) {
     logger.warn(
       {

@@ -1,8 +1,16 @@
+/**
+ * Renders notification payloads into email subject/body and sends via SMTP.
+ *
+ * Missing SMTP is treated as soft success so workers do not retry forever in
+ * local/dev environments without mail configured.
+ */
+
 const { formatDateForDisplay } = require('../../utils/dateFormatter');
 const { sendMail } = require('../../services/email/emailService');
 const logger = require('../../utils/logger');
 const logEvent = require('../../monitoring/logEvent');
 
+/** Plain-text booking lines shared by confirmation / reminder templates. */
 function buildBookingSummary(payload) {
   const lines = [
     payload.orderId ? `Order reference: #${payload.orderId}` : null,
@@ -24,6 +32,11 @@ function buildBookingSummary(payload) {
   return lines.join('\n');
 }
 
+/**
+ * Map notification.type + payload to email content.
+ * @param {object} notification
+ * @returns {{ subject: string, text: string, html: string }}
+ */
 function renderNotification(notification) {
   const payload = notification.payload || {};
 
@@ -99,7 +112,13 @@ function renderNotification(notification) {
   }
 }
 
+/**
+ * Send one email-channel notification; non-email channels are skipped.
+ * @param {object} notification
+ * @returns {Promise<{ sent: boolean, reason?: string }>}
+ */
 async function sendNotificationEmail(notification) {
+  // Only email channel is implemented; others are soft-failed for the worker.
   if (notification.channel !== 'email') {
     return { sent: false, reason: 'unsupported_channel' };
   }
@@ -122,8 +141,8 @@ async function sendNotificationEmail(notification) {
     reason: result.reason || null,
   });
 
+  // Treat missing SMTP as soft success so cron does not endlessly retry in local/dev.
   if (!result.sent && result.reason === 'smtp_not_configured') {
-    // Treat as soft success so cron does not endlessly retry in dev without SMTP
     logger.info(
       { notificationId: notification.id, type: notification.type },
       'Notification marked sent (SMTP not configured)'

@@ -1,9 +1,19 @@
+/**
+ * Tabbed promotional deals strip on the home page.
+ * Content is static marketing data — not live inventory pricing.
+ */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { dealTabs, dealTiles, type DealTabId } from '../../data/marketingAssets';
 
+/**
+ * Home-page deals strip with image tiles and a tabbed link list.
+ *
+ * @returns Marketing section; tab state is local and not synced to the URL.
+ */
 export function DealsSection() {
   const [activeTab, setActiveTab] = useState<DealTabId>('cities');
+  // Fall back to the first tab if the active id is ever missing from data.
   const active = dealTabs.find((tab) => tab.id === activeTab) ?? dealTabs[0];
 
   return (

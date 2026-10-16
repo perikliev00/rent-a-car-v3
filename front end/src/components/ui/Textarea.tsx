@@ -1,3 +1,4 @@
+/** Labeled multi-line text field matching Input/Select styling. */
 import type { TextareaHTMLAttributes } from 'react';
 
 interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -5,7 +6,17 @@ interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
   error?: string;
 }
 
+/**
+ * Labeled multi-line text field matching Input/Select styling.
+ *
+ * @param props.label - Optional visible label; also used to derive `id` when `id` is omitted.
+ * @param props.error - Optional validation message shown below the field.
+ * @param props.id - Explicit textarea id; falls back to a slug of `label`.
+ * @param props.className - Extra classes merged onto the `<textarea>`.
+ * @returns Label + textarea + optional error paragraph.
+ */
 export function Textarea({ label, error, id, className = '', ...props }: TextareaProps) {
+  // Derive a stable id from the label when the caller does not supply one.
   const textareaId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
   return (
     <div className="min-w-0 space-y-1.5">

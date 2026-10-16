@@ -1,3 +1,6 @@
+/**
+ * Seasonal price adjustment CRUD.
+ */
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -11,9 +14,14 @@ import { Input } from '../../../components/ui/Input';
 import { toast } from '../../../components/ui/toastStore';
 import { PricingSection } from './PricingSection';
 
+/**
+ * Seasonal price adjustment list with create/update/delete.
+ * @param seasons - Season rows from the pricing bundle
+ */
 export function SeasonsSection({ seasons }: { seasons: PricingSeason[] }) {
   const queryClient = useQueryClient();
 
+  // Create when `id` omitted; update when present.
   const seasonMutation = useMutation({
     mutationFn: (payload: { id?: number; data: Omit<PricingSeason, 'id'> }) =>
       payload.id ? updateSeason(payload.id, payload.data) : createSeason(payload.data),
@@ -68,6 +76,12 @@ export function SeasonsSection({ seasons }: { seasons: PricingSeason[] }) {
   );
 }
 
+/**
+ * Editable season row with local draft state until Save/Delete.
+ * @param season - Season from the server
+ * @param onSave - Persist the draft (without id)
+ * @param onDelete - Delete this season
+ */
 function SeasonRow({
   season,
   onSave,

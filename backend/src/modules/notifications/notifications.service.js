@@ -1,5 +1,12 @@
+/**
+ * Admin-facing notification list service (paginated inbox of queue rows).
+ */
+
 const repo = require('./notifications.repository');
 
+/**
+ * @param {{ limit?: number, offset?: number, status?: string|null }} [opts]
+ */
 async function listForAdmin({ limit = 50, offset = 0, status = null } = {}) {
   const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 100);
   const safeOffset = Math.max(Number(offset) || 0, 0);

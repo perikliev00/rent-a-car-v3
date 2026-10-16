@@ -1,5 +1,9 @@
+/**
+ * Accessible single-open FAQ accordion used on the static FAQ page.
+ */
 import { useId, useState } from 'react';
 
+/** One question/answer pair rendered by {@link FaqAccordion}. */
 export type FaqItem = {
   q: string;
   a: string;
@@ -9,8 +13,16 @@ interface FaqAccordionProps {
   items: FaqItem[];
 }
 
+/**
+ * Accessible single-open FAQ accordion.
+ *
+ * @param props.items - Ordered question/answer pairs.
+ * @returns A bordered accordion list; only one panel is expanded at a time.
+ * @remarks Initial state opens the first item (`index 0`); clicking an open item collapses it.
+ */
 export function FaqAccordion({ items }: FaqAccordionProps) {
   const baseId = useId();
+  // Start with the first question expanded for scannability.
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
@@ -29,6 +41,7 @@ export function FaqAccordion({ items }: FaqAccordionProps) {
                 className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition-colors hover:bg-[var(--color-surface)] sm:px-6"
                 aria-expanded={isOpen}
                 aria-controls={panelId}
+                // Toggle: open this panel, or collapse if it is already open.
                 onClick={() => setOpenIndex(isOpen ? null : index)}
               >
                 <span>{item.q}</span>

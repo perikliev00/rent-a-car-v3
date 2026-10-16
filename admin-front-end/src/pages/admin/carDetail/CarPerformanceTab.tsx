@@ -1,3 +1,6 @@
+/**
+ * Per-car analytics performance panel.
+ */
 import { Card, CardBody } from '../../../components/ui/Card';
 import { Input } from '../../../components/ui/Input';
 import { formatPrice } from '../../../utils/format';
@@ -12,6 +15,7 @@ type PerfCar = {
   profitability?: number | null;
 };
 
+/** Per-car analytics performance panel. */
 export function CarPerformanceTab({
   canMoney,
   perfRange,

@@ -1,3 +1,6 @@
+/**
+ * Query-string validation for the public car search booking window.
+ */
 const { query } = require('express-validator');
 const { validateBookingDates } = require('../utils/bookingValidation');
 const { ALLOWED_LOCATIONS } = require('../constants/locations');

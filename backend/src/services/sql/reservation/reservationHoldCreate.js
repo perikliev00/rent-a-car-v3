@@ -1,3 +1,6 @@
+/**
+ * Create reservation holds with overlap checks; race-sensitive booking entry point.
+ */
 const {
   acquireCarAdvisoryLocks,
   acquireSessionAdvisoryLock,
@@ -21,6 +24,12 @@ const {
   expireStaleHoldsForSession,
 } = require('./reservationHoldExpiry');
 
+/**
+ * Insert a pending_payment reservation hold row (caller supplies locks/client).
+ * holdExpiresAt = now + HOLD_WINDOW_MS so abandoned checkouts free the slot.
+ * @param {object} fields
+ * @param {object|null} [client]
+ */
 async function createPendingReservation(
   {
     carId,
@@ -38,6 +47,7 @@ async function createPendingReservation(
   client = null
 ) {
   const normalizedCarId = normalizeCarId(carId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId) {
     throw new Error('Invalid car id');
   }
@@ -127,6 +137,12 @@ async function createPendingReservation(
   return mapSqlReservation(result.rows[0]);
 }
 
+/**
+ * Full hold create under car + session advisory locks: expire stales, check
+ * open rentals / booked overlaps / other holds, then insert. Race survivors
+ * that hit unique/exclusion constraints are mapped to empty/conflict results.
+ * @param {object} params
+ */
 async function createPendingReservationWithAvailabilityCheck({
   carId,
   sessionId,
@@ -143,9 +159,11 @@ async function createPendingReservationWithAvailabilityCheck({
   excludeSessionId = null,
 }) {
   const normalizedCarId = normalizeCarId(carId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId) {
     throw new Error('Invalid car id');
   }
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!sessionId || typeof sessionId !== 'string') {
     throw new Error('Invalid session id');
   }
@@ -161,6 +179,7 @@ async function createPendingReservationWithAvailabilityCheck({
     await expireStaleHoldsForSession(sessionId, now, client);
 
     const existingActiveReservation = await findActiveBySessionId(sessionId, client);
+    // Idempotency guard: return early when work was already applied.
     if (existingActiveReservation) {
       return emptyCreateResult({ existingActiveReservation });
     }
@@ -176,6 +195,7 @@ async function createPendingReservationWithAvailabilityCheck({
     };
 
     const overlappingReservation = await findOverlappingHold(holdCriteria, client);
+    // Concurrency / overlap guard (race-sensitive).
     if (overlappingReservation) {
       return emptyCreateResult({ overlappingReservation });
     }
@@ -191,11 +211,13 @@ async function createPendingReservationWithAvailabilityCheck({
       endDate,
       client
     );
+    // Concurrency / overlap guard (race-sensitive).
     if (bookedOverlap) {
       return emptyCreateResult({ bookedOverlap });
     }
 
     await client.query('SAVEPOINT hold_insert');
+    // Protected block: isolate failure modes.
     try {
       const reservation = await createPendingReservation(
         {

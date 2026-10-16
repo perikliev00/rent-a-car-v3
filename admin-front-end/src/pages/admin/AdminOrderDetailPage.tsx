@@ -1,3 +1,6 @@
+/**
+ * Read-only order detail for staff follow-up.
+ */
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getAdminOrder } from '../../api/admin/orders';
@@ -8,6 +11,7 @@ import { formatPrice } from '../../utils/format';
 import { getCarFromOrder } from '../../types/api';
 import { PriceBreakdownView } from '../../components/booking/PriceBreakdownView';
 
+/** Read-only order detail for staff follow-up. */
 export function AdminOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data, isLoading } = useQuery({

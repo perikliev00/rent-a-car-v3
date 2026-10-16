@@ -1,3 +1,8 @@
+/**
+ * Admin/API entrypoint to request a full Stripe refund for a reservation.
+ * Locks the reservation, ensures a pending ledger row, then drives Stripe.
+ * Re-exports common refund helpers for callers that import this facade.
+ */
 const reservationRepository = require('../../../repositories/reservationRepository');
 const reservationSql = require('../../sql/reservationSqlService');
 const orderSql = require('../../sql/orderSqlService');
@@ -24,12 +29,22 @@ const { reconcilePendingRefunds } = require('./refundReconcileService');
 const { succeededResponse } = require('./refundAttemptLock');
 const { driveStripeForOperation } = require('./refundStripeDriver');
 
+/**
+ * Request (or resume) a full refund for a reservation.
+ * Idempotent when already refunded with a succeeded ledger row.
+ *
+ * @param {import('express').Request} req
+ * @param {{ reservationId: string|number, reason?: string|null }} params
+ * @returns {Promise<object>}
+ */
 async function requestReservationRefund(req, { reservationId, reason = null }) {
   const reservation = await reservationRepository.findById(reservationId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!reservation) {
     throw refundError('NOT_FOUND', 'Reservation not found.', 404);
   }
 
+  // Status / lifecycle guard before mutating domain state.
   if (reservation.status === 'refunded') {
     const existing = await refundOpSql.findActiveByReservationId(reservation.id);
     requireSucceededLedgerForRefunded(reservation, existing);
@@ -47,12 +62,15 @@ async function requestReservationRefund(req, { reservationId, reason = null }) {
   const order = await orderSql.findOrderByReservationId(reservation.id);
   const requestedByUserId = req?.session?.user?.id ?? null;
 
+  // Open a DB transaction so writes commit atomically.
   const reserved = await runWithTransaction(async (tx) => {
     const locked = await reservationSql.findByIdForUpdate(reservationId, tx);
+    // Guard: early-return or throw when required input is missing/invalid.
     if (!locked) {
       throw refundError('NOT_FOUND', 'Reservation not found.', 404);
     }
 
+    // Status / lifecycle guard before mutating domain state.
     if (locked.status === 'refunded') {
       const existing = await refundOpSql.findActiveByReservationId(locked.id, tx);
       requireSucceededLedgerForRefunded(locked, existing);
@@ -77,6 +95,7 @@ async function requestReservationRefund(req, { reservationId, reason = null }) {
     );
 
     let op = await refundOpSql.findActiveByReservationId(locked.id, tx);
+    // Status / lifecycle guard before mutating domain state.
     if (op?.status === 'succeeded') {
       return {
         done: true,
@@ -87,6 +106,7 @@ async function requestReservationRefund(req, { reservationId, reason = null }) {
       };
     }
 
+    // Guard: early-return or throw when required input is missing/invalid.
     if (!op) {
       const amountCents = amountCentsFromReservation(locked, resolved);
       const latest = await refundOpSql.findLatestByReservationId(locked.id, tx);
@@ -103,6 +123,7 @@ async function requestReservationRefund(req, { reservationId, reason = null }) {
           client: tx,
         });
       } else if (latest.status === 'failed' && latest.stripeRefundId) {
+        // Keep the failed op with Stripe id so the driver retrieves it (may still succeed).
         op = latest;
       } else if (latest.status === 'failed') {
         const nextAttempt = parseAttemptFromIdempotencyKey(latest.idempotencyKey) + 1;

@@ -1,3 +1,4 @@
+/** Home-page split section highlighting product advantages with marketing copy/image. */
 import {
   advantageHeadline,
   advantageImage,
@@ -5,6 +6,11 @@ import {
   advantagePoints,
 } from '../../data/marketingAssets';
 
+/**
+ * Home-page split section: photo left, advantage checklist on navy right.
+ *
+ * @returns Marketing section driven by {@link advantageHeadline} / {@link advantagePoints}.
+ */
 export function AdvantageSplit() {
   return (
     <section className="bg-[var(--color-surface-elevated)]">

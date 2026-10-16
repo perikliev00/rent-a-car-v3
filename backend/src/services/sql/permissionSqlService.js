@@ -1,6 +1,15 @@
+/**
+ * SQL for RBAC permissions catalog.
+ */
 const { clientQuery } = require('../../db/transaction');
 
+/**
+ * Map a DB/API row into the domain shape used by callers (mapPermission).
+ * @param {object} row
+ * @returns {*}
+ */
 function mapPermission(row) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) return null;
   return {
     id: String(row.id),
@@ -12,6 +21,11 @@ function mapPermission(row) {
   };
 }
 
+/**
+ * List permissions from SQL.
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function listPermissions(client = null) {
   const result = await clientQuery(
     client,
@@ -34,8 +48,15 @@ async function listPermissions(client = null) {
   return result.rows.map(mapPermission);
 }
 
+/**
+ * Find permission by key via SQL; returns null when missing.
+ * @param {string} key
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findPermissionByKey(key, client = null) {
   const normalized = String(key || '').trim();
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalized) return null;
   const result = await clientQuery(
     client,
@@ -50,6 +71,12 @@ async function findPermissionByKey(key, client = null) {
   return mapPermission(result.rows[0]);
 }
 
+/**
+ * Find permissions by keys via SQL; returns null when missing.
+ * @param {Array<*>} keys
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findPermissionsByKeys(keys, client = null) {
   const list = [...new Set((keys || []).map((k) => String(k || '').trim()).filter(Boolean))];
   if (list.length === 0) return [];
@@ -65,6 +92,12 @@ async function findPermissionsByKeys(keys, client = null) {
   return result.rows.map(mapPermission);
 }
 
+/**
+ * List permission keys for role ids from SQL.
+ * @param {Array<*>} roleIds
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function listPermissionKeysForRoleIds(roleIds, client = null) {
   const ids = (roleIds || [])
     .map((v) => Number(v))
@@ -85,12 +118,26 @@ async function listPermissionKeysForRoleIds(roleIds, client = null) {
   return result.rows.map((r) => r.key);
 }
 
+/**
+ * List permission keys for role id from SQL.
+ * @param {string|number} roleId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function listPermissionKeysForRoleId(roleId, client = null) {
   return listPermissionKeysForRoleIds([roleId], client);
 }
 
+/**
+ * replace role permissions.
+ * @param {string|number} roleId
+ * @param {Array<*>} permissionIds
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function replaceRolePermissions(roleId, permissionIds, client = null) {
   const rid = Number(roleId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(rid) || rid <= 0) {
     throw new Error('Invalid role id');
   }
@@ -122,6 +169,11 @@ async function replaceRolePermissions(roleId, permissionIds, client = null) {
   return listPermissionKeysForRoleId(rid, client);
 }
 
+/**
+ * List role permission matrix from SQL.
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function listRolePermissionMatrix(client = null) {
   const result = await clientQuery(
     client,
@@ -137,6 +189,7 @@ async function listRolePermissionMatrix(client = null) {
   const byRole = new Map();
   for (const row of result.rows) {
     const roleId = String(row.role_id);
+    // Guard: early-return or throw when required input is missing/invalid.
     if (!byRole.has(roleId)) {
       byRole.set(roleId, {
         roleId,

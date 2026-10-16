@@ -1,3 +1,6 @@
+/**
+ * Car overview/edit form and fleet status controls.
+ */
 import {
   CAR_FLEET_STATUSES,
   FUEL_LEVEL_OPTIONS,
@@ -12,6 +15,7 @@ type CarLike = {
   status?: string;
 };
 
+/** Car overview/edit form and fleet status controls. */
 export function CarOverviewTab({
   car,
   fleetStatus,

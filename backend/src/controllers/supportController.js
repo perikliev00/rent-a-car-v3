@@ -1,9 +1,20 @@
+/**
+ * Chatbot/support API handlers with a non-standard response contract (raw JSON / error shape).
+ * Success responses are unwrapped; errors use `{ error: { code, message, correlationId } }`.
+ */
 const carRepository = require('../repositories/carRepository');
 const { FEES } = require('../utils/fees');
 const { validationResult } = require('express-validator');
 const { respondJsonError } = require('../utils/controllerError');
 const logger = require('../utils/logger');
 
+/**
+ * Return a compact car fleet summary for the chatbot.
+ * Side effects: none beyond DB reads.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.getCarsSummary = async (req, res) => {
   try {
     const cars = await carRepository.listAvailable();
@@ -40,6 +51,10 @@ exports.getCarsSummary = async (req, res) => {
       .map((c) => c.priceTier_31_plus || c.price || 0)
       .filter((p) => p > 0);
 
+    /**
+     * @param {number[]} arr
+     * @returns {{ min: number, max: number }}
+     */
     const getMinMax = (arr) => ({
       min: arr.length > 0 ? Math.min(...arr) : 0,
       max: arr.length > 0 ? Math.max(...arr) : 0,
@@ -65,6 +80,13 @@ exports.getCarsSummary = async (req, res) => {
   }
 };
 
+/**
+ * Return cars matching optional category/fuel/transmission/seats filters.
+ * Side effects: none beyond DB reads (capped list for chat tool size).
+ * @param {import('express').Request} req - Query filters from chatRoutes validators
+ * @param {import('express').Response} res
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.getCarsByFilter = async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -100,6 +122,13 @@ exports.getCarsByFilter = async (req, res) => {
   }
 };
 
+/**
+ * Return pricing metadata used by the chatbot (static fee map + tier labels).
+ * Side effects: none.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.getPricingInfo = async (req, res) => {
   try {
     res.json({
@@ -119,6 +148,13 @@ exports.getPricingInfo = async (req, res) => {
   }
 };
 
+/**
+ * Return detailed car info for a single car id (raw car object, not API envelope).
+ * Side effects: none beyond DB read.
+ * @param {import('express').Request} req - Params: carId
+ * @param {import('express').Response} res
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.getCarDetails = async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {

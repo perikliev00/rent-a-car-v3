@@ -1,3 +1,6 @@
+/**
+ * Admin car compliance item CRUD and document download handlers.
+ */
 const { validationResult } = require('express-validator');
 const carAdminService = require('../../../../services/admin/carAdminService');
 const { logAdminAction } = require('../../../../services/admin/adminAuditService');
@@ -9,6 +12,14 @@ const {
   notFoundOrForward,
 } = require('./carControllerHelpers');
 
+/**
+ * List compliance items for a car.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 const listCompliance = asyncHandler(async (req, res, next) => {
   try {
     const items = await carAdminService.listCompliance(req.params.id);
@@ -18,15 +29,28 @@ const listCompliance = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Create a compliance item (optional document upload).
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 const createCompliance = asyncHandler(async (req, res, next) => {
   try {
+    // Multer/content validation soft-failed earlier in the chain.
     if (req.fileValidationError) {
+      // Drop temp uploads so failed requests leave no orphans.
       await cleanupUploads(req);
       return apiResponse.error(res, 'VALIDATION_ERROR', req.fileValidationError, 422);
     }
 
+    // Collect express-validator results for this request.
     const errors = validationResult(req);
+    // Validation failed — respond before running domain logic.
     if (!errors.isEmpty()) {
+      // Drop temp uploads so failed requests leave no orphans.
       await cleanupUploads(req);
       return validationErrorResponse(res, errors);
     }
@@ -38,6 +62,7 @@ const createCompliance = asyncHandler(async (req, res, next) => {
       req.file || null,
       userId
     );
+    // Record an admin audit entry for this mutation.
     await logAdminAction(req, {
       action: 'admin.created_car_compliance_item',
       entityType: 'car',
@@ -46,20 +71,34 @@ const createCompliance = asyncHandler(async (req, res, next) => {
     });
     return apiResponse.success(res, { item }, 201);
   } catch (err) {
+    // Drop temp uploads so failed requests leave no orphans.
     await cleanupUploads(req);
     return notFoundOrForward(err, req, res, next, 'api.createCarCompliance', 'Error creating compliance item.');
   }
 });
 
+/**
+ * Update a compliance item (optional document upload).
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 const updateCompliance = asyncHandler(async (req, res, next) => {
   try {
+    // Multer/content validation soft-failed earlier in the chain.
     if (req.fileValidationError) {
+      // Drop temp uploads so failed requests leave no orphans.
       await cleanupUploads(req);
       return apiResponse.error(res, 'VALIDATION_ERROR', req.fileValidationError, 422);
     }
 
+    // Collect express-validator results for this request.
     const errors = validationResult(req);
+    // Validation failed — respond before running domain logic.
     if (!errors.isEmpty()) {
+      // Drop temp uploads so failed requests leave no orphans.
       await cleanupUploads(req);
       return validationErrorResponse(res, errors);
     }
@@ -70,6 +109,7 @@ const updateCompliance = asyncHandler(async (req, res, next) => {
       req.body,
       req.file || null
     );
+    // Record an admin audit entry for this mutation.
     await logAdminAction(req, {
       action: 'admin.updated_car_compliance_item',
       entityType: 'car',
@@ -78,14 +118,24 @@ const updateCompliance = asyncHandler(async (req, res, next) => {
     });
     return apiResponse.success(res, { item });
   } catch (err) {
+    // Drop temp uploads so failed requests leave no orphans.
     await cleanupUploads(req);
     return notFoundOrForward(err, req, res, next, 'api.updateCarCompliance', 'Error updating compliance item.');
   }
 });
 
+/**
+ * Delete a compliance item.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 const deleteCompliance = asyncHandler(async (req, res, next) => {
   try {
     await carAdminService.deleteCompliance(req.params.id, req.params.itemId);
+    // Record an admin audit entry for this mutation.
     await logAdminAction(req, {
       action: 'admin.deleted_car_compliance_item',
       entityType: 'car',
@@ -98,6 +148,14 @@ const deleteCompliance = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Download the document attached to a compliance item.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 const downloadComplianceDocument = asyncHandler(async (req, res, next) => {
   try {
     const { stream, mimeType, filename } = await carAdminService.openComplianceDocumentDownload(

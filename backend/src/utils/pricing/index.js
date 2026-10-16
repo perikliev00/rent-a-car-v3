@@ -1,3 +1,7 @@
+/**
+ * Public barrel for pricing helpers (fees + rental price computation).
+ */
+
 const { FEES, feeFor } = require('./calculateFees');
 const {
   computeDayPrice,

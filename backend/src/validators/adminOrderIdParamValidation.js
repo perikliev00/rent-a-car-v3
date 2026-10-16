@@ -1,3 +1,6 @@
+/**
+ * Path-param validation for admin order :id.
+ */
 const { param } = require('express-validator');
 
 const adminOrderIdParamValidation = [

@@ -1,8 +1,17 @@
+/**
+ * Compare filesystem SQL migrations against the `schema_migrations` table.
+ */
+
 const fs = require('fs');
 const path = require('path');
 
 const MIGRATIONS_DIR = path.join(__dirname, '..', '..', 'migrations');
 
+/**
+ * Sorted list of `*.sql` filenames under backend/migrations.
+ * @returns {string[]}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function listMigrationFiles() {
   if (!fs.existsSync(MIGRATIONS_DIR)) {
     return [];
@@ -14,6 +23,11 @@ function listMigrationFiles() {
     .sort();
 }
 
+/**
+ * @param {import('pg').Pool} pool
+ * @returns {Promise<{ ok: boolean, expected: string[], applied: string[], pending: string[], error?: string }>}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 async function getMigrationStatus(pool) {
   const expected = listMigrationFiles();
 

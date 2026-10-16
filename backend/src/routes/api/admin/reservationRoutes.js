@@ -1,3 +1,6 @@
+/**
+ * Admin reservation ops, checklists, status changes, and refunds.
+ */
 const express = require('express');
 const reservationController = require('../../../controllers/api/admin/reservationController');
 const reservationOpsController = require('../../../controllers/api/admin/reservationOpsController');
@@ -21,14 +24,17 @@ const canManageChecklists = requirePermission('can_manage_checklists');
 const canCancelOrders = requirePermission('can_cancel_orders');
 const canRefundPayments = requirePermission('can_refund_payments');
 
+// Ops board: today's pickups/returns and attention items.
 router.get('/ops-dashboard', canViewOps, reservationOpsController.getOpsDashboard);
 
+// Customer cancellation requests awaiting staff review.
 router.get(
   '/cancellation-requests',
   canCancelOrders,
   checklistController.listCancellationRequests
 );
 
+// Approve or reject a cancellation request.
 router.post(
   '/cancellation-requests/:id/review',
   canCancelOrders,
@@ -37,10 +43,13 @@ router.post(
   checklistController.reviewCancellationRequest
 );
 
+// Reservation detail for ops drawer.
 router.get('/:id', canViewOps, reservationController.getReservation);
 
+// Pickup/return checklist history for a reservation.
 router.get('/:id/checklists', canViewOps, checklistController.getChecklists);
 
+// Submit pickup checklist with photos/signatures.
 router.post(
   '/:id/pickup-checklist',
   canManageChecklists,
@@ -50,6 +59,7 @@ router.post(
   checklistController.submitPickupChecklist
 );
 
+// Submit return checklist with photos/signatures.
 router.post(
   '/:id/return-checklist',
   canManageChecklists,
@@ -59,6 +69,7 @@ router.post(
   checklistController.submitReturnChecklist
 );
 
+// Download ops PDFs (checklist / contract kinds).
 router.get(
   '/:id/pdf/:kind',
   canViewOps,
@@ -67,6 +78,7 @@ router.get(
   checklistController.downloadPdf
 );
 
+// Advance reservation status along the allowed transition graph.
 router.post(
   '/:id/status',
   canChangeStatus,
@@ -75,6 +87,7 @@ router.post(
   reservationController.changeStatus
 );
 
+// Issue a refund against the reservation's payment.
 router.post('/:id/refund', canRefundPayments, reservationController.refundReservation);
 
 module.exports = router;

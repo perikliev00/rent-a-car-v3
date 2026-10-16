@@ -1,10 +1,19 @@
+/**
+ * Read-only checklist helpers: PDF download and fetch pickup/return rows.
+ */
 const pickupSql = require('../../sql/pickupChecklistSqlService');
 const returnSql = require('../../sql/returnChecklistSqlService');
 const reservationSql = require('../../sql/reservationSqlService');
 const { generatePdf } = require('../../pdf/pdfDocumentService');
 
+/**
+ * Generate a reservation PDF of the requested kind (contract, checklist, etc.).
+ * @param {number|string} reservationId
+ * @param {string} kind
+ */
 async function downloadReservationPdf(reservationId, kind) {
   const reservation = await reservationSql.findById(reservationId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!reservation) {
     const err = new Error('Reservation not found');
     err.code = 'NOT_FOUND';
@@ -14,6 +23,7 @@ async function downloadReservationPdf(reservationId, kind) {
   return generatePdf(kind, reservation);
 }
 
+/** @param {number|string} reservationId */
 async function getChecklists(reservationId) {
   const pickupChecklist = await pickupSql.findByReservationId(reservationId);
   const returnChecklist = await returnSql.findByReservationId(reservationId);

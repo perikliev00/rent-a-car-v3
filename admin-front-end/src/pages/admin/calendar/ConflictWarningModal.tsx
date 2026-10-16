@@ -1,7 +1,19 @@
+/**
+ * Conflict acknowledgment modal before force move/resize/block.
+ */
 import { Modal } from '../../../components/ui/Modal';
 import { Button } from '../../../components/ui/Button';
 import type { CalendarConflict } from './calendar.types';
 
+/**
+ * Lists blocking vs warning conflicts; shows Force only when permitted and no hard blocks.
+ *
+ * @param open - Modal visibility
+ * @param conflicts - Conflicts returned by the calendar mutation
+ * @param canOverride - RBAC: user may force soft conflicts
+ * @param onClose - Cancel / dismiss
+ * @param onForce - Retry the mutation with `force: true`
+ */
 export function ConflictWarningModal({
   open,
   conflicts,
@@ -17,6 +29,7 @@ export function ConflictWarningModal({
 }) {
   const blocks = conflicts.filter((c) => c.severity === 'block');
   const warns = conflicts.filter((c) => c.severity === 'warn');
+  // Some conflicts (e.g. hard locks) cannot be force-overridden even with permission.
   const hasHardBlock = blocks.some((c) => c.overridable === false);
   const showForce = canOverride && !hasHardBlock;
 
@@ -54,6 +67,12 @@ export function ConflictWarningModal({
   );
 }
 
+/**
+ * Styled list of conflicts for one severity group.
+ * @param title - Section heading
+ * @param items - Conflicts to list
+ * @param tone - Visual severity (danger vs warn)
+ */
 function ConflictGroup({
   title,
   items,

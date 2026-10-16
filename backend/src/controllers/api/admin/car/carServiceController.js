@@ -1,3 +1,6 @@
+/**
+ * Admin car service-record list/create/update/delete handlers.
+ */
 const { validationResult } = require('express-validator');
 const carAdminService = require('../../../../services/admin/carAdminService');
 const { logAdminAction } = require('../../../../services/admin/adminAuditService');
@@ -8,6 +11,14 @@ const {
   notFoundOrForward,
 } = require('./carControllerHelpers');
 
+/**
+ * List service records for a car.
+ * Side effects: none beyond DB reads.
+ * @param {import('express').Request} req - Params: id (car id)
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 const listServiceRecords = asyncHandler(async (req, res, next) => {
   try {
     const records = await carAdminService.listServiceRecords(req.params.id);
@@ -17,6 +28,14 @@ const listServiceRecords = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Create a service record for a car and audit the action.
+ * Side effects: inserts service record; writes admin audit log.
+ * @param {import('express').Request} req - Params: id; body: service fields
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 const createServiceRecord = asyncHandler(async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -38,6 +57,14 @@ const createServiceRecord = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Update a service record.
+ * Side effects: updates the service record row.
+ * @param {import('express').Request} req - Params: id, recordId; body: fields
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 const updateServiceRecord = asyncHandler(async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -56,6 +83,14 @@ const updateServiceRecord = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Delete a service record.
+ * Side effects: deletes the service record row.
+ * @param {import('express').Request} req - Params: id, recordId
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 const deleteServiceRecord = asyncHandler(async (req, res, next) => {
   try {
     await carAdminService.deleteServiceRecord(req.params.id, req.params.recordId);

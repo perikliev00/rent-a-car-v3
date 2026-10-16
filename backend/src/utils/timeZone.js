@@ -1,3 +1,6 @@
+/**
+ * Re-export of Sofia timezone constants and date helpers.
+ */
 const { SOFIA_TZ, parseSofiaDate, getSofiaIsoDateString, getTomorrowSofiaIsoDate } = require('./date/timezone');
 
 module.exports = {

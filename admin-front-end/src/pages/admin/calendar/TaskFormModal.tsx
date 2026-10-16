@@ -1,3 +1,6 @@
+/**
+ * Create/edit staff calendar tasks with assignee/car fields.
+ */
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatISO, parseISO } from 'date-fns';
@@ -16,6 +19,7 @@ import { toast } from '../../../components/ui/toastStore';
 import type { CalendarCar } from './calendar.types';
 import { taskTypeOptions } from '../tasks/taskDomain';
 
+/** Split Iso. */
 function splitIso(iso: string | undefined | null): { date: string; time: string } {
   if (!iso) {
     const now = new Date();
@@ -31,10 +35,12 @@ function splitIso(iso: string | undefined | null): { date: string; time: string 
   };
 }
 
+/** Join Iso. */
 function joinIso(date: string, time: string): string {
   return new Date(`${date}T${time}:00`).toISOString();
 }
 
+/** Create/edit staff calendar tasks with assignee/car fields. */
 export function TaskFormModal({
   open,
   onClose,

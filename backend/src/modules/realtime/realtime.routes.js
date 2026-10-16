@@ -1,3 +1,7 @@
+/**
+ * Staff realtime routes (SSE stream).
+ */
+
 const express = require('express');
 const realtimeController = require('./realtime.controller');
 const { requireStaffApi } = require('../../middleware/auth');

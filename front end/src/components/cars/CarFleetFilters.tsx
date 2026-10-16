@@ -1,9 +1,14 @@
+/**
+ * Category and advanced facet controls for fleet/search listings.
+ * Helpers sync filter state to/from the URL so results remain shareable.
+ */
 import type { Category } from '../../api/locations';
 import type { CarListFilters } from '../../api/cars';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 
+/** Fleet filters excluding pagination (page is managed separately). */
 export type FleetFilterValue = Omit<CarListFilters, 'page'>;
 
 interface CarFleetFiltersProps {
@@ -26,6 +31,12 @@ const FUEL_OPTIONS = [
   { value: 'Electric', label: 'Electric' },
 ];
 
+/**
+ * Build category-pill class names for active vs idle state.
+ *
+ * @param active - Whether this pill represents the current selection.
+ * @returns Tailwind class string for the pill button.
+ */
 function pillClass(active: boolean): string {
   return `rounded-lg px-3.5 py-1.5 text-sm font-medium transition ${
     active
@@ -34,6 +45,12 @@ function pillClass(active: boolean): string {
   }`;
 }
 
+/**
+ * Whether any non-category advanced facet is currently set.
+ *
+ * @param value - Current filter value object.
+ * @returns `true` when Clear filters should be shown.
+ */
 function hasActiveAdvancedFilters(value: FleetFilterValue): boolean {
   return Boolean(
     value.transmission ||
@@ -45,11 +62,21 @@ function hasActiveAdvancedFilters(value: FleetFilterValue): boolean {
   );
 }
 
+/**
+ * Category pills plus optional transmission/fuel/seats/price filters.
+ *
+ * @param props.categories - Category options from the API.
+ * @param props.value - Controlled filter state (without page).
+ * @param props.onChange - Called with the next filter object.
+ * @returns Filter toolbar UI.
+ */
 export function CarFleetFilters({ categories, value, onChange }: CarFleetFiltersProps) {
+  /** Merge a partial update into the controlled filter value. */
   const patch = (partial: Partial<FleetFilterValue>) => {
     onChange({ ...value, ...partial });
   };
 
+  /** Reset advanced facets while preserving the selected category. */
   const clearAdvanced = () => {
     onChange({
       categoryId: value.categoryId,
@@ -148,7 +175,13 @@ export function CarFleetFilters({ categories, value, onChange }: CarFleetFilters
   );
 }
 
-/** Serialize fleet filters into URLSearchParams keys (skips empty). */
+/**
+ * Serialize fleet filters into URLSearchParams keys (skips empty).
+ *
+ * @param params - Mutable query object to update in place.
+ * @param filters - Current fleet filter value.
+ * @remarks Side effect: mutates `params` (sets or deletes filter keys).
+ */
 export function applyFleetFiltersToParams(
   params: URLSearchParams,
   filters: FleetFilterValue,
@@ -172,11 +205,18 @@ export function applyFleetFiltersToParams(
   }
 }
 
+/**
+ * Parse fleet filter fields from the current URL query.
+ *
+ * @param params - URL search params from the router.
+ * @returns Filter value object with undefined for missing/invalid fields.
+ */
 export function fleetFiltersFromUrl(params: URLSearchParams): FleetFilterValue {
   const categoryRaw = params.get('categoryId');
   const categoryId = categoryRaw ? Number(categoryRaw) : NaN;
 
   return {
+    // Reject non-positive / non-numeric category ids.
     categoryId: Number.isFinite(categoryId) && categoryId > 0 ? categoryId : undefined,
     transmission: params.get('transmission') || undefined,
     fuelType: params.get('fuelType') || undefined,

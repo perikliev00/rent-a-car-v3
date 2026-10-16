@@ -1,6 +1,12 @@
+/**
+ * Calendar date picker that portals its popup to `document.body`.
+ * Positioning flips above/below the trigger so it stays in viewport;
+ * values are always ISO `YYYY-MM-DD` for URL/API compatibility.
+ */
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+/** Visual tone for labels sitting on light panels vs dark hero surfaces. */
 export type FieldTone = 'light' | 'onDark';
 
 interface DateSelectProps {
@@ -15,7 +21,9 @@ interface DateSelectProps {
   tone?: FieldTone;
 }
 
+/** Monday-first weekday headers for the calendar grid. */
 const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+/** Full month names shown in the picker header. */
 const MONTHS = [
   'January',
   'February',
@@ -31,14 +39,27 @@ const MONTHS = [
   'December',
 ];
 
+/**
+ * Parse an ISO `YYYY-MM-DD` string into a local Date.
+ *
+ * @param value - Candidate date string.
+ * @returns Local calendar Date, or `null` when the string is malformed or impossible.
+ */
 function parseISODate(value: string): Date | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
   const [y, m, d] = value.split('-').map(Number);
   const date = new Date(y, m - 1, d);
+  // Reject rolled-over dates such as 2024-02-31.
   if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) return null;
   return date;
 }
 
+/**
+ * Format a Date as ISO `YYYY-MM-DD` using local calendar parts.
+ *
+ * @param date - Local Date to serialize.
+ * @returns Zero-padded ISO date string.
+ */
 function toISODate(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -46,10 +67,22 @@ function toISODate(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+/**
+ * Strip time-of-day for inclusive date comparisons against `min`.
+ *
+ * @param date - Any Date.
+ * @returns Same calendar day at local midnight.
+ */
 function startOfDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
+/**
+ * Human-readable trigger label for the selected ISO date.
+ *
+ * @param value - ISO date string (may be empty/invalid).
+ * @returns en-GB short display, or `"Select date"` when unset/invalid.
+ */
 function formatDisplay(value: string): string {
   const date = parseISODate(value);
   if (!date) return 'Select date';
@@ -61,6 +94,7 @@ function formatDisplay(value: string): string {
   });
 }
 
+/** Decorative calendar glyph inside the trigger button. */
 function CalendarIcon({ className = '' }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -71,10 +105,20 @@ function CalendarIcon({ className = '' }: { className?: string }) {
   );
 }
 
+/** Shared trigger chrome matching other custom field controls. */
 const triggerClass =
   'flex min-h-11 w-full min-w-0 items-center justify-between gap-3 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] px-3.5 py-2.5 text-left text-sm text-[var(--color-ink)] shadow-sm transition-[border-color,box-shadow] focus:border-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/25';
 
+/**
+ * Compute fixed coordinates for the portaled calendar popup.
+ *
+ * @param anchor - Trigger element's bounding rect.
+ * @param pickerHeight - Measured (or estimated) popup height in px.
+ * @returns `top` / `left` / `width` for `position: fixed`.
+ * @remarks Flips above the trigger when there is more space above than below.
+ */
 function computePickerPos(anchor: DOMRect, pickerHeight: number) {
+  // Cap width at 19rem but never overflow the viewport padding.
   const width = Math.min(19 * 16, Math.max(0, window.innerWidth - 16));
   const left = Math.min(Math.max(8, anchor.left), Math.max(8, window.innerWidth - width - 8));
   const spaceBelow = window.innerHeight - anchor.bottom - 8;
@@ -86,6 +130,20 @@ function computePickerPos(anchor: DOMRect, pickerHeight: number) {
   return { top, left, width };
 }
 
+/**
+ * Calendar date picker that portals its popup to `document.body`.
+ *
+ * @param props.label - Optional field label.
+ * @param props.value - Controlled ISO `YYYY-MM-DD` value.
+ * @param props.onChange - Called with the newly selected ISO date.
+ * @param props.min - Optional minimum selectable ISO date.
+ * @param props.error - Optional validation message.
+ * @param props.id - Explicit control id.
+ * @param props.className - Extra classes on the root wrapper.
+ * @param props.tone - Label color for light vs on-dark backgrounds.
+ * @returns Labeled date field with portaled month grid.
+ * @remarks Side effects while open: scroll/resize repositioning, outside-click and Escape dismiss.
+ */
 export function DateSelect({
   label,
   value,
@@ -108,12 +166,14 @@ export function DateSelect({
   const selected = parseISODate(value);
   const minDate = min ? parseISODate(min) : null;
 
+  // Prefer selected date, else min, else today for the initial month view.
   const initialMonth = selected ?? minDate ?? new Date();
   const [viewYear, setViewYear] = useState(initialMonth.getFullYear());
   const [viewMonth, setViewMonth] = useState(initialMonth.getMonth());
 
   useEffect(() => {
     if (!open) return;
+    // Sync the visible month to the current value whenever the picker opens.
     const base = parseISODate(value) ?? (min ? parseISODate(min) : null) ?? new Date();
     setViewYear(base.getFullYear());
     setViewMonth(base.getMonth());
@@ -128,7 +188,9 @@ export function DateSelect({
     const update = () => {
       if (!rootRef.current) return;
       const rect = rootRef.current.getBoundingClientRect();
+      // Fall back to ~320px before the portal has measured itself.
       const pickerHeight = pickerRef.current?.offsetHeight || 320;
+      // Close if the trigger scrolled completely out of the viewport.
       if (rect.bottom < 0 || rect.top > window.innerHeight) {
         setOpen(false);
         return;
@@ -138,6 +200,7 @@ export function DateSelect({
 
     update();
     window.addEventListener('resize', update);
+    // Capture scroll so nested scroll parents also reposition the popup.
     window.addEventListener('scroll', update, true);
     window.visualViewport?.addEventListener('resize', update);
     window.visualViewport?.addEventListener('scroll', update);
@@ -154,6 +217,7 @@ export function DateSelect({
 
     const onPointerDown = (event: MouseEvent) => {
       const target = event.target as Node;
+      // Ignore clicks inside the trigger or the portaled picker.
       if (rootRef.current?.contains(target) || pickerRef.current?.contains(target)) {
         return;
       }
@@ -175,8 +239,10 @@ export function DateSelect({
     };
   }, [open]);
 
+  // Build a Monday-first grid of day cells (null = leading/trailing padding).
   const days = useMemo(() => {
     const first = new Date(viewYear, viewMonth, 1);
+    // Convert Sunday=0 JS weekday to Monday-first offset.
     const startOffset = (first.getDay() + 6) % 7;
     const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
     const cells: Array<{ date: Date; inMonth: boolean } | null> = [];
@@ -187,18 +253,21 @@ export function DateSelect({
     for (let day = 1; day <= daysInMonth; day += 1) {
       cells.push({ date: new Date(viewYear, viewMonth, day), inMonth: true });
     }
+    // Pad to a complete final week for a rectangular grid.
     while (cells.length % 7 !== 0) {
       cells.push(null);
     }
     return cells;
   }, [viewYear, viewMonth]);
 
+  // Disable prev-month when every day in the previous month is before `min`.
   const canGoPrev = (() => {
     if (!minDate) return true;
     const prevMonthEnd = new Date(viewYear, viewMonth, 0);
     return startOfDay(prevMonthEnd) >= startOfDay(minDate);
   })();
 
+  /** Move the calendar view one month backward when allowed. */
   const goPrev = () => {
     if (!canGoPrev) return;
     if (viewMonth === 0) {
@@ -209,6 +278,7 @@ export function DateSelect({
     }
   };
 
+  /** Move the calendar view one month forward. */
   const goNext = () => {
     if (viewMonth === 11) {
       setViewYear((y) => y + 1);
@@ -218,6 +288,7 @@ export function DateSelect({
     }
   };
 
+  /** Commit a day click when it is not before `min`, then close. */
   const pickDate = (date: Date) => {
     if (minDate && startOfDay(date) < startOfDay(minDate)) return;
     onChange(toISODate(date));

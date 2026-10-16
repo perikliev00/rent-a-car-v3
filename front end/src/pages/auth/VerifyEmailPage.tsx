@@ -1,3 +1,7 @@
+/**
+ * Email verification UI. When `?token=` is present, consumes the one-time token
+ * (deduped across Strict Mode remounts). Otherwise offers a resend for signed-in users.
+ */
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../auth/useAuth';
@@ -7,6 +11,12 @@ import { Button } from '../../components/ui/Button';
 import { ErrorAlert } from '../../components/ui/Toast';
 import { ApiError } from '../../api/client';
 
+/**
+ * Verify-email landing and resend controls.
+ *
+ * @returns Auth shell that either auto-verifies a token or offers resend/login CTAs.
+ * @remarks Side effects: consumes a one-time verify token; may refresh session and navigate to `/account`.
+ */
 export function VerifyEmailPage() {
   const { user, refresh } = useAuth();
   const navigate = useNavigate();
@@ -25,10 +35,12 @@ export function VerifyEmailPage() {
   useEffect(() => {
     if (!token) return;
 
+    // Ignore late resolutions after unmount / token change.
     let ignore = false;
     setStatus('verifying');
     setError('');
 
+    // Start a new request only when the token changes.
     if (!verifyRequestRef.current || verifyRequestRef.current.token !== token) {
       verifyRequestRef.current = {
         token,
@@ -45,6 +57,7 @@ export function VerifyEmailPage() {
       })
       .catch((err) => {
         if (ignore) return;
+        // Clear the shared promise so a retry can run.
         if (verifyRequestRef.current?.token === token) {
           verifyRequestRef.current = null;
         }
@@ -61,6 +74,7 @@ export function VerifyEmailPage() {
     };
   }, [token, refresh, navigate]);
 
+  /** Ask the API to send another verification email to the signed-in user. */
   const handleResend = async () => {
     setError('');
     setStatus('sending');
