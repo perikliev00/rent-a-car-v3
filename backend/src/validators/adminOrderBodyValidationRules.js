@@ -1,3 +1,6 @@
+/**
+ * Body validation for admin order create/update and empty-deleted-orders confirm.
+ */
 const { body } = require('express-validator');
 const { ALLOWED_LOCATIONS } = require('../constants/locations');
 const { bodyTimeRule } = require('./timeFieldRules');

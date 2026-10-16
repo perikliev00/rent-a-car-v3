@@ -1,12 +1,21 @@
+/** Horizontally scrollable customer-quote carousel for the home page. */
 import { useRef } from 'react';
 import { reviews } from '../../data/marketingAssets';
 
+/**
+ * Horizontally scrollable customer-quote carousel for the home page.
+ *
+ * @returns Review cards in a snap scroller with a “next” control.
+ * @remarks Side effect: `scrollNext` mutates the scroller’s scrollLeft smoothly.
+ */
 export function ReviewsCarousel() {
   const scrollerRef = useRef<HTMLDivElement>(null);
 
+  /** Scroll by roughly one card width (plus gap) toward the next review. */
   const scrollNext = () => {
     const el = scrollerRef.current;
     if (!el) return;
+    // Prefer measuring a real card so the step stays aligned with snap points.
     const card = el.querySelector<HTMLElement>('[data-review-card]');
     const step = card ? card.offsetWidth + 16 : 280;
     el.scrollBy({ left: step, behavior: 'smooth' });

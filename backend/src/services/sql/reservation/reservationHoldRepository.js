@@ -1,3 +1,6 @@
+/**
+ * Facade for hold create/expiry/rehold/read operations.
+ */
 const {
   expireStaleHoldsForCar,
   expireStaleHoldsForSession,

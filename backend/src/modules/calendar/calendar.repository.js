@@ -1,3 +1,7 @@
+/**
+ * Calendar repository facade over car, reservation, block, and task SQL modules.
+ */
+
 const { mapTask } = require('./repository/calendarTaskMapper');
 const {
   listCarsForCalendar,

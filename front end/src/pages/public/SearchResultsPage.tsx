@@ -1,3 +1,7 @@
+/**
+ * Availability search results driven entirely by the URL query string.
+ * Trip criteria and fleet filters stay shareable; invalid params prompt a home redirect.
+ */
 import { useMemo } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -17,9 +21,16 @@ import { parseSearchFromUrl, searchParamsToQuery } from '../../utils/searchParam
 import { defaultSearchParams } from '../../utils/searchParams';
 import type { SearchParams } from '../../types/api';
 
+/**
+ * Priced car search results for the current trip criteria and filters.
+ *
+ * @returns Search results UI, or an invalid-params fallback when the URL is incomplete.
+ * @remarks Side effects: updates the URL via `setUrlParams`; fetches priced cars when params are valid.
+ */
 export function SearchResultsPage() {
   const [urlParams, setUrlParams] = useSearchParams();
 
+  // Prefer URL trip criteria; fall back to defaults only for form display.
   const search = useMemo(
     () => parseSearchFromUrl(urlParams) ?? defaultSearchParams(),
     [urlParams],
@@ -33,12 +44,14 @@ export function SearchResultsPage() {
     queryFn: getCategories,
   });
 
+  // Only hit the search API when the URL has a complete trip window.
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['cars', 'search', search, page, filters],
     queryFn: () => searchCars(search, { ...filters, page }),
     enabled: !!parseSearchFromUrl(urlParams),
   });
 
+  /** Patch individual URL keys (null deletes). */
   const updateUrlParams = (updates: Record<string, string | null>) => {
     const params = new URLSearchParams(urlParams);
     Object.entries(updates).forEach(([key, value]) => {
@@ -51,18 +64,21 @@ export function SearchResultsPage() {
     setUrlParams(params);
   };
 
+  /** Replace trip criteria in the URL while preserving current filters. */
   const handleSearch = (newSearch: SearchParams) => {
     const params = new URLSearchParams(searchParamsToQuery(newSearch));
     applyFleetFiltersToParams(params, filters);
     setUrlParams(params);
   };
 
+  /** Re-apply the controlled form values to the URL (submit button). */
   const handleSubmit = () => {
     const params = new URLSearchParams(searchParamsToQuery(search));
     applyFleetFiltersToParams(params, filters);
     setUrlParams(params);
   };
 
+  /** Write fleet filters to the URL and reset to page 1. */
   const handleFiltersChange = (next: FleetFilterValue) => {
     const params = new URLSearchParams(urlParams);
     applyFleetFiltersToParams(params, next);
@@ -70,6 +86,7 @@ export function SearchResultsPage() {
     setUrlParams(params);
   };
 
+  // Incomplete deep-links should not invent a search — send the user home.
   if (!parseSearchFromUrl(urlParams)) {
     return (
       <div>
@@ -160,6 +177,7 @@ export function SearchResultsPage() {
           ) : (
             <div className="grid min-w-0 gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {data.cars.map((car) => {
+                // Carry trip + filters into the detail deep-link.
                 const qs = searchParamsToQuery(search);
                 const detailParams = new URLSearchParams(qs);
                 applyFleetFiltersToParams(detailParams, filters);

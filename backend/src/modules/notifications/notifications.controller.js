@@ -1,8 +1,13 @@
+/**
+ * Admin HTTP handlers for notification inbox and manual scheduler runs.
+ */
+
 const notificationsService = require('./notifications.service');
 const apiResponse = require('../../utils/apiResponse');
 const asyncHandler = require('../../utils/asyncHandler');
 const { forwardControllerError } = require('../../utils/controllerError');
 
+/** GET / — paginated notification rows. */
 exports.list = asyncHandler(async (req, res, next) => {
   try {
     const data = await notificationsService.listForAdmin({
@@ -19,6 +24,7 @@ exports.list = asyncHandler(async (req, res, next) => {
   }
 });
 
+/** POST /run-scheduler — enqueue due reminders then process the worker queue. */
 exports.runScheduler = asyncHandler(async (req, res, next) => {
   try {
     const { runNotificationScheduler } = require('./notifications.scheduler');

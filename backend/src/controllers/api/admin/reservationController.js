@@ -1,3 +1,6 @@
+/**
+ * Admin reservation detail, status change, and refund handlers.
+ */
 const { validationResult } = require('express-validator');
 const {
   changeReservationStatus,
@@ -7,6 +10,13 @@ const apiResponse = require('../../../utils/apiResponse');
 const asyncHandler = require('../../../utils/asyncHandler');
 const { forwardControllerError } = require('../../../utils/controllerError');
 
+/**
+ * Respond with 422 VALIDATION_ERROR for validation failures.
+ * Side effects: writes a 422 JSON API error.
+ * @param {import('express').Response} res
+ * @param {import('express-validator').Result} errors
+ * @returns {import('express').Response}
+ */
 function validationErrorResponse(res, errors) {
   return apiResponse.error(
     res,
@@ -16,8 +26,18 @@ function validationErrorResponse(res, errors) {
   );
 }
 
+/**
+ * Change reservation operational status.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.changeStatus = asyncHandler(async (req, res, next) => {
+  // Collect express-validator results for this request.
   const errors = validationResult(req);
+  // Validation failed — respond before running domain logic.
   if (!errors.isEmpty()) {
     return validationErrorResponse(res, errors);
   }
@@ -58,6 +78,14 @@ exports.changeStatus = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Issue a refund for a reservation payment.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.refundReservation = asyncHandler(async (req, res, next) => {
   try {
     const {
@@ -109,6 +137,14 @@ exports.refundReservation = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Return admin reservation detail.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.getReservation = asyncHandler(async (req, res, next) => {
   try {
     const data = await getReservationDetail(req.params.id);

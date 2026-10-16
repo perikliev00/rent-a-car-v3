@@ -1,3 +1,7 @@
+/**
+ * Facade re-exporting admin car sub-controllers (CRUD, alerts, service, damage, documents, compliance).
+ * Keeps route imports stable while implementations live under `car/`.
+ */
 const {
   listCars,
   getCarById,

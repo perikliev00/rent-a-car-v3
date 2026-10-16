@@ -1,3 +1,7 @@
+/**
+ * Customer registration. Client-side password rules mirror common server checks;
+ * on success the user is sent to email verification.
+ */
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/useAuth';
@@ -7,6 +11,12 @@ import { Button } from '../../components/ui/Button';
 import { ErrorAlert } from '../../components/ui/Toast';
 import { ApiError } from '../../api/client';
 
+/**
+ * New account signup form.
+ *
+ * @returns Auth shell with registration form and login link.
+ * @remarks Side effect: creates a session via {@link useAuth} and navigates to `/verify-email`.
+ */
 export function SignupPage() {
   const { signup } = useAuth();
   const navigate = useNavigate();
@@ -17,6 +27,7 @@ export function SignupPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  /** Validate locally, register, then send the user to email verification. */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -26,6 +37,7 @@ export function SignupPage() {
       return;
     }
 
+    // Mirror common server rules so obvious failures never hit the network.
     if (password.length < 8 || !/[a-zA-Z]/.test(password) || !/\d/.test(password)) {
       setError('Password must be at least 8 characters with a letter and a number');
       return;

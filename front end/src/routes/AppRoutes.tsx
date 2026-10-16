@@ -1,3 +1,7 @@
+/**
+ * Top-level React Router map for the public site and authenticated account area.
+ * Account routes are wrapped in {@link ProtectedRoute}; everything else sits under {@link PublicLayout}.
+ */
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { PublicLayout } from '../components/layout/PublicLayout';
 import { ProtectedRoute } from '../auth/ProtectedRoute';
@@ -27,6 +31,11 @@ import {
 import { NotFoundPage } from '../pages/NotFoundPage';
 import { ScrollToTop } from './ScrollToTop';
 
+/**
+ * Mount the browser router and declare all public + account routes.
+ *
+ * @returns The app’s route tree under {@link PublicLayout}.
+ */
 export function AppRoutes() {
   return (
     <BrowserRouter>

@@ -1,5 +1,12 @@
+/**
+ * SQL for vehicle categories used in fleet pricing/grouping.
+ */
 const pool = require('../../db/pool');
 
+/**
+ * List categories from SQL.
+ * @returns {Promise<*>}
+ */
 async function listCategories() {
   const result = await pool.query(
     `

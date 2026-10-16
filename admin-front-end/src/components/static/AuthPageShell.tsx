@@ -1,3 +1,6 @@
+/**
+ * Branded two-column shell for the admin login page.
+ */
 import type { ReactNode } from 'react';
 import { authAsideImage } from '../../data/marketingAssets';
 
@@ -9,6 +12,15 @@ interface AuthPageShellProps {
   sideDescription?: string;
 }
 
+/**
+ * Login layout: marketing aside (lg+) plus form column with title/subtitle.
+ *
+ * @param title - Form column heading
+ * @param subtitle - Supporting line under the heading
+ * @param children - Auth form content
+ * @param sideTitle - Aside headline (default marketing copy)
+ * @param sideDescription - Aside supporting sentence
+ */
 export function AuthPageShell({
   title,
   subtitle,
@@ -16,6 +28,7 @@ export function AuthPageShell({
   sideTitle = 'Drive Bulgaria in style',
   sideDescription = 'Premium car rental with transparent pricing and instant online booking.',
 }: AuthPageShellProps) {
+  // Photo aside is lg+ only; form column always renders.
   return (
     <div className="mx-auto grid min-h-[calc(100vh-8rem)] max-w-6xl items-stretch gap-0 px-4 py-10 sm:px-6 lg:grid-cols-2 lg:py-14">
       <aside className="relative hidden overflow-hidden text-white lg:flex lg:flex-col lg:justify-end">

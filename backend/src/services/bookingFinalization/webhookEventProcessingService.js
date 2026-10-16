@@ -1,3 +1,8 @@
+/**
+ * Process checkout.session.completed webhooks with at-most-once semantics via
+ * processed_stripe_events insert. Records payment_events outcomes and sends
+ * confirmation emails only after the transaction commits.
+ */
 const stripeEventSql = require('../sql/processedStripeEventSqlService');
 const paymentEventSql = require('../sql/paymentEventSqlService');
 const { ConflictError, NotFoundError } = require('../../utils/appError');
@@ -5,6 +10,12 @@ const { runWithTransaction } = require('../../db/transaction');
 const { isStripeSessionPaid } = require('./stripeSessionResolutionService');
 const { finalizeReservationCore } = require('./finalizeReservationCore');
 
+/**
+ * Idempotent webhook processing for a Stripe checkout.session.completed event.
+ *
+ * @param {object} params
+ * @returns {Promise<object>} Finalization result
+ */
 async function processStripeWebhookEvent({
   eventId,
   stripeSessionId,
@@ -17,18 +28,22 @@ async function processStripeWebhookEvent({
   stripePaymentIntent,
   logPrefix,
 }) {
+  // Stripe / payment-related branch.
   if (!eventId || !stripeSessionId) {
     throw new NotFoundError('Stripe webhook event payload is incomplete.');
   }
 
   let result;
 
+  // Open a DB transaction so writes commit atomically.
   await runWithTransaction(async (client) => {
+    // Unique eventId insert is the idempotency gate for Stripe redeliveries.
     const inserted = await stripeEventSql.insertProcessedEvent(
       { eventId, stripeSessionId },
       client
     );
 
+    // Guard: early-return or throw when required input is missing/invalid.
     if (!inserted) {
       result = {
         found: true,
@@ -110,6 +125,7 @@ async function processStripeWebhookEvent({
     return result;
   }
 
+  // Known non-success reasons are returned to the webhook layer; unknown is a conflict.
   if (
     result &&
     result.reason !== 'duplicate_event' &&

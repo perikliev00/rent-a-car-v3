@@ -1,10 +1,19 @@
+/**
+ * LuxRide HTTP API process: Express app bootstrap, session store, health/metrics,
+ * versioned API mounts, optional in-process background jobs, and graceful shutdown.
+ *
+ * Side effects at load: validates env, initializes Sentry, builds the Express app,
+ * and starts an async bootstrap IIFE that connects to Postgres and listens.
+ */
 require('dotenv').config();
 
 const env = require('./config/env');
+// Fail fast before any listeners or DB clients are created.
 env.validateEnv();
 const { config } = env;
 
 const { initSentry } = require('./config/sentry');
+// No-op when SENTRY_DSN is unset; must run before request handling.
 initSentry();
 
 const express = require('express');
@@ -47,23 +56,30 @@ const {
 } = require('./jobs/backgroundJobRunner');
 
 const app = express();
+/** Idle session lifetime (ms); also drives cookie maxAge and Postgres session TTL. */
 const SESSION_IDLE_MS = 20 * 60 * 1000;
 const isProd = config.isProd;
 let server = null;
 let isShuttingDown = false;
 let gaugePollerTimer = null;
 
+// Correlation id for logs/metrics before any business handlers run.
 app.use(requestIdMiddleware);
+// Record request latency/status for /metrics and Prometheus.
 app.use(requestMetrics);
+// Reject new work once graceful shutdown has begun.
 app.use(createShutdownGate(() => isShuttingDown));
 
 const corsMiddleware = createCorsMiddleware(config);
+// Skip CORS entirely when no origins are allowed (typical locked-down prod misconfig guard).
 if (corsMiddleware) {
   app.use(corsMiddleware);
 }
 
+// Public car images served from the API host (local disk / synced assets).
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
 
+// Stripe webhooks need the raw body for signature verification — mount before JSON parsers.
 app.post(
   '/webhook/stripe',
   express.raw({ type: 'application/json' }),
@@ -71,12 +87,15 @@ app.post(
 );
 
 app.use(bodyParser.json());
+// Helmet + Permissions-Policy; HSTS only in production.
 applySecurity(app, { isProd });
 
+// Liveness: process is up (no dependency checks).
 app.get('/health/live', (req, res) => {
   res.json(getLiveStatus());
 });
 
+// Readiness: DB (and related) must be reachable; 503 when not ready.
 app.get('/health/ready', async (req, res, next) => {
   try {
     const payload = await getReadyStatus(pool);
@@ -86,10 +105,12 @@ app.get('/health/ready', async (req, res, next) => {
   }
 });
 
+// Alias of /health/live for older probes.
 app.get('/health', (req, res) => {
   res.json(getLiveStatus());
 });
 
+// Alias of /health/ready for older probes.
 app.get('/ready', async (req, res, next) => {
   try {
     const payload = await getReadyStatus(pool);
@@ -99,10 +120,12 @@ app.get('/ready', async (req, res, next) => {
   }
 });
 
+// JSON metrics snapshot; gated by metrics token middleware.
 app.get('/metrics', requireMetricsToken, (req, res) => {
   res.json(metrics.getSnapshot());
 });
 
+// Prometheus text exposition; same token gate as /metrics.
 app.get('/prometheus', requireMetricsToken, async (req, res, next) => {
   try {
     res.set('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
@@ -112,6 +135,7 @@ app.get('/prometheus', requireMetricsToken, async (req, res, next) => {
   }
 });
 
+// Persist express-session rows in Postgres (shared across API replicas).
 const store = new pgSession({
   pool,
   tableName: 'session',
@@ -124,6 +148,7 @@ store.on('error', (err) => {
   logger.error({ err }, 'Session store error');
 });
 
+// Needed so secure cookies work behind a reverse proxy / load balancer.
 if (isProd) {
   app.set('trust proxy', 1);
 }
@@ -135,6 +160,7 @@ app.use(
     store,
     resave: false,
     saveUninitialized: false,
+    // Extend cookie on activity within the idle window.
     rolling: true,
     cookie: {
       httpOnly: true,
@@ -145,22 +171,35 @@ app.use(
   })
 );
 
+// Ensure payment-flag and session-id mirror fields exist for downstream handlers.
 app.use((req, _res, next) => {
   if (!req.session.isPaid) req.session.isPaid = false;
   if (req.session._sid !== req.sessionID) req.session._sid = req.sessionID;
   next();
 });
 
+// Issue CSRF cookie/token on API traffic before auth/key checks.
 app.use('/api', ensureCsrfToken);
+// Optional X-API-Key elevates auth context when present and valid.
 app.use('/api', optionalApiKeyAuth);
+// Reject state-changing API calls without a matching CSRF token.
 app.use('/api', requireCsrfToken);
 
+/**
+ * Mount shared API routes under a path prefix with endpoint-specific rate limiters.
+ * Side effects: registers multiple `app.use` middleware stacks for the given prefix.
+ * @param {string} prefix - e.g. `/api/v1` or `/api`
+ * @returns {void}
+ */
 function mountVersionedApi(prefix) {
+  // Checkout session creation is expensive and abuse-prone.
   app.use(`${prefix}/checkout`, checkoutLimiter);
+  // Order/reservation writes share booking limits.
   app.use(`${prefix}/orders`, bookingLimiter);
   app.use(`${prefix}/reservations`, bookingLimiter);
   app.use(`${prefix}/chat`, chatLimiter);
   app.use(`${prefix}/contacts`, contactLimiter);
+  // Admin stack: read/write/realtime limiters layered for method-aware throttling.
   app.use(
     `${prefix}/admin`,
     adminReadLimiter,
@@ -170,13 +209,24 @@ function mountVersionedApi(prefix) {
   app.use(prefix, apiRoutes);
 }
 
-// Canonical versioned API + backward-compatible alias
+// Canonical versioned API + backward-compatible unversioned alias.
 mountVersionedApi('/api/v1');
 mountVersionedApi('/api');
+// Catch-all 404 JSON for unmatched routes.
 app.use(handleNotFound);
+// Centralized error → JSON (+ Sentry when configured).
 app.use(errorHandler);
 
+/**
+ * Stop accepting work, tear down jobs/realtime/HTTP/pool, then exit.
+ * Idempotent: concurrent signals after the first are ignored.
+ * Side effects: clears timers, stops jobs/realtime, closes HTTP server and pool, `process.exit`.
+ * @param {string} trigger - Signal or error name that initiated shutdown
+ * @param {Error|null} [error=null] - When set, process exits with code 1
+ * @returns {Promise<void>}
+ */
 async function gracefulShutdown(trigger, error = null) {
+  // Guard against overlapping SIGINT/SIGTERM/unhandled handlers.
   if (isShuttingDown) {
     return;
   }
@@ -185,6 +235,7 @@ async function gracefulShutdown(trigger, error = null) {
   logger.error({ trigger, err: error }, 'Starting graceful shutdown');
 
   stopBackgroundJobs();
+  // Stop gauge poller so we do not keep querying a closing pool.
   if (gaugePollerTimer) {
     clearInterval(gaugePollerTimer);
     gaugePollerTimer = null;
@@ -195,14 +246,17 @@ async function gracefulShutdown(trigger, error = null) {
     logger.error({ err: realtimeErr }, 'Error closing realtime SSE subscribers');
   }
 
+  // Hard deadline so a stuck close cannot hang the process forever.
   const forceExitTimer = setTimeout(() => {
     logger.error('Graceful shutdown timed out. Forcing exit.');
     process.exit(error ? 1 : 0);
   }, 10000);
+  // Do not keep the event loop alive solely for the force-exit timer.
   forceExitTimer.unref?.();
 
   try {
     if (server) {
+      // Stop accepting new connections; wait for in-flight requests to finish.
       await new Promise((resolve, reject) => {
         server.close((serverCloseError) => {
           if (serverCloseError) {
@@ -225,13 +279,17 @@ async function gracefulShutdown(trigger, error = null) {
 
 (async () => {
   try {
+    // Verify DB connectivity before advertising the server as ready.
     const pgResult = await pool.query('SELECT NOW() AS now');
     logger.info({ dbTime: pgResult.rows[0].now }, 'PostgreSQL connected');
 
+    // Ensure connect-pg-simple table exists even if createTableIfMissing races.
     await ensureSessionTable();
 
+    // Wire SSE/realtime hub used by admin clients.
     initRealtime();
 
+    // Multi-replica setups disable jobs here and run `worker.js` instead.
     if (isBackgroundJobsEnabled()) {
       await startBackgroundJobs({ pool });
     } else {
@@ -251,14 +309,17 @@ async function gracefulShutdown(trigger, error = null) {
       );
     });
 
+    // Container / local Ctrl+C.
     process.on('SIGINT', () => {
       gracefulShutdown('SIGINT');
     });
 
+    // Orchestrator rolling deploy / stop.
     process.on('SIGTERM', () => {
       gracefulShutdown('SIGTERM');
     });
 
+    // Treat unhandled rejections as fatal to avoid inconsistent state.
     process.on('unhandledRejection', (reason) => {
       const err = reason instanceof Error ? reason : new Error(String(reason));
       logger.error({ err }, 'Unhandled promise rejection');

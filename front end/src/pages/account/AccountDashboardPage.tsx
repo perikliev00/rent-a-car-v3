@@ -1,3 +1,7 @@
+/**
+ * Authenticated account home: reservation counts, upcoming trip, and recent list.
+ * Shows {@link EmailUnverifiedBanner} until the customer confirms their email.
+ */
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { getAccountDashboard } from '../../api/account';
@@ -6,6 +10,13 @@ import { Card, CardBody } from '../../components/ui/Card';
 import { PageLoader } from '../../components/ui/Loading';
 import { EmailUnverifiedBanner } from './EmailUnverifiedBanner';
 
+/**
+ * Format a reservation date (and optional time) for dashboard cards.
+ *
+ * @param value - ISO date string or nullish.
+ * @param time - Optional HH:MM time to append.
+ * @returns Locale date string, optionally with time; `—` when missing.
+ */
 function formatWhen(value?: string | null, time?: string | null) {
   if (!value) return '—';
   try {
@@ -17,6 +28,11 @@ function formatWhen(value?: string | null, time?: string | null) {
   }
 }
 
+/**
+ * Customer account dashboard overview.
+ *
+ * @returns Loading/error states, or counts + upcoming + recent reservations.
+ */
 export function AccountDashboardPage() {
   const query = useQuery({
     queryKey: ['account', 'dashboard'],

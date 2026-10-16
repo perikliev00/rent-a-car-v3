@@ -1,3 +1,6 @@
+/**
+ * Admin analytics range queries: KPIs, series, utilization, and per-car performance.
+ */
 import { api } from '../client';
 
 export type AnalyticsKpis = {
@@ -49,14 +52,34 @@ export type AnalyticsOverview = {
   }>;
 };
 
+/**
+ * Shared `from`/`to` query fragment for all analytics endpoints.
+ * Values are URI-encoded so ISO dates with timezone markers stay safe.
+ *
+ * @param from - Range start (ISO / API date string)
+ * @param to - Range end (ISO / API date string)
+ */
 function rangeQuery(from: string, to: string) {
+  // Encode so `+` / special chars in timestamps do not break the query string.
   return `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
 }
 
+/**
+ * Dashboard overview: KPIs, revenue/bookings series, and most-rented cars.
+ *
+ * @param from - Inclusive range start
+ * @param to - Inclusive range end
+ */
 export async function getAnalyticsOverview(from: string, to: string): Promise<AnalyticsOverview> {
   return api(`/api/admin/analytics/overview?${rangeQuery(from, to)}`);
 }
 
+/**
+ * Revenue aggregated per car for the selected window.
+ *
+ * @param from - Inclusive range start
+ * @param to - Inclusive range end
+ */
 export async function getRevenueByCar(
   from: string,
   to: string
@@ -64,6 +87,12 @@ export async function getRevenueByCar(
   return api(`/api/admin/analytics/revenue-by-car?${rangeQuery(from, to)}`);
 }
 
+/**
+ * Revenue aggregated per pickup/location for the selected window.
+ *
+ * @param from - Inclusive range start
+ * @param to - Inclusive range end
+ */
 export async function getRevenueByLocation(
   from: string,
   to: string
@@ -71,6 +100,12 @@ export async function getRevenueByLocation(
   return api(`/api/admin/analytics/revenue-by-location?${rangeQuery(from, to)}`);
 }
 
+/**
+ * Fleet utilization rows (booked / maintenance / available days per car).
+ *
+ * @param from - Inclusive range start
+ * @param to - Inclusive range end
+ */
 export async function getUtilization(
   from: string,
   to: string
@@ -88,6 +123,12 @@ export async function getUtilization(
   return api(`/api/admin/analytics/utilization?${rangeQuery(from, to)}`);
 }
 
+/**
+ * Per-car performance table for the analytics “cars” view.
+ *
+ * @param from - Inclusive range start
+ * @param to - Inclusive range end
+ */
 export async function getCarsPerformance(
   from: string,
   to: string
@@ -95,6 +136,13 @@ export async function getCarsPerformance(
   return api(`/api/admin/analytics/cars?${rangeQuery(from, to)}`);
 }
 
+/**
+ * Single-car performance detail (car detail Performance tab).
+ *
+ * @param carId - Target car id
+ * @param from - Inclusive range start
+ * @param to - Inclusive range end
+ */
 export async function getCarPerformance(
   carId: string,
   from: string,

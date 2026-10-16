@@ -1,13 +1,23 @@
+/**
+ * Populate order rows with nested car objects for admin list/detail views.
+ */
 const { clientQuery } = require('../../../db/transaction');
 const { mapSqlCar } = require('../carSqlService');
 const { normalizeId, attachCarToOrder } = require('./orderMapper');
 
+/**
+ * Load cars by ids.
+ * @param {Array<*>} carIds
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function fetchCarsByIds(carIds, client = null) {
   const normalizedIds = [...new Set(
     carIds.map(normalizeId).filter((id) => id !== null)
   )];
 
   const map = new Map();
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedIds.length) {
     return map;
   }
@@ -46,7 +56,14 @@ async function fetchCarsByIds(carIds, client = null) {
   return map;
 }
 
+/**
+ * populate orders with cars.
+ * @param {object} orders
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function populateOrdersWithCars(orders, client = null) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!Array.isArray(orders) || !orders.length) {
     return orders || [];
   }

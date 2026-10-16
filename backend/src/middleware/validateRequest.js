@@ -1,9 +1,21 @@
+/**
+ * express-validator result helpers for the standard API envelope and chat contract.
+ */
 const { validationResult } = require('express-validator');
 const apiResponse = require('../utils/apiResponse');
 
+/**
+ * Reject with 422 + API envelope when express-validator reported errors.
+ * Side effects: may write a 422 JSON error response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {void|import('express').Response}
+ */
 function validateRequest(req, res, next) {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
+    // Surface the first message; clients can request full details later if needed.
     return apiResponse.error(
       res,
       'VALIDATION_ERROR',
@@ -15,6 +27,14 @@ function validateRequest(req, res, next) {
   return next();
 }
 
+/**
+ * Chat-specific validation errors (400 + alternate error shape with correlationId).
+ * Side effects: may write a 400 JSON error response (non-envelope chat contract).
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {void|import('express').Response}
+ */
 function validateChatRequest(req, res, next) {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {

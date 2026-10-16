@@ -1,3 +1,6 @@
+/**
+ * Admin car document list/upload/download/delete handlers.
+ */
 const carAdminService = require('../../../../services/admin/carAdminService');
 const { logAdminAction } = require('../../../../services/admin/adminAuditService');
 const apiResponse = require('../../../../utils/apiResponse');
@@ -7,6 +10,14 @@ const {
   notFoundOrForward,
 } = require('./carControllerHelpers');
 
+/**
+ * List private documents attached to a car.
+ * Side effects: none beyond DB reads.
+ * @param {import('express').Request} req - Params: id (car id)
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 const listDocuments = asyncHandler(async (req, res, next) => {
   try {
     const documents = await carAdminService.listDocuments(req.params.id);
@@ -16,6 +27,14 @@ const listDocuments = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Upload a private document for a car.
+ * Side effects: persists upload, inserts document row, audits; cleans temp on failure.
+ * @param {import('express').Request} req - Params: id; file + body.name
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 const uploadDocument = asyncHandler(async (req, res, next) => {
   try {
     if (req.fileValidationError) {
@@ -43,6 +62,14 @@ const uploadDocument = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Stream a document download by id.
+ * Side effects: opens a storage stream and pipes it to the response.
+ * @param {import('express').Request} req - Params: id, docId
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<void>}
+ */
 const downloadDocument = asyncHandler(async (req, res, next) => {
   try {
     const { stream, mimeType, filename } = await carAdminService.openDocumentDownload(
@@ -60,6 +87,14 @@ const downloadDocument = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Delete a document by id.
+ * Side effects: removes storage object and document row.
+ * @param {import('express').Request} req - Params: id, docId
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 const deleteDocument = asyncHandler(async (req, res, next) => {
   try {
     await carAdminService.deleteDocument(req.params.id, req.params.docId);

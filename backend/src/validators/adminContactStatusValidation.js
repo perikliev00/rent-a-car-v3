@@ -1,3 +1,6 @@
+/**
+ * Body validation for updating an admin contact message status.
+ */
 const { body } = require('express-validator');
 
 const adminContactStatusValidation = [

@@ -1,5 +1,6 @@
 /**
  * Single source of truth for reservation lifecycle statuses and transitions.
+ * Controllers and services must use these helpers instead of ad-hoc status string checks.
  */
 
 const RESERVATION_STATUSES = Object.freeze([
@@ -67,19 +68,46 @@ const ADMIN_OPS_STATUSES = Object.freeze([
   'confirmed',
 ]);
 
+/**
+ * Whether `status` is one of the known reservation lifecycle values.
+ *
+ * @param {string} status
+ * @returns {boolean}
+ * @throws {never}
+ */
 function isValidStatus(status) {
   return RESERVATION_STATUSES.includes(status);
 }
 
+/**
+ * Whether `status` is a payment hold that blocks car availability.
+ *
+ * @param {string} status
+ * @returns {boolean}
+ * @throws {never}
+ */
 function isHoldStatus(status) {
   return ACTIVE_HOLD_STATUSES.includes(status);
 }
 
+/**
+ * Whether `status` is terminal (no further customer-facing lifecycle progress).
+ *
+ * @param {string} status
+ * @returns {boolean}
+ * @throws {never}
+ */
 function isTerminal(status) {
   return TERMINAL_STATUSES.includes(status);
 }
 
-/** Confirmed booking or later rental ops (order exists / finalization done). */
+/**
+ * Confirmed booking or later rental ops (order exists / finalization done).
+ *
+ * @param {string} status
+ * @returns {boolean}
+ * @throws {never}
+ */
 function isOpsLifecycleStatus(status) {
   return [
     'confirmed',
@@ -91,21 +119,44 @@ function isOpsLifecycleStatus(status) {
   ].includes(status);
 }
 
+/**
+ * Whether a status change is allowed by the lifecycle graph.
+ * Same-status is always allowed; null `fromStatus` only permits pending_payment or confirmed.
+ *
+ * @param {string | null | undefined} fromStatus - Current status, or null for brand-new rows
+ * @param {string} toStatus - Desired next status
+ * @returns {boolean}
+ * @throws {never}
+ */
 function canTransition(fromStatus, toStatus) {
+  // New rows may only start as a payment hold or an admin-created confirmed booking.
   if (fromStatus == null) {
     return toStatus === 'pending_payment' || toStatus === 'confirmed';
   }
+  // Unknown statuses are never transitionable.
   if (!isValidStatus(fromStatus) || !isValidStatus(toStatus)) {
     return false;
   }
+  // Idempotent no-op updates are always allowed.
   if (fromStatus === toStatus) {
     return true;
   }
+  // Look up the allowed edge list for the current status.
   const allowed = TRANSITIONS[fromStatus] || [];
   return allowed.includes(toStatus);
 }
 
+/**
+ * Throw a 422-style error when `canTransition` is false.
+ * Same-status is a no-op (returns without throwing).
+ *
+ * @param {string | null | undefined} fromStatus
+ * @param {string} toStatus
+ * @returns {void}
+ * @throws {Error} With `code=INVALID_STATUS_TRANSITION` and `status=422` when disallowed
+ */
 function assertTransition(fromStatus, toStatus) {
+  // Same status → nothing to assert.
   if (fromStatus === toStatus) {
     return;
   }

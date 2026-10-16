@@ -1,6 +1,15 @@
+/**
+ * SQL for car private documents (metadata + public DTO mapping).
+ */
 const { clientQuery } = require('../../db/transaction');
 
+/**
+ * Map a DB/API row into the domain shape used by callers (mapDocument).
+ * @param {object} row
+ * @returns {*}
+ */
 function mapDocument(row) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) return null;
   const storageKey = row.storage_key || null;
   const legacyUrl = row.url || null;
@@ -19,7 +28,13 @@ function mapDocument(row) {
   };
 }
 
+/**
+ * Transform helper: to public document.
+ * @param {*} doc
+ * @returns {*}
+ */
 function toPublicDocument(doc) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!doc) return null;
   return {
     id: doc.id,
@@ -34,6 +49,12 @@ function toPublicDocument(doc) {
   };
 }
 
+/**
+ * List by car id from SQL.
+ * @param {string|number} carId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function listByCarId(carId, client = null) {
   const result = await clientQuery(
     client,
@@ -48,6 +69,13 @@ async function listByCarId(carId, client = null) {
   return result.rows.map(mapDocument);
 }
 
+/**
+ * Find by id via SQL; returns null when missing.
+ * @param {string|number} carId
+ * @param {string|number} docId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findById(carId, docId, client = null) {
   const result = await clientQuery(
     client,
@@ -62,6 +90,13 @@ async function findById(carId, docId, client = null) {
   return mapDocument(result.rows[0]);
 }
 
+/**
+ * Insert a new row and return the mapped result.
+ * @param {string|number} carId
+ * @param {*} payload
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function create(carId, payload, client = null) {
   const result = await clientQuery(
     client,
@@ -92,6 +127,13 @@ async function create(carId, payload, client = null) {
   return mapDocument(result.rows[0]);
 }
 
+/**
+ * Delete row; returns whether a row was affected.
+ * @param {string|number} carId
+ * @param {string|number} docId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function remove(carId, docId, client = null) {
   const result = await clientQuery(
     client,

@@ -1,3 +1,6 @@
+/**
+ * Body validation for signup and email-verification token submission.
+ */
 const { body } = require('express-validator');
 
 const signupPasswordRules = body('password')

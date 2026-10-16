@@ -1,3 +1,6 @@
+/**
+ * Admin payment monitoring, refund queue, and reconcile endpoints.
+ */
 const express = require('express');
 const paymentController = require('../../../controllers/api/admin/paymentController');
 const { requireAnyPermission, requirePermission } = require('../../../middleware/auth');
@@ -10,6 +13,7 @@ const stripeTestStub = require('../../../services/payment/stripeTestStub');
 
 const router = express.Router();
 
+// Payments awaiting refund action / review.
 router.get(
   '/refund-queue',
   requirePermission('can_refund_payments'),
@@ -17,11 +21,13 @@ router.get(
   validateRequest,
   paymentController.getPaymentRefundQueue
 );
+// Payment monitor table (revenue viewers or payment managers).
 router.get(
   '/',
   requireAnyPermission(['can_manage_payments_monitor', 'can_view_revenue']),
   paymentController.getPaymentMonitoring
 );
+// Pull Stripe state into local payment rows.
 router.post(
   '/reconcile',
   requirePermission('can_refund_payments'),
@@ -29,6 +35,7 @@ router.post(
   paymentController.reconcilePayments
 );
 
+// Dev/test-only stub to mark a Checkout Session paid without Stripe.
 if (stripeTestStub.isStubEnabled()) {
   router.post(
     '/stub/mark-paid',

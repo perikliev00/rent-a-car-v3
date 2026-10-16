@@ -1,3 +1,7 @@
+/**
+ * Static marketing/legal pages (about, FAQ, terms, privacy, how-to-book, support, contact).
+ * Content is local to this module; contact submits via {@link ContactForm}.
+ */
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ContactForm } from '../../components/static/ContactForm';
@@ -6,6 +10,12 @@ import { StaticPageHero } from '../../components/static/StaticPageHero';
 import { StaticSection } from '../../components/static/StaticSection';
 import { Button } from '../../components/ui/Button';
 
+/**
+ * Decorative mail envelope icon for contact/support cards.
+ *
+ * @param props.className - Optional extra SVG classes.
+ * @returns Aria-hidden mail SVG.
+ */
 function IconMail({ className = '' }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -19,6 +29,12 @@ function IconMail({ className = '' }: { className?: string }) {
   );
 }
 
+/**
+ * Decorative phone icon for contact/support cards.
+ *
+ * @param props.className - Optional extra SVG classes.
+ * @returns Aria-hidden phone SVG.
+ */
 function IconPhone({ className = '' }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -32,6 +48,12 @@ function IconPhone({ className = '' }: { className?: string }) {
   );
 }
 
+/**
+ * Decorative clock icon for hours/availability callouts.
+ *
+ * @param props.className - Optional extra SVG classes.
+ * @returns Aria-hidden clock SVG.
+ */
 function IconClock({ className = '' }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -41,6 +63,12 @@ function IconClock({ className = '' }: { className?: string }) {
   );
 }
 
+/**
+ * Decorative map-pin icon for location callouts.
+ *
+ * @param props.className - Optional extra SVG classes.
+ * @returns Aria-hidden map SVG.
+ */
 function IconMap({ className = '' }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -164,6 +192,14 @@ const FAQ_ITEMS: FaqItem[] = [
   },
 ];
 
+/**
+ * Numbered legal article block used on Terms/Privacy pages.
+ *
+ * @param props.number - Article number shown in the heading.
+ * @param props.title - Article title.
+ * @param props.children - Article body paragraphs/lists.
+ * @returns A section with heading and body.
+ */
 function LegalArticle({
   title,
   updated,
@@ -226,6 +262,10 @@ function LegalArticle({
   );
 }
 
+/**
+ * Static About page.
+ * @returns About marketing content under the shared static hero.
+ */
 export function AboutPage() {
   return (
     <div>
@@ -307,6 +347,10 @@ export function AboutPage() {
   );
 }
 
+/**
+ * Static FAQ page with accordion answers.
+ * @returns FAQ hero + accordion list.
+ */
 export function FaqPage() {
   return (
     <div>
@@ -342,6 +386,10 @@ export function FaqPage() {
   );
 }
 
+/**
+ * Static how-to-book guide page.
+ * @returns Step-by-step booking instructions.
+ */
 export function HowToBookPage() {
   return (
     <div>
@@ -375,6 +423,10 @@ export function HowToBookPage() {
   );
 }
 
+/**
+ * Static support/contact info page.
+ * @returns Support channels and hours.
+ */
 export function SupportPage() {
   return (
     <div>
@@ -450,6 +502,10 @@ export function SupportPage() {
   );
 }
 
+/**
+ * Public contact page hosting ContactForm.
+ * @returns Contact hero + form section.
+ */
 export function ContactPage() {
   return (
     <div>
@@ -520,6 +576,10 @@ export function ContactPage() {
   );
 }
 
+/**
+ * Terms of service legal page.
+ * @returns Terms articles under the static hero.
+ */
 export function TermsPage() {
   return (
     <LegalArticle
@@ -620,6 +680,10 @@ export function TermsPage() {
   );
 }
 
+/**
+ * Privacy policy legal page.
+ * @returns Privacy articles under the static hero.
+ */
 export function PrivacyPage() {
   return (
     <LegalArticle

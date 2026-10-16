@@ -1,3 +1,7 @@
+/**
+ * Domain helpers for admin orders: date parsing, contact validation, pricing,
+ * expiry status, and deciding when an edit must recalculate price.
+ */
 const { computeBookingPriceAsync } = require('../../../utils/pricing/calculateRentalPrice');
 const { parseSofiaDate } = require('../../../utils/date/timezone');
 const {
@@ -9,6 +13,14 @@ const { OrderFormError } = require('./orderErrors');
 const CONTACT_REQUIRED_MESSAGE =
   'Full name, phone number, email, and address are required.';
 
+/**
+ * Parse pickup/return into Sofia-local Date bounds; rejects empty or inverted ranges.
+ * @param {string} pickupDate
+ * @param {string} pickupTime
+ * @param {string} returnDate
+ * @param {string} returnTime
+ * @returns {{start: Date, end: Date}}
+ */
 function parseOrderDateRange(pickupDate, pickupTime, returnDate, returnTime) {
   const start = parseSofiaDate(pickupDate, pickupTime || '00:00');
   const end = parseSofiaDate(returnDate, returnTime || '23:59');
@@ -26,6 +38,11 @@ function parseOrderDateRange(pickupDate, pickupTime, returnDate, returnTime) {
   return { start, end };
 }
 
+/**
+ * Trim and validate required contact fields for order create/update.
+ * @param {object} payload
+ * @returns {{ok: boolean, contact: object, message?: string}}
+ */
 function validateOrderContact(payload) {
   const contact = trimContactDetails(payload);
   if (contactFieldsIncomplete(contact)) {
@@ -34,13 +51,22 @@ function validateOrderContact(payload) {
   return { ok: true, contact };
 }
 
+/** Delegate to shared booking price calculator (same rules as online checkout). */
 async function computeOrderPricing(car, start, end, pickupLocation, returnLocation, options = {}) {
   return computeBookingPriceAsync(car, start, end, pickupLocation, returnLocation, options);
 }
 
+/**
+ * Mark order active vs expired based on return end vs now.
+ * Preserves an existing expiredAt timestamp on re-save of already-expired orders.
+ * @param {object} order
+ * @param {Date} endDate
+ * @param {Date} [now]
+ */
 function applyOrderExpiryStatus(order, endDate, now = new Date()) {
   if (endDate <= now) {
     order.status = 'expired';
+    // Guard: early-return or throw when required input is missing/invalid.
     if (!order.expiredAt) {
       order.expiredAt = now;
     }
@@ -51,6 +77,15 @@ function applyOrderExpiryStatus(order, endDate, now = new Date()) {
   return order;
 }
 
+/**
+ * True when car, dates, locations, hotel delivery, or extras changed vs existing order.
+ * Avoids unnecessary price recomputation on contact-only edits.
+ * @param {object} existingOrder
+ * @param {object} payload
+ * @param {{start: Date, end: Date}} range
+ * @param {string|number} newCarId
+ * @param {string|number} prevCarId
+ */
 function shouldRecalculateOrderPrice(existingOrder, payload, range, newCarId, prevCarId) {
   const prevStart =
     existingOrder.pickupDate instanceof Date

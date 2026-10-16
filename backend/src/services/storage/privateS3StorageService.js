@@ -1,3 +1,7 @@
+/**
+ * Private S3 driver (PRIVATE_STORAGE_DRIVER=s3) for non-public documents.
+ * Objects are not given public URLs; access is via openPrivateReadStream only.
+ */
 const fs = require('fs');
 const {
   S3Client,
@@ -8,8 +12,13 @@ const {
 } = require('@aws-sdk/client-s3');
 const { KEY_PREFIX, generatePrivateKey, isValidPrivateStorageKey } = require('./privateStorageKeys');
 
+/**
+ * Load config.
+ * @returns {*}
+ */
 function getConfig() {
   const bucket = process.env.PRIVATE_S3_BUCKET;
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!bucket) {
     throw new Error('PRIVATE_S3_BUCKET is required when PRIVATE_STORAGE_DRIVER=s3.');
   }
@@ -21,6 +30,10 @@ function getConfig() {
   };
 }
 
+/**
+ * Insert s3 client and return the mapped result.
+ * @returns {*}
+ */
 function createS3Client() {
   const region = process.env.S3_REGION || 'auto';
   const endpoint = process.env.S3_ENDPOINT || undefined;
@@ -40,7 +53,13 @@ function createS3Client() {
   });
 }
 
+/**
+ * Transform helper: build object key.
+ * @param {string} storageKey
+ * @returns {*}
+ */
 function buildObjectKey(storageKey) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!isValidPrivateStorageKey(storageKey)) {
     return null;
   }
@@ -48,13 +67,24 @@ function buildObjectKey(storageKey) {
   return `${keyPrefix}${storageKey}`;
 }
 
+/**
+ * Predicate helper: is not found error.
+ * @param {*} err
+ * @returns {*}
+ */
 function isNotFoundError(err) {
   const status = err?.$metadata?.httpStatusCode;
   return err?.name === 'NotFound' || err?.name === 'NoSuchKey' || status === 404;
 }
 
+/**
+ * put private object.
+ * @param {object} params
+ * @returns {Promise<*>}
+ */
 async function putPrivateObject({ storageKey, body, mimeType, sizeBytes }) {
   const objectKey = buildObjectKey(storageKey);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!objectKey) {
     throw new Error('Invalid private storage key.');
   }
@@ -79,7 +109,13 @@ async function putPrivateObject({ storageKey, body, mimeType, sizeBytes }) {
   };
 }
 
+/**
+ * store private file.
+ * @param {object} params
+ * @returns {Promise<*>}
+ */
 async function storePrivateFile({ tempPath, originalName, category = 'doc', mimeType }) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!tempPath) {
     throw new Error('Missing temp upload path.');
   }
@@ -96,6 +132,11 @@ async function storePrivateFile({ tempPath, originalName, category = 'doc', mime
   return stored;
 }
 
+/**
+ * store private buffer.
+ * @param {object} params
+ * @returns {Promise<*>}
+ */
 async function storePrivateBuffer({ buffer, originalName, category = 'doc', mimeType }) {
   const storageKey = generatePrivateKey(originalName, category);
   return putPrivateObject({
@@ -106,14 +147,21 @@ async function storePrivateBuffer({ buffer, originalName, category = 'doc', mime
   });
 }
 
+/**
+ * open private read stream.
+ * @param {string} storageKey
+ * @returns {Promise<*>}
+ */
 async function openPrivateReadStream(storageKey) {
   const objectKey = buildObjectKey(storageKey);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!objectKey) {
     return null;
   }
 
   const { bucket } = getConfig();
   const client = createS3Client();
+  // Protected block: isolate failure modes.
   try {
     const response = await client.send(
       new GetObjectCommand({
@@ -121,6 +169,7 @@ async function openPrivateReadStream(storageKey) {
         Key: objectKey,
       })
     );
+    // Guard: early-return or throw when required input is missing/invalid.
     if (!response.Body) {
       return null;
     }
@@ -133,12 +182,19 @@ async function openPrivateReadStream(storageKey) {
   }
 }
 
+/**
+ * Delete private file; returns whether a row was affected.
+ * @param {string} storageKey
+ * @returns {Promise<*>}
+ */
 async function deletePrivateFile(storageKey) {
   const objectKey = buildObjectKey(storageKey);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!objectKey) return false;
 
   const { bucket } = getConfig();
   const client = createS3Client();
+  // Protected block: isolate failure modes.
   try {
     await client.send(
       new DeleteObjectCommand({
@@ -155,12 +211,19 @@ async function deletePrivateFile(storageKey) {
   }
 }
 
+/**
+ * private file exists.
+ * @param {string} storageKey
+ * @returns {Promise<*>}
+ */
 async function privateFileExists(storageKey) {
   const objectKey = buildObjectKey(storageKey);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!objectKey) return false;
 
   const { bucket } = getConfig();
   const client = createS3Client();
+  // Protected block: isolate failure modes.
   try {
     await client.send(
       new HeadObjectCommand({
@@ -177,6 +240,10 @@ async function privateFileExists(storageKey) {
   }
 }
 
+/**
+ * Ensure private dir exists or is initialized.
+ * @returns {Promise<*>}
+ */
 async function ensurePrivateDir() {
   // No local directory for S3-backed private storage.
 }

@@ -1,3 +1,6 @@
+/**
+ * Multi-car timeline grid: rows, headers, drag/resize interactions.
+ */
 import { useMemo } from 'react';
 import {
   addDays,
@@ -13,6 +16,7 @@ import { nowInSofia } from './timeline/timelineLayout';
 import { useCarColWidth } from './timeline/useCarColWidth';
 import { useTimelineDrag } from './timeline/useTimelineDrag';
 
+/** Multi-car timeline grid: rows, headers, drag/resize interactions. */
 export function FleetTimelineCalendar({
   cars,
   events,

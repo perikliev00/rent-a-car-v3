@@ -1,3 +1,6 @@
+/**
+ * Order list with filters, soft-delete bin, and restore/empty flows.
+ */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -21,6 +24,7 @@ import type { OrderStatus } from '../../types/api';
 
 type Tab = 'active' | 'expired' | 'deleted';
 
+/** Order list with filters, soft-delete bin, and restore/empty flows. */
 export function AdminOrdersPage() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>('active');

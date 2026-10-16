@@ -1,3 +1,6 @@
+/**
+ * Service history list/create UI for a car.
+ */
 import { SERVICE_TYPE_OPTIONS } from '../../../api/admin/cars';
 import { Button } from '../../../components/ui/Button';
 import { Card, CardBody } from '../../../components/ui/Card';
@@ -14,6 +17,7 @@ type ServiceRecord = {
   nextServiceDate?: string | null;
 };
 
+/** Service history list/create UI for a car. */
 export function CarServiceTab({
   serviceForm,
   setServiceForm,

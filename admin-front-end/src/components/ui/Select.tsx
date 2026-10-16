@@ -1,3 +1,6 @@
+/**
+ * Native select wrapper with admin field styling.
+ */
 import type { SelectHTMLAttributes } from 'react';
 
 interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
@@ -6,6 +9,16 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   options: Array<{ value: string; label: string }>;
 }
 
+/**
+ * Labeled native `<select>` with option list and optional error styling.
+ * When `id` is omitted, derives one from the label.
+ *
+ * @param label - Optional visible label
+ * @param error - Optional error text (also tints the border)
+ * @param options - Value/label pairs rendered as `<option>`s
+ * @param id - Explicit select id; otherwise derived from label
+ * @param className - Extra classes on the `<select>`
+ */
 export function Select({ label, error, options, id, className = '', ...props }: SelectProps) {
   const selectId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
   return (

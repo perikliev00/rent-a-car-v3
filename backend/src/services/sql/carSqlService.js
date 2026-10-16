@@ -1,3 +1,6 @@
+/**
+ * Facade re-exporting car search, fleet, admin CRUD, and mapper SQL helpers.
+ */
 const {
   mapSqlCar,
   mapPublicCar,

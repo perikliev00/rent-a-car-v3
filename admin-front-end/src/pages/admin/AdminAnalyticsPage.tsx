@@ -1,3 +1,6 @@
+/**
+ * Revenue/utilization analytics for a selected date range.
+ */
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -24,6 +27,7 @@ import { formatPrice } from '../../utils/format';
 import { useAuth } from '../../auth/useAuth';
 import { hasPermission } from '../../auth/permissions';
 
+/** Default Range. */
 function defaultRange() {
   const to = new Date();
   const from = new Date();
@@ -32,10 +36,12 @@ function defaultRange() {
   return { from: fmt(from), to: fmt(to) };
 }
 
+/** Pct. */
 function pct(rate: number) {
   return `${(rate * 100).toFixed(1)}%`;
 }
 
+/** Kpi. */
 function Kpi({
   label,
   value,
@@ -53,6 +59,7 @@ function Kpi({
   );
 }
 
+/** Revenue/utilization analytics for a selected date range. */
 export function AdminAnalyticsPage() {
   const { user } = useAuth();
   const canMoney = hasPermission(user, 'can_view_revenue');

@@ -3,14 +3,18 @@
  * Replace Unsplash URLs with your own assets when ready.
  */
 
+/** Full-bleed home hero photograph. */
 export const heroImage =
   'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=1920&q=80';
 
+/** Accessible alt text for {@link heroImage}. */
 export const heroImageAlt = 'Scenic mountain road ideal for a premium road trip';
 
+/** Shared photo used by {@link StaticPageHero} on utility/static pages. */
 export const staticHeroImage =
   'https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=1920&q=80';
 
+/** Branded aside image for login/signup/verify shells. */
 export const authAsideImage =
   'https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&w=1200&q=80';
 
@@ -24,6 +28,7 @@ export const partnerMarks = [
   'OpenRoad Co',
 ] as const;
 
+/** Customer quotes shown in {@link ReviewsCarousel}. */
 export const reviews = [
   {
     quote: 'Transparent pricing and a smooth pickup at the airport. Exactly what we needed.',
@@ -57,13 +62,17 @@ export const reviews = [
   },
 ] as const;
 
+/** Photo for the home-page advantage split (left column). */
 export const advantageImage =
   'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=1400&q=80';
 
+/** Accessible alt text for {@link advantageImage}. */
 export const advantageImageAlt = 'Traveller overlooking green mountains on a road trip';
 
+/** Headline for the navy advantage checklist column. */
 export const advantageHeadline = 'Discover the LuxRide Advantage';
 
+/** Bullet points listed under {@link advantageHeadline}. */
 export const advantagePoints = [
   'Compare rates with transparent totals before you book',
   'Free cancellation up to 48 hours before pickup',
@@ -72,6 +81,7 @@ export const advantagePoints = [
   'Pickup across Bulgaria — airports, resorts & cities',
 ] as const;
 
+/** Image tiles at the top of {@link DealsSection}. */
 export const dealTiles = [
   {
     title: 'Coastal road trips',
@@ -93,8 +103,10 @@ export const dealTiles = [
   },
 ] as const;
 
+/** Tab ids for the deals link list. */
 export type DealTabId = 'cities' | 'regions';
 
+/** Tabbed destination link groups under the deals tiles. */
 export const dealTabs: {
   id: DealTabId;
   label: string;

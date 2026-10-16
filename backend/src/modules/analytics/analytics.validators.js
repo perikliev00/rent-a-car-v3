@@ -1,5 +1,10 @@
+/**
+ * express-validator chains for analytics date-range and car id params.
+ */
+
 const { query, param } = require('express-validator');
 
+/** Inclusive YYYY-MM-DD from/to query pair. */
 const dateRangeQuery = [
   query('from')
     .matches(/^\d{4}-\d{2}-\d{2}$/)

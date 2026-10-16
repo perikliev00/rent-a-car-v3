@@ -1,3 +1,7 @@
+/**
+ * Public facade for admin car fleet operations. Re-exports CRUD, service
+ * records, damage reports, documents, compliance, and fleet alerts.
+ */
 const {
   listCars,
   getCarById,

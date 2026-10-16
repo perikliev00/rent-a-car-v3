@@ -1,15 +1,26 @@
+/**
+ * SQL for car_damage_reports (list/create/resolve/remove).
+ */
 const { clientQuery } = require('../../db/transaction');
 
+/**
+ * Map a DB/API row into the domain shape used by callers (mapDamageReport).
+ * @param {object} row
+ * @returns {*}
+ */
 function mapDamageReport(row) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) return null;
   let photos = row.photos;
   if (typeof photos === 'string') {
+    // Protected block: isolate failure modes.
     try {
       photos = JSON.parse(photos);
     } catch {
       photos = [];
     }
   }
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!Array.isArray(photos)) photos = [];
 
   return {
@@ -27,6 +38,12 @@ function mapDamageReport(row) {
   };
 }
 
+/**
+ * List by car id from SQL.
+ * @param {string|number} carId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function listByCarId(carId, client = null) {
   const result = await clientQuery(
     client,
@@ -41,6 +58,13 @@ async function listByCarId(carId, client = null) {
   return result.rows.map(mapDamageReport);
 }
 
+/**
+ * Find by id via SQL; returns null when missing.
+ * @param {string|number} carId
+ * @param {string|number} reportId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findById(carId, reportId, client = null) {
   const result = await clientQuery(
     client,
@@ -55,6 +79,12 @@ async function findById(carId, reportId, client = null) {
   return mapDamageReport(result.rows[0]);
 }
 
+/**
+ * count unresolved.
+ * @param {string|number} carId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function countUnresolved(carId, client = null) {
   const result = await clientQuery(
     client,
@@ -68,6 +98,13 @@ async function countUnresolved(carId, client = null) {
   return result.rows[0]?.count ?? 0;
 }
 
+/**
+ * Insert a new row and return the mapped result.
+ * @param {string|number} carId
+ * @param {*} payload
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function create(carId, payload, client = null) {
   const result = await clientQuery(
     client,
@@ -96,6 +133,13 @@ async function create(carId, payload, client = null) {
   return mapDamageReport(result.rows[0]);
 }
 
+/**
+ * Resolve  from inputs / Stripe / DB.
+ * @param {string|number} carId
+ * @param {string|number} reportId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function resolve(carId, reportId, client = null) {
   const result = await clientQuery(
     client,
@@ -113,6 +157,13 @@ async function resolve(carId, reportId, client = null) {
   return mapDamageReport(result.rows[0]);
 }
 
+/**
+ * Delete row; returns whether a row was affected.
+ * @param {string|number} carId
+ * @param {string|number} reportId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function remove(carId, reportId, client = null) {
   const result = await clientQuery(
     client,
@@ -123,6 +174,7 @@ async function remove(carId, reportId, client = null) {
     `,
     [Number(reportId), Number(carId)]
   );
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!result.rowCount) return null;
   return mapDamageReport({ ...result.rows[0], car_id: carId, description: '', status: 'resolved' });
 }

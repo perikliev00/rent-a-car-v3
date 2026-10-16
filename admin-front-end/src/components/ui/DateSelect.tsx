@@ -1,3 +1,6 @@
+/**
+ * Accessible ISO-date picker with portal popup (avoids native date quirks).
+ */
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -31,14 +34,23 @@ const MONTHS = [
   'December',
 ];
 
+/**
+ * Parse a strict `YYYY-MM-DD` into a local Date, or null if invalid/nonexistent.
+ * @param value - ISO date string
+ */
 function parseISODate(value: string): Date | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
   const [y, m, d] = value.split('-').map(Number);
   const date = new Date(y, m - 1, d);
+  // Reject overflow dates like 2024-02-31 that JS would roll forward.
   if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) return null;
   return date;
 }
 
+/**
+ * Format a Date as `YYYY-MM-DD` in local time.
+ * @param date - Local date
+ */
 function toISODate(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -46,10 +58,18 @@ function toISODate(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+/**
+ * Truncate a Date to local midnight.
+ * @param date - Any datetime
+ */
 function startOfDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
+/**
+ * Human-readable trigger label, or “Select date” when unset/invalid.
+ * @param value - Controlled ISO date string
+ */
 function formatDisplay(value: string): string {
   const date = parseISODate(value);
   if (!date) return 'Select date';
@@ -61,6 +81,7 @@ function formatDisplay(value: string): string {
   });
 }
 
+/** Decorative calendar glyph inside the trigger button. */
 function CalendarIcon({ className = '' }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -74,11 +95,17 @@ function CalendarIcon({ className = '' }: { className?: string }) {
 const triggerClass =
   'flex min-h-11 w-full min-w-0 items-center justify-between gap-3 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] px-3.5 py-2.5 text-left text-sm text-[var(--color-ink)] shadow-sm transition-[border-color,box-shadow] focus:border-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/25';
 
+/**
+ * Position the calendar popup under (or above) the trigger within the viewport.
+ * @param anchor - Trigger getBoundingClientRect()
+ * @param pickerHeight - Measured popup height
+ */
 function computePickerPos(anchor: DOMRect, pickerHeight: number) {
   const width = Math.min(19 * 16, Math.max(0, window.innerWidth - 16));
   const left = Math.min(Math.max(8, anchor.left), Math.max(8, window.innerWidth - width - 8));
   const spaceBelow = window.innerHeight - anchor.bottom - 8;
   const spaceAbove = anchor.top - 8;
+  // Flip above when there is more room above than below.
   const placeAbove = spaceBelow < pickerHeight && spaceAbove > spaceBelow;
   const top = placeAbove
     ? Math.max(8, anchor.top - pickerHeight - 6)
@@ -86,6 +113,7 @@ function computePickerPos(anchor: DOMRect, pickerHeight: number) {
   return { top, left, width };
 }
 
+/** Accessible ISO-date picker with portal popup (avoids native date quirks). */
 export function DateSelect({
   label,
   value,

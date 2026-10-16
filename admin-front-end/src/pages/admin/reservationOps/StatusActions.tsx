@@ -1,3 +1,6 @@
+/**
+ * Permission-gated status change + refund action controls.
+ */
 import { useMemo, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import {
@@ -16,6 +19,7 @@ import { toast } from '../../../components/ui/toastStore';
 import { noteLocalAdminMutation } from '../../../hooks/useAdminRealtime';
 import { RefundConfirmModal } from '../refund/RefundConfirmModal';
 
+/** Permission-gated status change + refund action controls. */
 export function StatusActions({
   row,
   onChanged,
@@ -29,6 +33,7 @@ export function StatusActions({
   const canRefund = hasPermission(user, 'can_refund_payments');
   const ledgerStatus = row.refundOperation?.status;
   const refundPending = ledgerStatus === 'pending';
+  // Hide refund when already succeeded or reservation is past refundable statuses.
   const showRefund =
     allowRefund &&
     canRefund &&
@@ -47,6 +52,7 @@ export function StatusActions({
     onSuccess: () => {
       toast('Status updated', 'success');
       setStatus('');
+      // Avoid duplicate SSE toast for the mutation we just performed.
       noteLocalAdminMutation();
       onChanged();
     },

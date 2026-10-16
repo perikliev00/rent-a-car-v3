@@ -21,6 +21,13 @@ const {
   runCommand,
 } = require('./dbCliUtils');
 
+/**
+ * Restore a plain SQL backup using psql.
+ *
+ * @param {*} [argv] - argv = process.argv.slice(2)
+ * @returns {Promise<*>}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 async function restore(argv = process.argv.slice(2)) {
   assertDevelopmentOnly('db:restore');
 

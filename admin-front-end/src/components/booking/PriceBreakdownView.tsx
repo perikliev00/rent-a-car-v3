@@ -1,6 +1,15 @@
+/**
+ * Renders a priced quote line-item breakdown for admin order/pricing UIs.
+ */
 import type { PriceBreakdown } from '../../types/api';
 import { formatPrice } from '../../utils/format';
 
+/**
+ * Line items, total, and optional deposit row for a {@link PriceBreakdown}.
+ * Negative line amounts are tinted as discounts.
+ *
+ * @param breakdown - Quote breakdown from pricing/order APIs
+ */
 export function PriceBreakdownView({ breakdown }: { breakdown: PriceBreakdown }) {
   return (
     <div className="space-y-2 border-t border-[var(--color-line)] pt-4 text-sm">

@@ -1,5 +1,14 @@
+/**
+ * Reusable section chrome for pricing settings panels.
+ */
 import { Card, CardBody } from '../../../components/ui/Card';
 
+/**
+ * Card wrapper with title and optional hint for pricing settings panels.
+ * @param title - Section heading
+ * @param children - Section body controls
+ * @param hint - Optional muted helper text under the title
+ */
 export function PricingSection({
   title,
   children,

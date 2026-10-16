@@ -1,3 +1,6 @@
+/**
+ * Damage-report query/mutation hooks for a car.
+ */
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -10,6 +13,13 @@ import { toast } from '../../../components/ui/toastStore';
 import type { DamageForm, Tab } from './carDetailTypes';
 import { refreshCar } from './carDetailRefresh';
 
+/**
+ * Damage-report CRUD helpers for a car (active on the Damage tab).
+ * Create uses multipart FormData so optional photos can be attached.
+ *
+ * @param id - Car id
+ * @param tab - Active detail tab
+ */
 export function useCarDamage(id: string, tab: Tab) {
   const queryClient = useQueryClient();
   const [damageForm, setDamageForm] = useState<DamageForm>({
@@ -31,6 +41,7 @@ export function useCarDamage(id: string, tab: Tab) {
       fd.append('description', damageForm.description);
       if (damageForm.reservationId) fd.append('reservationId', damageForm.reservationId);
       if (damageForm.repairCost) fd.append('repairCost', damageForm.repairCost);
+      // Multiple files share the `photos` field name expected by the API.
       if (damagePhotos) {
         Array.from(damagePhotos).forEach((file) => fd.append('photos', file));
       }
@@ -46,6 +57,7 @@ export function useCarDamage(id: string, tab: Tab) {
     onError: (err) => toast((err as Error).message, 'error'),
   });
 
+  /** Mark a damage report resolved and refresh the list. */
   async function resolveDamage(reportId: number) {
     try {
       await resolveCarDamageReport(id, reportId);
@@ -56,6 +68,7 @@ export function useCarDamage(id: string, tab: Tab) {
     }
   }
 
+  /** Delete a damage report and refresh the list. */
   async function deleteDamage(reportId: number) {
     try {
       await deleteCarDamageReport(id, reportId);

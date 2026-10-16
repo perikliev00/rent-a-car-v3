@@ -1,6 +1,15 @@
+/**
+ * SQL upsert/find for return_checklists tied to reservations.
+ */
 const { clientQuery } = require('../../db/transaction');
 
+/**
+ * Map a DB/API row into the domain shape used by callers (mapChecklist).
+ * @param {object} row
+ * @returns {*}
+ */
 function mapChecklist(row) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) return null;
   return {
     id: Number(row.id),
@@ -22,6 +31,12 @@ function mapChecklist(row) {
   };
 }
 
+/**
+ * Find by reservation id via SQL; returns null when missing.
+ * @param {string|number} reservationId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findByReservationId(reservationId, client = null) {
   const result = await clientQuery(
     client,
@@ -35,6 +50,12 @@ async function findByReservationId(reservationId, client = null) {
   return mapChecklist(result.rows[0]);
 }
 
+/**
+ * Update or upsert row; returns null when not found.
+ * @param {*} payload
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function upsert(payload, client = null) {
   const result = await clientQuery(
     client,

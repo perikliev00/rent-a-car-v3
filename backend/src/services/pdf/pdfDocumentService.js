@@ -9,14 +9,29 @@ const ACCENT = '#C4A35A';
 const INK = '#1a1a1a';
 const MUTED = '#666666';
 
+/**
+ * location label.
+ * @param {string|number} id
+ * @returns {*}
+ */
 function locationLabel(id) {
   return LOCATION_LABELS[id] || id || '—';
 }
 
+/**
+ * money.
+ * @param {*} value
+ * @returns {*}
+ */
 function money(value) {
   return `EUR ${Number(value || 0).toFixed(2)}`;
 }
 
+/**
+ * car name.
+ * @param {object} reservation
+ * @returns {*}
+ */
 function carName(reservation) {
   if (reservation.carId && typeof reservation.carId === 'object') {
     return reservation.carId.name || 'Vehicle';
@@ -24,6 +39,12 @@ function carName(reservation) {
   return 'Vehicle';
 }
 
+/**
+ * draw header.
+ * @param {*} doc
+ * @param {*} title
+ * @returns {*}
+ */
 function drawHeader(doc, title) {
   doc.fillColor(INK).fontSize(22).font('Helvetica-Bold').text('LuxRide', { continued: false });
   doc.fillColor(ACCENT).fontSize(10).font('Helvetica').text('Premium car rental — Bulgaria');
@@ -34,6 +55,11 @@ function drawHeader(doc, title) {
   doc.moveDown(1);
 }
 
+/**
+ * draw footer.
+ * @param {*} doc
+ * @returns {*}
+ */
 function drawFooter(doc) {
   const bottom = doc.page.height - 40;
   doc.fontSize(8).fillColor(MUTED).text(
@@ -44,11 +70,25 @@ function drawFooter(doc) {
   );
 }
 
+/**
+ * field.
+ * @param {*} doc
+ * @param {*} label
+ * @param {*} value
+ * @returns {*}
+ */
 function field(doc, label, value) {
   doc.font('Helvetica-Bold').fillColor(INK).fontSize(10).text(`${label}: `, { continued: true });
   doc.font('Helvetica').fillColor(MUTED).text(String(value ?? '—'));
 }
 
+/**
+ * reservation block.
+ * @param {*} doc
+ * @param {object} reservation
+ * @param {object} order
+ * @returns {*}
+ */
 function reservationBlock(doc, reservation, order) {
   field(doc, 'Reservation', `#${reservation.id}`);
   if (order?.id) field(doc, 'Order', `#${order.id}`);
@@ -73,6 +113,11 @@ function reservationBlock(doc, reservation, order) {
   doc.moveDown(0.5);
 }
 
+/**
+ * Transform helper: build pdf buffer.
+ * @param {*} buildFn
+ * @returns {*}
+ */
 function buildPdfBuffer(buildFn) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 50, size: 'A4' });
@@ -80,6 +125,7 @@ function buildPdfBuffer(buildFn) {
     doc.on('data', (chunk) => chunks.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
+    // Protected block: isolate failure modes.
     try {
       buildFn(doc);
       drawFooter(doc);
@@ -90,6 +136,11 @@ function buildPdfBuffer(buildFn) {
   });
 }
 
+/**
+ * Load context.
+ * @param {object} reservation
+ * @returns {Promise<*>}
+ */
 async function loadContext(reservation) {
   const order = await orderSql.findOrderByReservationId(reservation.id);
   const pickupChecklist = await pickupSql.findByReservationId(reservation.id);
@@ -97,6 +148,11 @@ async function loadContext(reservation) {
   return { order, pickupChecklist, returnChecklist };
 }
 
+/**
+ * generate rental agreement.
+ * @param {object} reservation
+ * @returns {Promise<*>}
+ */
 async function generateRentalAgreement(reservation) {
   const { order } = await loadContext(reservation);
   return buildPdfBuffer((doc) => {
@@ -115,6 +171,11 @@ async function generateRentalAgreement(reservation) {
   });
 }
 
+/**
+ * generate invoice.
+ * @param {object} reservation
+ * @returns {Promise<*>}
+ */
 async function generateInvoice(reservation) {
   const { order } = await loadContext(reservation);
   return buildPdfBuffer((doc) => {
@@ -134,12 +195,18 @@ async function generateInvoice(reservation) {
   });
 }
 
+/**
+ * generate receipt.
+ * @param {object} reservation
+ * @returns {Promise<*>}
+ */
 async function generateReceipt(reservation) {
   const { order } = await loadContext(reservation);
   return buildPdfBuffer((doc) => {
     drawHeader(doc, 'Payment Receipt');
     reservationBlock(doc, reservation, order);
     field(doc, 'Payment status', reservation.status);
+    // Stripe / payment-related branch.
     if (reservation.stripeSessionId) {
       field(doc, 'Stripe session', reservation.stripeSessionId);
     }
@@ -150,6 +217,11 @@ async function generateReceipt(reservation) {
   });
 }
 
+/**
+ * generate damage report.
+ * @param {object} reservation
+ * @returns {Promise<*>}
+ */
 async function generateDamageReport(reservation) {
   const { pickupChecklist, returnChecklist } = await loadContext(reservation);
   return buildPdfBuffer((doc) => {
@@ -163,8 +235,14 @@ async function generateDamageReport(reservation) {
   });
 }
 
+/**
+ * generate pickup checklist pdf.
+ * @param {object} reservation
+ * @returns {Promise<*>}
+ */
 async function generatePickupChecklistPdf(reservation) {
   const { pickupChecklist } = await loadContext(reservation);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!pickupChecklist) {
     const err = new Error('Pickup checklist not found');
     err.code = 'NOT_FOUND';
@@ -185,8 +263,14 @@ async function generatePickupChecklistPdf(reservation) {
   });
 }
 
+/**
+ * generate return checklist pdf.
+ * @param {object} reservation
+ * @returns {Promise<*>}
+ */
 async function generateReturnChecklistPdf(reservation) {
   const { returnChecklist } = await loadContext(reservation);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!returnChecklist) {
     const err = new Error('Return checklist not found');
     err.code = 'NOT_FOUND';
@@ -216,8 +300,15 @@ const GENERATORS = {
   return_checklist: generateReturnChecklistPdf,
 };
 
+/**
+ * generate pdf.
+ * @param {*} kind
+ * @param {object} reservation
+ * @returns {Promise<*>}
+ */
 async function generatePdf(kind, reservation) {
   const generator = GENERATORS[kind];
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!generator) {
     const err = new Error('Unknown PDF document type');
     err.code = 'VALIDATION_ERROR';

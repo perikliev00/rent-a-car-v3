@@ -1,3 +1,6 @@
+/**
+ * Long-rental / early / last-minute discount editors.
+ */
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   updateDiscount,
@@ -7,9 +10,14 @@ import { Input } from '../../../components/ui/Input';
 import { toast } from '../../../components/ui/toastStore';
 import { PricingSection } from './PricingSection';
 
+/**
+ * Editors for long-rental / early-booking / last-minute discount rules.
+ * @param rules - Discount rules from the pricing bundle
+ */
 export function DiscountsSection({ rules }: { rules: PricingDiscountRule[] }) {
   const queryClient = useQueryClient();
 
+  // Wrap so callers pass `{ id, ...fields }` while the API takes (id, data).
   const discountMutation = useMutation({
     mutationFn: ({
       id,

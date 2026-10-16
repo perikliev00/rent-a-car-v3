@@ -1,3 +1,6 @@
+/**
+ * Read-side reservation finds (by id, overlap, open physical rental, etc.).
+ */
 const { clientQuery } = require('../../../db/transaction');
 const { ACTIVE_RESERVATION_STATUSES } = require('../../../utils/reservationHelpers');
 const {
@@ -9,8 +12,16 @@ const {
 /** Physically out — must stay unbookable until return checklist. */
 const OPEN_PHYSICAL_RENTAL_STATUSES = Object.freeze(['picked_up', 'active_rental']);
 
+/**
+ * Find open physical rental via SQL; returns null when missing.
+ * @param {string|number} carId
+ * @param {object|null} [client]
+ * @param {object} [options]
+ * @returns {Promise<*>}
+ */
 async function findOpenPhysicalRental(carId, client = null, options = {}) {
   const normalizedCarId = normalizeCarId(carId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId) {
     return null;
   }
@@ -40,12 +51,25 @@ async function findOpenPhysicalRental(carId, client = null, options = {}) {
   return mapSqlReservation(result.rows[0]) || null;
 }
 
+/**
+ * car has open physical rental.
+ * @param {string|number} carId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function carHasOpenPhysicalRental(carId, client = null) {
   const open = await findOpenPhysicalRental(carId, client);
   return Boolean(open);
 }
 
+/**
+ * Find active by session id via SQL; returns null when missing.
+ * @param {string|number} sessionId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findActiveBySessionId(sessionId, client = null) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!sessionId) {
     return null;
   }
@@ -70,6 +94,13 @@ async function findActiveBySessionId(sessionId, client = null) {
   return mapSqlReservation(result.rows[0]) || null;
 }
 
+/**
+ * Find an active pending hold overlapping the date range for a car.
+ * Optional excludes avoid matching the caller's own session/reservation during rehold.
+ * @param {object} params
+ * @param {object|null} [client]
+ * @returns {Promise<object|null>}
+ */
 async function findOverlappingHold(
   {
     carId,
@@ -125,8 +156,17 @@ async function findOverlappingHold(
   return mapSqlReservation(result.rows[0]) || null;
 }
 
+/**
+ * Find booked date overlap via SQL; returns null when missing.
+ * @param {string|number} carId
+ * @param {*} startDate
+ * @param {*} endDate
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findBookedDateOverlap(carId, startDate, endDate, client = null) {
   const normalizedCarId = normalizeCarId(carId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId) {
     return null;
   }
@@ -144,6 +184,7 @@ async function findBookedDateOverlap(carId, startDate, endDate, client = null) {
     [normalizedCarId, startDate, endDate]
   );
 
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!result.rowCount) {
     return null;
   }
@@ -151,8 +192,15 @@ async function findBookedDateOverlap(carId, startDate, endDate, client = null) {
   return { id: String(normalizedCarId) };
 }
 
+/**
+ * Find by id via SQL; returns null when missing.
+ * @param {string|number} id
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findById(id, client = null) {
   const reservationId = Number(id);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(reservationId) || reservationId <= 0) {
     return null;
   }
@@ -174,8 +222,15 @@ async function findById(id, client = null) {
   return mapSqlReservation(result.rows[0]) || null;
 }
 
+/**
+ * Find by id for update via SQL; returns null when missing.
+ * @param {string|number} id
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findByIdForUpdate(id, client = null) {
   const reservationId = Number(id);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(reservationId) || reservationId <= 0) {
     return null;
   }
@@ -198,7 +253,14 @@ async function findByIdForUpdate(id, client = null) {
   return mapSqlReservation(result.rows[0]) || null;
 }
 
+/**
+ * Find by stripe session id via SQL; returns null when missing.
+ * @param {string|number} stripeSessionId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findByStripeSessionId(stripeSessionId, client = null) {
+  // Stripe / payment-related branch.
   if (!stripeSessionId) {
     return null;
   }
@@ -220,6 +282,11 @@ async function findByStripeSessionId(stripeSessionId, client = null) {
   return mapSqlReservation(result.rows[0]) || null;
 }
 
+/**
+ * Find processing with stripe session via SQL; returns null when missing.
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findProcessingWithStripeSession(client = null) {
   const result = await clientQuery(
     client,
@@ -238,6 +305,11 @@ async function findProcessingWithStripeSession(client = null) {
   return result.rows.map((row) => mapSqlReservation(row)).filter(Boolean);
 }
 
+/**
+ * Find processing with expired hold via SQL; returns null when missing.
+ * @param {*} [now]
+ * @returns {Promise<*>}
+ */
 async function findProcessingWithExpiredHold(now = new Date(), client = null) {
   const result = await clientQuery(
     client,

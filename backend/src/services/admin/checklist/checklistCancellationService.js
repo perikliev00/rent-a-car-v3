@@ -1,3 +1,8 @@
+/**
+ * Admin review of customer cancellation requests. Approving a paid reservation
+ * requires can_refund_payments and triggers Stripe refund when a payment exists;
+ * otherwise falls back to a status-only cancel.
+ */
 const cancellationSql = require('../../sql/cancellationRequestSqlService');
 const reservationSql = require('../../sql/reservationSqlService');
 const { changeStatus } = require('../../reservation/reservationStatusService');
@@ -6,6 +11,7 @@ const { REFUNDABLE_STATUSES } = require('../../payment/refund/refundPolicy');
 const { requestReservationRefund } = require('../../payment/refund/reservationRefundService');
 const rbacService = require('../../rbac/rbacService');
 
+/** Normalize session roles/permissions for RBAC checks. */
 function sessionAccess(req) {
   const user = req?.session?.user || {};
   return {
@@ -14,6 +20,7 @@ function sessionAccess(req) {
   };
 }
 
+/** Gate paid-cancellation approval behind refund permission. */
 function assertCanRefundPaidCancellation(req) {
   if (rbacService.userHasPermission(sessionAccess(req), 'can_refund_payments')) {
     return;
@@ -26,12 +33,20 @@ function assertCanRefundPaidCancellation(req) {
   throw err;
 }
 
+/** Pending cancellation requests for the ops queue. */
 async function listCancellationRequests() {
   return cancellationSql.listPending({ limit: 50 });
 }
 
+/**
+ * Approve (cancel + optional refund) or reject a pending cancellation request.
+ * @param {import('express').Request} req
+ * @param {number|string} requestId
+ * @param {{approve: boolean, adminNote?: string}} decision
+ */
 async function reviewCancellationRequest(req, requestId, { approve, adminNote }) {
   const existing = await cancellationSql.findById(requestId);
+  // Idempotency guard: return early when work was already applied.
   if (!existing || existing.status !== 'pending') {
     const err = new Error('Cancellation request not found');
     err.code = 'NOT_FOUND';
@@ -39,6 +54,7 @@ async function reviewCancellationRequest(req, requestId, { approve, adminNote })
     throw err;
   }
 
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!approve) {
     const reviewed = await cancellationSql.review({
       id: requestId,
@@ -59,7 +75,9 @@ async function reviewCancellationRequest(req, requestId, { approve, adminNote })
   let reservation = await reservationSql.findById(existing.reservationId);
   let refundResult = null;
 
+  // Status / lifecycle guard before mutating domain state.
   if (reservation && reservation.status !== 'cancelled') {
+    // Status / lifecycle guard before mutating domain state.
     if (REFUNDABLE_STATUSES.includes(reservation.status)) {
       assertCanRefundPaidCancellation(req);
       try {

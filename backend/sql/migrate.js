@@ -15,6 +15,13 @@ const { acquireDbSetupLock, releaseDbSetupLock } = require('./dbSetupLock');
 
 const MIGRATIONS_DIR = path.join(__dirname, '..', 'migrations');
 
+/**
+ * Ensure the schema_migrations tracking table exists.
+ *
+ * @param {*} client
+ * @returns {Promise<*>}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 async function ensureMigrationsTable(client) {
   await client.query(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -25,13 +32,22 @@ async function ensureMigrationsTable(client) {
   `);
 }
 
+/**
+ * Apply pending versioned SQL migrations in sorted order under the setup lock.
+ *
+ * @param {object} options - { endPool = true } = {}
+ * @returns {Promise<*>}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 async function migrate({ endPool = true } = {}) {
+  // Fail fast when DATABASE_URL is missing.
   requireDatabaseUrl();
 
   if (!fs.existsSync(MIGRATIONS_DIR)) {
     throw new Error(`Migrations directory not found: ${MIGRATIONS_DIR}`);
   }
 
+  // Deterministic order: lexicographic filename sort (use numbered prefixes).
   const files = fs
     .readdirSync(MIGRATIONS_DIR)
     .filter((name) => name.endsWith('.sql'))
@@ -41,11 +57,13 @@ async function migrate({ endPool = true } = {}) {
   let locked = false;
 
   try {
+    // Serialize with applySchema so concurrent containers do not interleave DDL.
     await acquireDbSetupLock(client);
     locked = true;
 
     await ensureMigrationsTable(client);
 
+    // Load already-applied names so re-runs are idempotent.
     const appliedResult = await client.query('SELECT name FROM schema_migrations');
     const applied = new Set(appliedResult.rows.map((row) => row.name));
 
@@ -60,6 +78,7 @@ async function migrate({ endPool = true } = {}) {
       const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf8');
       console.log(`→ ${file}`);
 
+      // One transaction per file: DDL + schema_migrations insert, or full rollback.
       await client.query('BEGIN');
       try {
         await client.query(sql);
@@ -78,6 +97,7 @@ async function migrate({ endPool = true } = {}) {
       console.log(`✓ Applied ${appliedCount} migration(s)`);
     }
   } finally {
+    // Always unlock and release; optionally end the process pool for CLI mode.
     if (locked) {
       try {
         await releaseDbSetupLock(client);

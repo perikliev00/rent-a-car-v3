@@ -1,3 +1,6 @@
+/**
+ * Filter controls for fleet calendar event queries.
+ */
 import { useState } from 'react';
 import { formatISO } from 'date-fns';
 import { Input } from '../../../components/ui/Input';
@@ -17,6 +20,16 @@ const FILTER_LABELS: Partial<Record<keyof CalendarFiltersState, string>> = {
   staffUserId: 'Staff',
 };
 
+/**
+ * Fleet calendar filter panel with chips, presets, and expandable advanced fields.
+ *
+ * @param filters - Current filter state
+ * @param onChange - Update one filter key
+ * @param onClear - Reset all filters
+ * @param view - Active view (affects which presets make sense)
+ * @param onApplyPreset - Apply a named filter/view preset
+ * @param compact - Tighter layout for narrow toolbars
+ */
 export function CalendarFilters({
   filters,
   onChange,
@@ -34,6 +47,7 @@ export function CalendarFilters({
 }) {
   const [expanded, setExpanded] = useState(false);
 
+  // Chips for non-empty filter values (shown even when the panel is collapsed).
   const activeChips = (Object.keys(filters) as (keyof CalendarFiltersState)[])
     .filter((k) => Boolean(filters[k]))
     .map((k) => ({

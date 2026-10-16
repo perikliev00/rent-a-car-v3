@@ -1,3 +1,6 @@
+/**
+ * Body validation for replacing an existing session hold (rehold).
+ */
 const { body } = require('express-validator');
 const { ALLOWED_LOCATIONS } = require('../constants/locations');
 const { bodyTimeRule } = require('./timeFieldRules');

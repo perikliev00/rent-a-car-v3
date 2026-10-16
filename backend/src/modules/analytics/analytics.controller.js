@@ -1,8 +1,13 @@
+/**
+ * HTTP handlers for admin analytics endpoints (JSON + CSV export).
+ */
+
 const analyticsService = require('./analytics.service');
 const apiResponse = require('../../utils/apiResponse');
 const asyncHandler = require('../../utils/asyncHandler');
 const { forwardControllerError } = require('../../utils/controllerError');
 
+/** Minimal session access object for RBAC money/export checks. */
 function sessionAccess(req) {
   return {
     roles: req.session?.user?.roles || [],
@@ -10,6 +15,12 @@ function sessionAccess(req) {
   };
 }
 
+/**
+ * Map known service errors (status+code) to API error responses.
+ * @param {Error} err
+ * @param {import('express').Response} res
+ * @returns {object|null} Response if mapped; null to fall through to forwardControllerError
+ */
 function mapServiceError(err, res) {
   if (err?.status && err?.code) {
     return apiResponse.error(res, err.code, err.message, err.status);
@@ -17,6 +28,7 @@ function mapServiceError(err, res) {
   return null;
 }
 
+/** GET analytics overview KPIs + series. */
 exports.getOverview = asyncHandler(async (req, res, next) => {
   try {
     const data = await analyticsService.getOverview({
@@ -35,6 +47,7 @@ exports.getOverview = asyncHandler(async (req, res, next) => {
   }
 });
 
+/** GET revenue breakdown by car. */
 exports.getRevenueByCar = asyncHandler(async (req, res, next) => {
   try {
     const data = await analyticsService.getRevenueByCar({
@@ -53,6 +66,7 @@ exports.getRevenueByCar = asyncHandler(async (req, res, next) => {
   }
 });
 
+/** GET revenue breakdown by pickup location. */
 exports.getRevenueByLocation = asyncHandler(async (req, res, next) => {
   try {
     const data = await analyticsService.getRevenueByLocation({
@@ -71,6 +85,7 @@ exports.getRevenueByLocation = asyncHandler(async (req, res, next) => {
   }
 });
 
+/** GET per-car utilization (no money fields). */
 exports.getUtilization = asyncHandler(async (req, res, next) => {
   try {
     const data = await analyticsService.getUtilization({
@@ -88,6 +103,7 @@ exports.getUtilization = asyncHandler(async (req, res, next) => {
   }
 });
 
+/** GET fleet car performance table. */
 exports.getCarsPerformance = asyncHandler(async (req, res, next) => {
   try {
     const data = await analyticsService.getCarsPerformance({
@@ -106,6 +122,7 @@ exports.getCarsPerformance = asyncHandler(async (req, res, next) => {
   }
 });
 
+/** GET single-car performance detail. */
 exports.getCarPerformance = asyncHandler(async (req, res, next) => {
   try {
     const data = await analyticsService.getCarPerformance({
@@ -125,6 +142,7 @@ exports.getCarPerformance = asyncHandler(async (req, res, next) => {
   }
 });
 
+/** GET CSV export of car performance (requires export permission). */
 exports.exportCsv = asyncHandler(async (req, res, next) => {
   try {
     const csv = await analyticsService.exportCsv({
@@ -132,6 +150,7 @@ exports.exportCsv = asyncHandler(async (req, res, next) => {
       to: req.query.to,
       access: sessionAccess(req),
     });
+    // Force download with a date-stamped filename for the selected range.
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader(
       'Content-Disposition',

@@ -1,3 +1,7 @@
+/**
+ * My Account reservation APIs: dashboard, list/detail, travel updates,
+ * cancellation (immediate for unpaid holds; request queue for paid bookings).
+ */
 const reservationSql = require('../sql/reservationSqlService');
 const orderSql = require('../sql/orderSqlService');
 const cancellationSql = require('../sql/cancellationRequestSqlService');
@@ -11,7 +15,9 @@ const {
 const { isTerminal } = require('../../domain/reservationStatus');
 const { isUniqueViolation } = require('../../db/transaction');
 
+/** Unpaid hold statuses — customer may cancel immediately without admin review. */
 const HOLD_STATUSES = new Set(['pending_payment', 'processing_payment']);
+/** Paid/ops statuses that require a cancellation request for staff approval. */
 const REQUEST_CANCEL_STATUSES = new Set([
   'paid',
   'confirmed',
@@ -29,15 +35,31 @@ const PAYMENT_PAID_STATUSES = new Set([
   'completed',
 ]);
 
+/**
+ * Coarse payment label for the account UI (not a separate payments table).
+ * @param {string} status
+ * @returns {string}
+ */
 function paymentStatusLabel(status) {
+  // Status / lifecycle guard before mutating domain state.
   if (HOLD_STATUSES.has(status)) return 'pending';
+  // Status / lifecycle guard before mutating domain state.
   if (status === 'manual_review') return 'manual_review';
+  // Status / lifecycle guard before mutating domain state.
   if (status === 'refunded') return 'refunded';
+  // Status / lifecycle guard before mutating domain state.
   if (status === 'expired' || status === 'cancelled') return status;
+  // Status / lifecycle guard before mutating domain state.
   if (PAYMENT_PAID_STATUSES.has(status)) return 'paid';
   return status;
 }
 
+/**
+ * Map a reservation row to the public account DTO.
+ * @param {object} reservation
+ * @param {object} [extras]
+ * @returns {object}
+ */
 function toPublicReservation(reservation, extras = {}) {
   const carName =
     reservation.carId && typeof reservation.carId === 'object'
@@ -76,6 +98,10 @@ function toPublicReservation(reservation, extras = {}) {
   };
 }
 
+/**
+ * @param {string|number} userId
+ * @returns {Promise<object>}
+ */
 async function getDashboard(userId) {
   const reservations = await reservationSql.listByUserId(userId, { limit: 100 });
   const upcoming = reservations.find((r) =>
@@ -97,13 +123,23 @@ async function getDashboard(userId) {
   };
 }
 
+/**
+ * @param {string|number} userId
+ * @returns {Promise<object[]>}
+ */
 async function listReservations(userId) {
   const reservations = await reservationSql.listByUserId(userId, { limit: 100 });
   return reservations.map((r) => toPublicReservation(r));
 }
 
+/**
+ * Full reservation detail including instructions, cancellation, PDF availability.
+ * @param {string|number} userId
+ * @param {string|number} reservationId
+ */
 async function getReservationDetail(userId, reservationId) {
   const reservation = await reservationSql.findByIdForUser(reservationId, userId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!reservation) {
     const err = new Error('Reservation not found');
     err.code = 'NOT_FOUND';
@@ -112,6 +148,7 @@ async function getReservationDetail(userId, reservationId) {
   }
 
   let order = null;
+  // Protected block: isolate failure modes.
   try {
     order = await orderSql.findOrderByReservationId(reservationId);
   } catch {
@@ -128,6 +165,7 @@ async function getReservationDetail(userId, reservationId) {
   const availablePdfs = ['rental_agreement', 'invoice', 'receipt'];
   if (pickupChecklist) availablePdfs.push('pickup_checklist');
   if (returnChecklist) availablePdfs.push('return_checklist');
+  // Idempotency guard: return early when work was already applied.
   if (returnChecklist?.newDamages || pickupChecklist?.existingDamages) {
     availablePdfs.push('damage_report');
   }
@@ -146,8 +184,12 @@ async function getReservationDetail(userId, reservationId) {
   });
 }
 
+/**
+ * Update flight/hotel travel fields on an owned reservation.
+ */
 async function updateTravel(userId, reservationId, travel) {
   const updated = await reservationSql.updateTravelDetails(reservationId, userId, travel);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!updated) {
     const err = new Error('Reservation not found');
     err.code = 'NOT_FOUND';
@@ -157,8 +199,17 @@ async function updateTravel(userId, reservationId, travel) {
   return toPublicReservation(updated);
 }
 
+/**
+ * Cancel an unpaid hold immediately, or create a pending cancellation request for paid bookings.
+ *
+ * @param {import('express').Request} req
+ * @param {string|number} userId
+ * @param {string|number} reservationId
+ * @param {string} [reason]
+ */
 async function requestCancellation(req, userId, reservationId, reason) {
   const reservation = await reservationSql.findByIdForUser(reservationId, userId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!reservation) {
     const err = new Error('Reservation not found');
     err.code = 'NOT_FOUND';
@@ -166,6 +217,7 @@ async function requestCancellation(req, userId, reservationId, reason) {
     throw err;
   }
 
+  // Status / lifecycle guard before mutating domain state.
   if (isTerminal(reservation.status) && reservation.status !== 'cancelled') {
     const err = new Error('This reservation can no longer be cancelled.');
     err.code = 'VALIDATION_ERROR';
@@ -173,6 +225,7 @@ async function requestCancellation(req, userId, reservationId, reason) {
     throw err;
   }
 
+  // Status / lifecycle guard before mutating domain state.
   if (reservation.status === 'cancelled') {
     const err = new Error('Reservation is already cancelled.');
     err.code = 'VALIDATION_ERROR';
@@ -180,6 +233,7 @@ async function requestCancellation(req, userId, reservationId, reason) {
     throw err;
   }
 
+  // Unpaid holds: release immediately so the car becomes available again.
   if (HOLD_STATUSES.has(reservation.status)) {
     const { reservation: updated } = await changeStatus({
       reservationId,
@@ -195,6 +249,7 @@ async function requestCancellation(req, userId, reservationId, reason) {
     };
   }
 
+  // Status / lifecycle guard before mutating domain state.
   if (!REQUEST_CANCEL_STATUSES.has(reservation.status)) {
     const err = new Error(
       'Cancellation requests are not available for this reservation status. Please contact support.'
@@ -205,6 +260,7 @@ async function requestCancellation(req, userId, reservationId, reason) {
   }
 
   const existing = await cancellationSql.findPendingForReservation(reservationId);
+  // Idempotency guard: return early when work was already applied.
   if (existing) {
     return {
       immediate: false,
@@ -213,6 +269,7 @@ async function requestCancellation(req, userId, reservationId, reason) {
     };
   }
 
+  // Protected block: isolate failure modes.
   try {
     const cancellationRequest = await cancellationSql.create({
       reservationId,
@@ -225,6 +282,7 @@ async function requestCancellation(req, userId, reservationId, reason) {
       cancellationRequest,
     };
   } catch (err) {
+    // Concurrent duplicate request — return the existing pending row.
     if (isUniqueViolation(err)) {
       const pending = await cancellationSql.findPendingForReservation(reservationId);
       return {
@@ -237,9 +295,13 @@ async function requestCancellation(req, userId, reservationId, reason) {
   }
 }
 
+/**
+ * Load reservation for PDF generation (owner or admin).
+ */
 async function getReservationForPdf(userId, reservationId, { admin = false } = {}) {
   if (admin) {
     const reservation = await reservationSql.findById(reservationId);
+    // Guard: early-return or throw when required input is missing/invalid.
     if (!reservation) {
       const err = new Error('Reservation not found');
       err.code = 'NOT_FOUND';
@@ -249,6 +311,7 @@ async function getReservationForPdf(userId, reservationId, { admin = false } = {
     return reservation;
   }
   const reservation = await reservationSql.findByIdForUser(reservationId, userId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!reservation) {
     const err = new Error('Reservation not found');
     err.code = 'NOT_FOUND';

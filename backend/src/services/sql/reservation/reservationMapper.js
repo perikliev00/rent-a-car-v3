@@ -1,21 +1,41 @@
+/**
+ * Map reservation SQL rows to camelCase domain objects.
+ */
 const { ACTIVE_RESERVATION_STATUSES } = require('../../../utils/reservationHelpers');
 
 const ACTIVE_STATUS_SQL = ACTIVE_RESERVATION_STATUSES.map((s) => `'${s}'`).join(', ');
 
+/**
+ * Normalize car id before persistence or comparison.
+ * @param {string|number} carId
+ * @returns {*}
+ */
 function normalizeCarId(carId) {
   const id = Number(carId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(id) || id <= 0) {
     return null;
   }
   return id;
 }
 
+/**
+ * Transform helper: to number or zero.
+ * @param {*} value
+ * @returns {*}
+ */
 function toNumberOrZero(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number : 0;
 }
 
+/**
+ * Map a DB/API row into the domain shape used by callers (mapSqlReservation).
+ * @param {object} row
+ * @returns {*}
+ */
 function mapSqlReservation(row) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) {
     return null;
   }

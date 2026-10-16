@@ -1,13 +1,27 @@
+/**
+ * SQL access for the admin_audit_logs table (insert + filtered list).
+ */
 const { clientQuery } = require('../../db/transaction');
 
+/**
+ * Normalize admin user id before persistence or comparison.
+ * @param {*} value
+ * @returns {*}
+ */
 function normalizeAdminUserId(value) {
   const id = Number(value);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(id) || id <= 0) {
     return null;
   }
   return id;
 }
 
+/**
+ * Normalize actor type before persistence or comparison.
+ * @param {*} value
+ * @returns {*}
+ */
 function normalizeActorType(value) {
   if (value === 'system' || value === 'admin' || value === 'customer') {
     return value;
@@ -15,7 +29,13 @@ function normalizeActorType(value) {
   return 'admin';
 }
 
+/**
+ * Map a DB/API row into the domain shape used by callers (mapAuditLogRow).
+ * @param {object} row
+ * @returns {*}
+ */
 function mapAuditLogRow(row) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) return null;
 
   const action = row.action;
@@ -43,6 +63,20 @@ function mapAuditLogRow(row) {
   };
 }
 
+/**
+ * Insert an admin audit log row (action + entity required).
+ * @param {object} params
+ * @param {string|number|null} [params.adminUserId]
+ * @param {string} [params.actorType='admin']
+ * @param {string} params.action
+ * @param {string} params.entityType
+ * @param {string|number|null} [params.entityId]
+ * @param {object|null} [params.metadata]
+ * @param {string|null} [params.ipAddress]
+ * @param {object|null} [client]
+ * @returns {Promise<{ id: number, created_at: * }>}
+ * @throws {Error} when action or entityType is missing
+ */
 async function insertAuditLog(
   {
     adminUserId = null,
@@ -88,6 +122,12 @@ async function insertAuditLog(
   return result.rows[0];
 }
 
+/**
+ * Paginated audit log list with optional filters (time, actor, action, entity).
+ * @param {object} [params]
+ * @param {object|null} [client]
+ * @returns {Promise<{ items: object[], page: number, limit: number, total: number }>}
+ */
 async function listAuditLogs(
   {
     from = null,
@@ -103,6 +143,7 @@ async function listAuditLogs(
   } = {},
   client = null
 ) {
+  // Clamp pagination to keep admin list queries bounded.
   const safePage = Math.max(1, Number(page) || 1);
   const safeLimit = Math.min(100, Math.max(1, Number(limit) || 50));
   const offset = (safePage - 1) * safeLimit;

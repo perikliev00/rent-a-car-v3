@@ -1,3 +1,7 @@
+/**
+ * Fleet car admin APIs: CRUD, fleet status, service/damage/documents/compliance,
+ * availability checks, and fleet-alert reconciliation.
+ */
 import type {
   Car,
   CarComplianceItem,
@@ -8,12 +12,16 @@ import type {
 } from '../../types/api';
 import { api, apiFormData, downloadAuthenticated } from '../client';
 
+/**
+ * List all cars for the admin fleet table.
+ */
 export async function getAdminCars(): Promise<{ cars: Car[] }> {
   return api<{ cars: Car[] }>('/api/admin/cars');
 }
 
 export type FleetAlertSeverity = 'critical' | 'warning' | 'info';
 
+/** Server-derived alert kinds (expiry, damage, status, overdue service). */
 export type FleetAlertType =
   | 'insurance_expired'
   | 'insurance_expiring_soon'
@@ -48,32 +56,62 @@ export interface FleetAlertsData {
   alerts: FleetAlert[];
 }
 
+/**
+ * Current fleet alert feed used by the Fleet Alerts page and nav badge.
+ */
 export async function getFleetAlerts(): Promise<FleetAlertsData> {
   return api<FleetAlertsData>('/api/admin/cars/fleet-alerts');
 }
 
+/**
+ * Recomputes alerts from live car/compliance data (ops self-heal).
+ */
 export async function reconcileFleetAlerts(): Promise<
   FleetAlertsData & { reconcile?: Record<string, unknown> }
 > {
   return api('/api/admin/cars/fleet-alerts/reconcile', { method: 'POST' });
 }
 
+/**
+ * Load a single car for the car detail page.
+ * @param id - Car id
+ */
 export async function getAdminCar(id: string): Promise<{ car: Car }> {
   return api<{ car: Car }>(`/api/admin/cars/${id}`);
 }
 
+/**
+ * Create a car via multipart form (supports image upload).
+ * @param formData - Multipart fields + optional photo
+ */
 export async function createAdminCar(formData: FormData): Promise<{ car: Car }> {
   return apiFormData<{ car: Car }>('/api/admin/cars', formData);
 }
 
+/**
+ * Replace/update a car via multipart form (PUT).
+ * @param id - Car id
+ * @param formData - Multipart fields + optional photo
+ */
 export async function updateAdminCar(id: string, formData: FormData): Promise<{ car: Car }> {
   return apiFormData<{ car: Car }>(`/api/admin/cars/${id}`, formData, 'PUT');
 }
 
+/**
+ * Permanently delete a car record.
+ * @param id - Car id
+ */
 export async function deleteAdminCar(id: string): Promise<{ deleted: boolean; id: number }> {
   return api<{ deleted: boolean; id: number }>(`/api/admin/cars/${id}`, { method: 'DELETE' });
 }
 
+/**
+ * Explicit fleet-status transition (separate from inventory edit).
+ *
+ * @param id - Car id
+ * @param body.status - Target fleet status
+ * @param body.reason - Optional reason stored with the transition
+ */
 export async function changeCarFleetStatus(
   id: string,
   body: { status: CarFleetStatus; reason?: string }
@@ -84,10 +122,19 @@ export async function changeCarFleetStatus(
   });
 }
 
+/**
+ * List service/maintenance records for a car.
+ * @param id - Car id
+ */
 export async function getCarServiceRecords(id: string): Promise<{ records: CarServiceRecord[] }> {
   return api(`/api/admin/cars/${id}/service-records`);
 }
 
+/**
+ * Create a service record on a car.
+ * @param id - Car id
+ * @param body - Service record fields as accepted by the API
+ */
 export async function createCarServiceRecord(
   id: string,
   body: Record<string, unknown>
@@ -98,6 +145,11 @@ export async function createCarServiceRecord(
   });
 }
 
+/**
+ * Delete one service record.
+ * @param carId - Car id
+ * @param recordId - Service record id
+ */
 export async function deleteCarServiceRecord(
   carId: string,
   recordId: number
@@ -105,10 +157,19 @@ export async function deleteCarServiceRecord(
   return api(`/api/admin/cars/${carId}/service-records/${recordId}`, { method: 'DELETE' });
 }
 
+/**
+ * List damage reports for a car.
+ * @param id - Car id
+ */
 export async function getCarDamageReports(id: string): Promise<{ reports: CarDamageReport[] }> {
   return api(`/api/admin/cars/${id}/damage-reports`);
 }
 
+/**
+ * Create a damage report (multipart for optional photos).
+ * @param id - Car id
+ * @param formData - Report fields + optional images
+ */
 export async function createCarDamageReport(
   id: string,
   formData: FormData
@@ -116,6 +177,11 @@ export async function createCarDamageReport(
   return apiFormData(`/api/admin/cars/${id}/damage-reports`, formData);
 }
 
+/**
+ * Mark a damage report as resolved.
+ * @param carId - Car id
+ * @param reportId - Damage report id
+ */
 export async function resolveCarDamageReport(
   carId: string,
   reportId: number
@@ -123,6 +189,11 @@ export async function resolveCarDamageReport(
   return api(`/api/admin/cars/${carId}/damage-reports/${reportId}/resolve`, { method: 'POST' });
 }
 
+/**
+ * Delete a damage report.
+ * @param carId - Car id
+ * @param reportId - Damage report id
+ */
 export async function deleteCarDamageReport(
   carId: string,
   reportId: number
@@ -130,10 +201,19 @@ export async function deleteCarDamageReport(
   return api(`/api/admin/cars/${carId}/damage-reports/${reportId}`, { method: 'DELETE' });
 }
 
+/**
+ * List uploaded documents for a car.
+ * @param id - Car id
+ */
 export async function getCarDocuments(id: string): Promise<{ documents: CarDocument[] }> {
   return api(`/api/admin/cars/${id}/documents`);
 }
 
+/**
+ * Upload a car document (multipart).
+ * @param id - Car id
+ * @param formData - Document metadata + file
+ */
 export async function uploadCarDocument(
   id: string,
   formData: FormData
@@ -141,6 +221,12 @@ export async function uploadCarDocument(
   return apiFormData(`/api/admin/cars/${id}/documents`, formData);
 }
 
+/**
+ * Download a car document via authenticated blob fetch.
+ * @param carId - Car id
+ * @param docId - Document id
+ * @param filename - Suggested download filename
+ */
 export async function downloadCarDocument(
   carId: string,
   docId: number,
@@ -152,6 +238,11 @@ export async function downloadCarDocument(
   );
 }
 
+/**
+ * Delete a car document.
+ * @param carId - Car id
+ * @param docId - Document id
+ */
 export async function deleteCarDocument(
   carId: string,
   docId: number
@@ -159,10 +250,19 @@ export async function deleteCarDocument(
   return api(`/api/admin/cars/${carId}/documents/${docId}`, { method: 'DELETE' });
 }
 
+/**
+ * List compliance items for a car.
+ * @param id - Car id
+ */
 export async function getCarCompliance(id: string): Promise<{ items: CarComplianceItem[] }> {
   return api(`/api/admin/cars/${id}/compliance`);
 }
 
+/**
+ * Create a compliance item (multipart for optional attachment).
+ * @param id - Car id
+ * @param formData - Compliance fields + optional file
+ */
 export async function createCarCompliance(
   id: string,
   formData: FormData
@@ -170,6 +270,12 @@ export async function createCarCompliance(
   return apiFormData(`/api/admin/cars/${id}/compliance`, formData);
 }
 
+/**
+ * Update a compliance item (multipart PUT).
+ * @param carId - Car id
+ * @param itemId - Compliance item id
+ * @param formData - Updated fields + optional file
+ */
 export async function updateCarCompliance(
   carId: string,
   itemId: number,
@@ -178,6 +284,12 @@ export async function updateCarCompliance(
   return apiFormData(`/api/admin/cars/${carId}/compliance/${itemId}`, formData, 'PUT');
 }
 
+/**
+ * Download the file attached to a compliance item.
+ * @param carId - Car id
+ * @param itemId - Compliance item id
+ * @param filename - Suggested download filename
+ */
 export async function downloadCarComplianceDocument(
   carId: string,
   itemId: number,
@@ -189,6 +301,11 @@ export async function downloadCarComplianceDocument(
   );
 }
 
+/**
+ * Delete a compliance item.
+ * @param carId - Car id
+ * @param itemId - Compliance item id
+ */
 export async function deleteCarCompliance(
   carId: string,
   itemId: number
@@ -196,10 +313,21 @@ export async function deleteCarCompliance(
   return api(`/api/admin/cars/${carId}/compliance/${itemId}`, { method: 'DELETE' });
 }
 
+/**
+ * Overlap check used when creating/editing admin orders for a car.
+ * Optional times are omitted from the query when unset.
+ *
+ * @param id - Car id
+ * @param params.pickupDate - Pickup date
+ * @param params.returnDate - Return date
+ * @param params.pickupTime - Optional pickup time
+ * @param params.returnTime - Optional return time
+ */
 export async function checkCarAvailability(
   id: string,
   params: { pickupDate: string; returnDate: string; pickupTime?: string; returnTime?: string },
 ): Promise<{ available: boolean; conflicts: Array<{ startDate: string; endDate: string }> }> {
+  // Required dates always present; times only when the form supplied them.
   const qs = new URLSearchParams({
     pickupDate: params.pickupDate,
     returnDate: params.returnDate,
@@ -271,7 +399,15 @@ export const COMPLIANCE_TYPES_WITHOUT_EXPIRY = new Set([
   'warning_triangle',
 ]);
 
+/**
+ * Whether the compliance form should show issued/expiry date fields.
+ * Equipment types without expiry always return false; unknown types fall back
+ * to the “with expiry” set membership.
+ *
+ * @param itemType - Compliance type key from the form/API
+ */
 export function complianceTypeHasExpiry(itemType: string): boolean {
+  // Explicit no-date equipment wins over the with-expiry set.
   if (COMPLIANCE_TYPES_WITHOUT_EXPIRY.has(itemType)) return false;
   return COMPLIANCE_TYPES_WITH_EXPIRY.has(itemType);
 }

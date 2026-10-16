@@ -1,3 +1,6 @@
+/**
+ * Default deposit rule editor.
+ */
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   updateDeposit,
@@ -7,6 +10,12 @@ import { Input } from '../../../components/ui/Input';
 import { toast } from '../../../components/ui/toastStore';
 import { PricingSection } from './PricingSection';
 
+/**
+ * Editor for the default deposit rule (amount + active flag).
+ * Saves on blur/change via {@link updateDeposit}.
+ *
+ * @param rule - Current deposit rule from the pricing bundle (may be undefined)
+ */
 export function DepositSection({ rule }: { rule: PricingDepositRule | undefined }) {
   const queryClient = useQueryClient();
 

@@ -1,3 +1,6 @@
+/**
+ * Path-param validation for admin routes that take a car :id.
+ */
 const { param } = require('express-validator');
 
 const adminCarIdParamValidation = [

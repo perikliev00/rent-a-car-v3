@@ -1,3 +1,7 @@
+/**
+ * Single-car detail view. Continues the booking flow when trip criteria are
+ * present in the URL; otherwise prompts the customer to start a search.
+ */
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -9,6 +13,12 @@ import { parseSearchFromUrl } from '../../utils/searchParams';
 
 const PLACEHOLDER_IMAGE = '/placeholder-car.svg';
 
+/**
+ * Decorative SVG icon for a car spec row.
+ *
+ * @param props.kind - Which glyph to render (`gear` | `fuel` | `seats` | `category`).
+ * @returns An aria-hidden SVG matching the requested kind.
+ */
 function SpecIcon({ kind }: { kind: 'gear' | 'fuel' | 'seats' | 'category' }) {
   const common = 'h-5 w-5 text-[var(--color-accent-ink)]';
   if (kind === 'gear') {
@@ -59,6 +69,7 @@ function SpecIcon({ kind }: { kind: 'gear' | 'fuel' | 'seats' | 'category' }) {
       </svg>
     );
   }
+  // Default: category / diamond glyph.
   return (
     <svg className={common} viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path
@@ -72,6 +83,12 @@ function SpecIcon({ kind }: { kind: 'gear' | 'fuel' | 'seats' | 'category' }) {
   );
 }
 
+/**
+ * Format an ISO date for the trip summary card.
+ *
+ * @param iso - `YYYY-MM-DD` string from search params.
+ * @returns en-GB short date, or the raw string when parsing fails.
+ */
 function formatTripDate(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number);
   if (!y || !m || !d) return iso;
@@ -82,6 +99,12 @@ function formatTripDate(iso: string): string {
   });
 }
 
+/**
+ * Single-car detail view with specs, pricing tiers, and book CTA.
+ *
+ * @returns Car detail page, loader, or not-found fallback.
+ * @remarks Side effect: `handleBook` navigates to `/order/:carId` with the current query string.
+ */
 export function CarDetailPage() {
   const { carId } = useParams<{ carId: string }>();
   const [searchParams] = useSearchParams();
@@ -96,10 +119,12 @@ export function CarDetailPage() {
     enabled: !!carId,
   });
 
+  // Reset the placeholder flag when the car image URL changes.
   useEffect(() => {
     setImgFailed(false);
   }, [data?.car.image]);
 
+  /** Continue to the order/hold step with the current trip query intact. */
   const handleBook = () => {
     if (!search || !carId) return;
     const qs = searchParams.toString();
@@ -134,12 +159,14 @@ export function CarDetailPage() {
     { kind: 'category' as const, label: 'Category', value: car.category || 'Standard' },
   ];
 
+  // Only show tiers the API actually priced.
   const tiers = [
     { label: '1–3 days', price: car.priceTier_1_3, hint: 'Short trips' },
     { label: '7–31 days', price: car.priceTier_7_31, hint: 'Best for holidays' },
     { label: '31+ days', price: car.priceTier_31_plus, hint: 'Long-term rate' },
   ].filter((tier) => tier.price != null);
 
+  // Prefer longer-term rates for the “from” teaser when available.
   const fromPrice =
     car.priceTier_31_plus ?? car.priceTier_7_31 ?? car.priceTier_1_3 ?? car.pricePerDay ?? car.price;
 

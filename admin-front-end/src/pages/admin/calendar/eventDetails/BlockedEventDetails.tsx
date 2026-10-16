@@ -1,7 +1,11 @@
+/**
+ * Detail panel UI for manual block events.
+ */
 import { Button } from '../../../../components/ui/Button';
 import { Field, Section } from './EventDetailsPrimitives';
 import { fmt } from './formatEventDate';
 
+/** Detail panel UI for manual block events. */
 export function BlockedEventDetails({
   block,
   eventId,

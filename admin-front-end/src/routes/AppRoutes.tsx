@@ -1,3 +1,6 @@
+/**
+ * Top-level React Router map for login, admin shell, and role task pages.
+ */
 import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom';
 import { AdminLayout } from '../components/layout/AdminLayout';
 import { AdminRoute } from '../auth/AdminRoute';
@@ -28,6 +31,10 @@ import {
 } from '../pages/admin/tasks/RoleTasksPages';
 import { NotFoundPage } from '../pages/NotFoundPage';
 
+/**
+ * App route tree: public login, staff-guarded `/admin/*`, and catch-all 404.
+ * Root `/` redirects into the admin dashboard.
+ */
 export function AppRoutes() {
   return (
     <BrowserRouter>

@@ -1,3 +1,6 @@
+/**
+ * Customer cancellation-request review (approve/deny).
+ */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   listCancellationRequests,
@@ -10,10 +13,12 @@ import { toast } from '../../../components/ui/toastStore';
 
 const REFUNDABLE_STATUSES = new Set(['paid', 'manual_review', 'confirmed', 'car_prepared']);
 
+/** Is Refundable Status. */
 function isRefundableStatus(status: string | undefined): boolean {
   return Boolean(status && REFUNDABLE_STATUSES.has(status));
 }
 
+/** Customer cancellation-request review (approve/deny). */
 export function CancellationRequestsPanel({ onChanged }: { onChanged: () => void }) {
   const queryClient = useQueryClient();
   const canRefundPayments = usePermission('can_refund_payments');

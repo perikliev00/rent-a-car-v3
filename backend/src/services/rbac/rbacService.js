@@ -1,3 +1,8 @@
+/**
+ * Role-based access control: resolve user roles/permissions, assign/revoke roles,
+ * and update role permission matrices. Owner always has all permissions.
+ * Role changes destroy affected sessions so stale cookies cannot retain old rights.
+ */
 const roleSql = require('../sql/roleSqlService');
 const permissionSql = require('../sql/permissionSqlService');
 const userRoleSql = require('../sql/userRoleSqlService');
@@ -5,8 +10,16 @@ const userSql = require('../sql/userSqlService');
 const sessionSql = require('../sql/sessionSqlService');
 const { runWithTransaction, clientQuery } = require('../../db/transaction');
 
+/** Privileged role slug that implicitly grants every permission key. */
 const OWNER_SLUG = 'owner';
 
+/**
+ * Insert http error and return the mapped result.
+ * @param {*} code
+ * @param {string} message
+ * @param {string} [status]
+ * @returns {*}
+ */
 function createHttpError(code, message, status = 400) {
   const err = new Error(message);
   err.code = code;
@@ -14,6 +27,14 @@ function createHttpError(code, message, status = 400) {
   return err;
 }
 
+/**
+ * Load roles and effective permission keys for a user.
+ * Owners receive the full permission catalog regardless of role_permissions rows.
+ *
+ * @param {string|number} userId
+ * @param {object|null} [client]
+ * @returns {Promise<{ roles: string[], permissions: string[], roleDetails: object[] }>}
+ */
 async function getUserAccess(userId, client = null) {
   const roleRows = await userRoleSql.listRolesForUser(userId, client);
   const roles = roleRows.map((r) => r.roleSlug).filter(Boolean);
@@ -39,13 +60,27 @@ async function getUserAccess(userId, client = null) {
   };
 }
 
+/**
+ * user has permission.
+ * @param {object} access
+ * @param {string} permissionKey
+ * @returns {*}
+ */
 function userHasPermission(access, permissionKey) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!access) return false;
   if ((access.roles || []).includes(OWNER_SLUG)) return true;
   return (access.permissions || []).includes(permissionKey);
 }
 
+/**
+ * user has any permission.
+ * @param {object} access
+ * @param {Array<*>} keys
+ * @returns {*}
+ */
 function userHasAnyPermission(access, keys) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!access) return false;
   if ((access.roles || []).includes(OWNER_SLUG)) return true;
   const set = new Set(access.permissions || []);
@@ -57,12 +92,18 @@ function userHasAnyPermission(access, keys) {
  * `users.role` is a denormalized cache and must never grant access on its own.
  */
 function isStaffAccess(access) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!access) return false;
   if ((access.roles || []).length > 0) return true;
   if ((access.permissions || []).length > 0) return true;
   return false;
 }
 
+/**
+ * compute legacy role from assigned.
+ * @param {*} assigned
+ * @returns {*}
+ */
 function computeLegacyRoleFromAssigned(assigned) {
   const slugs = (assigned || [])
     .map((r) => r.roleSlug || r.slug)
@@ -72,6 +113,13 @@ function computeLegacyRoleFromAssigned(assigned) {
   return 'user';
 }
 
+/**
+ * Update or upsert user legacy role; returns null when not found.
+ * @param {string|number} userId
+ * @param {*} role
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function updateUserLegacyRole(userId, role, client) {
   await clientQuery(
     client,
@@ -80,12 +128,26 @@ async function updateUserLegacyRole(userId, role, client) {
   );
 }
 
+/**
+ * sync user legacy role.
+ * @param {string|number} userId
+ * @param {*} assigned
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function syncUserLegacyRole(userId, assigned, client) {
   await updateUserLegacyRole(userId, computeLegacyRoleFromAssigned(assigned), client);
 }
 
+/**
+ * assert can remove owner.
+ * @param {string|number} userId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function assertCanRemoveOwner(userId, client) {
   const currentlyOwner = await userRoleSql.userHasRoleSlug(userId, OWNER_SLUG, client);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!currentlyOwner) return;
 
   const ownerCount = await userRoleSql.countUsersWithRoleSlug(OWNER_SLUG, client);
@@ -98,9 +160,19 @@ async function assertCanRemoveOwner(userId, client) {
   }
 }
 
+/**
+ * Replace a user's roles atomically; refuses to remove the last owner.
+ * Destroys all sessions for the user after commit.
+ *
+ * @param {string|number} userId
+ * @param {Array<string|number>} roleIds
+ * @param {string|number|null} [assignedByUserId]
+ */
 async function setUserRoles(userId, roleIds, assignedByUserId = null) {
+  // Open a DB transaction so writes commit atomically.
   const result = await runWithTransaction(async (client) => {
     const user = await userSql.findUserById(userId, client);
+    // Guard: early-return or throw when required input is missing/invalid.
     if (!user) {
       throw createHttpError('NOT_FOUND', 'User not found.', 404);
     }
@@ -113,6 +185,7 @@ async function setUserRoles(userId, roleIds, assignedByUserId = null) {
 
     const ownerRole = await roleSql.findRoleBySlug(OWNER_SLUG, client);
     const nextHasOwner = ownerRole && uniqueIds.includes(Number(ownerRole.id));
+    // Guard: early-return or throw when required input is missing/invalid.
     if (!nextHasOwner) {
       await assertCanRemoveOwner(userId, client);
     }
@@ -139,12 +212,16 @@ async function setUserRoles(userId, roleIds, assignedByUserId = null) {
   return result;
 }
 
+/** Assign one role; syncs legacy users.role cache and destroys sessions. */
 async function assignUserRole(userId, roleId, assignedByUserId = null) {
+  // Open a DB transaction so writes commit atomically.
   const result = await runWithTransaction(async (client) => {
     const user = await userSql.findUserById(userId, client);
+    // Guard: early-return or throw when required input is missing/invalid.
     if (!user) throw createHttpError('NOT_FOUND', 'User not found.', 404);
 
     const role = await roleSql.findRoleById(roleId, client);
+    // Guard: early-return or throw when required input is missing/invalid.
     if (!role) throw createHttpError('NOT_FOUND', 'Role not found.', 404);
 
     const assigned = await userRoleSql.assignRoleToUser(
@@ -169,12 +246,16 @@ async function assignUserRole(userId, roleId, assignedByUserId = null) {
   return result;
 }
 
+/** Revoke one role; cannot revoke the last owner. */
 async function revokeUserRole(userId, roleId) {
+  // Open a DB transaction so writes commit atomically.
   const result = await runWithTransaction(async (client) => {
     const user = await userSql.findUserById(userId, client);
+    // Guard: early-return or throw when required input is missing/invalid.
     if (!user) throw createHttpError('NOT_FOUND', 'User not found.', 404);
 
     const role = await roleSql.findRoleById(roleId, client);
+    // Guard: early-return or throw when required input is missing/invalid.
     if (!role) throw createHttpError('NOT_FOUND', 'Role not found.', 404);
 
     if (role.slug === OWNER_SLUG) {
@@ -197,9 +278,16 @@ async function revokeUserRole(userId, roleId) {
   return result;
 }
 
+/**
+ * Replace permission keys for a non-owner role; destroys sessions for that role.
+ * @param {string|number} roleId
+ * @param {string[]} permissionKeys
+ */
 async function updateRolePermissions(roleId, permissionKeys) {
+  // Open a DB transaction so writes commit atomically.
   const result = await runWithTransaction(async (client) => {
     const role = await roleSql.findRoleById(roleId, client);
+    // Guard: early-return or throw when required input is missing/invalid.
     if (!role) throw createHttpError('NOT_FOUND', 'Role not found.', 404);
 
     if (role.slug === OWNER_SLUG) {
@@ -238,6 +326,10 @@ async function updateRolePermissions(roleId, permissionKeys) {
   return result;
 }
 
+/**
+ * Admin catalog: roles, permissions, and matrix (owner shown with all keys).
+ * @returns {Promise<{ roles: object[], permissions: object[], matrix: object[] }>}
+ */
 async function getRbacCatalog() {
   const [roles, permissions, matrix] = await Promise.all([
     roleSql.listRoles(),

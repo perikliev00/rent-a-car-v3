@@ -1,3 +1,8 @@
+/**
+ * Background reconcile for stuck refund webhook inbox rows and pending/failed
+ * refund operations. Polls Stripe for truth when webhooks were missed or
+ * HTTP responses timed out after Stripe recorded the refund.
+ */
 const refundOpSql = require('../../sql/refundOperationSqlService');
 const paymentEventSql = require('../../sql/paymentEventSqlService');
 const { retrieveRefund } = require('../stripeRefundService');
@@ -6,10 +11,17 @@ const { markRefundFailed, resurrectPending } = require('./refundLedgerService');
 const { applyRefundFromStripeObject } = require('./refundWebhookService');
 const logger = require('../../../utils/logger');
 
+/** Inbox outcomes that are safe to mark ignored (not retried forever). */
 const IGNORE_REASONS = new Set(['no_matching_operation', 'partial_or_amount_mismatch']);
 
+/**
+ * inbox payload object.
+ * @param {object} row
+ * @returns {*}
+ */
 function inboxPayloadObject(row) {
   const payload = row.payload;
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!payload || typeof payload !== 'object') {
     return { object: null, eventType: row.event_type };
   }
@@ -19,6 +31,10 @@ function inboxPayloadObject(row) {
   };
 }
 
+/**
+ * Replay refund webhook events stuck in received status.
+ * @param {{ dryRun?: boolean, olderThanMinutes?: number, limit?: number }} [options]
+ */
 async function reconcileStuckRefundInbox({ dryRun = false, olderThanMinutes = 5, limit = 50 } = {}) {
   const stuck = await paymentEventSql.listStuckReceivedRefundEvents({
     olderThanMinutes,
@@ -36,6 +52,7 @@ async function reconcileStuckRefundInbox({ dryRun = false, olderThanMinutes = 5,
     };
 
     const { object, eventType } = inboxPayloadObject(row);
+    // Guard: early-return or throw when required input is missing/invalid.
     if (!object) {
       summary.reason = 'missing_payload_object';
       results.push(summary);
@@ -48,6 +65,7 @@ async function reconcileStuckRefundInbox({ dryRun = false, olderThanMinutes = 5,
       continue;
     }
 
+    // Protected block: isolate failure modes.
     try {
       const result = await applyRefundFromStripeObject(object, { eventType });
       const nextStatus =
@@ -56,6 +74,7 @@ async function reconcileStuckRefundInbox({ dryRun = false, olderThanMinutes = 5,
       summary.action = nextStatus === 'ignored' ? 'ignored' : 'processed';
       summary.reason = result?.reason || result?.status || null;
     } catch (err) {
+      // Leave as received so the next reconcile pass retries.
       logger.error(
         { err, eventId: row.event_id, paymentEventId: row.id },
         'Refund inbox reconcile apply failed; leaving received'
@@ -73,6 +92,10 @@ async function reconcileStuckRefundInbox({ dryRun = false, olderThanMinutes = 5,
   };
 }
 
+/**
+ * Sync pending/failed ledger rows with Stripe refund status, then drain stuck inbox.
+ * @param {{ dryRun?: boolean, olderThanMinutes?: number, limit?: number }} [options]
+ */
 async function reconcilePendingRefunds({ dryRun = false, olderThanMinutes = 5, limit = 50 } = {}) {
   const pending = await refundOpSql.findPendingOlderThan({ olderThanMinutes, limit });
   const results = [];
@@ -85,6 +108,7 @@ async function reconcilePendingRefunds({ dryRun = false, olderThanMinutes = 5, l
       reason: null,
     };
 
+    // Stripe / payment-related branch.
     if (!op.stripeRefundId) {
       summary.reason = 'missing_stripe_refund_id';
       results.push(summary);
@@ -92,6 +116,7 @@ async function reconcilePendingRefunds({ dryRun = false, olderThanMinutes = 5, l
     }
 
     let refund;
+    // Protected block: isolate failure modes.
     try {
       refund = await retrieveRefund(op.stripeRefundId);
     } catch (err) {
@@ -106,6 +131,7 @@ async function reconcilePendingRefunds({ dryRun = false, olderThanMinutes = 5, l
       continue;
     }
 
+    // Status / lifecycle guard before mutating domain state.
     if (refund.status === 'succeeded') {
       await applySucceededRefund({
         refundOperation: op,
@@ -128,6 +154,7 @@ async function reconcilePendingRefunds({ dryRun = false, olderThanMinutes = 5, l
     results.push(summary);
   }
 
+  // Failed locally but Stripe may still show success/pending (timeout-after-record).
   const failedWithId = await refundOpSql.findFailedWithRefundIdOlderThan({
     olderThanMinutes,
     limit,
@@ -142,6 +169,7 @@ async function reconcilePendingRefunds({ dryRun = false, olderThanMinutes = 5, l
     };
 
     let refund;
+    // Protected block: isolate failure modes.
     try {
       refund = await retrieveRefund(op.stripeRefundId);
     } catch (err) {
@@ -156,6 +184,7 @@ async function reconcilePendingRefunds({ dryRun = false, olderThanMinutes = 5, l
       continue;
     }
 
+    // Status / lifecycle guard before mutating domain state.
     if (refund.status === 'succeeded') {
       await applySucceededRefund({
         refundOperation: op,

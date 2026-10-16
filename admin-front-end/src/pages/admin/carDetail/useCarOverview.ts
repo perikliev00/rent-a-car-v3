@@ -1,3 +1,6 @@
+/**
+ * Form state and save handlers for the car overview tab.
+ */
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -10,6 +13,10 @@ import type { CarFleetStatus } from '../../../types/api';
 import type { OverviewForm } from './carDetailTypes';
 import { refreshCar } from './carDetailRefresh';
 
+/**
+ * Form state, car query, and save/status mutations for the Overview tab.
+ * @param id - Car id
+ */
 export function useCarOverview(id: string) {
   const queryClient = useQueryClient();
   const [fleetStatus, setFleetStatus] = useState<CarFleetStatus | ''>('');

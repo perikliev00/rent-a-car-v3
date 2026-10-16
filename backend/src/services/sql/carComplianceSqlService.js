@@ -1,23 +1,46 @@
+/**
+ * SQL for car_compliance_items and denormalized car expiry cache sync.
+ */
 const { clientQuery } = require('../../db/transaction');
 const { COMPLIANCE_TYPE_LABELS } = require('../../constants/carEnums');
 
+/**
+ * Transform helper: to date only.
+ * @param {*} value
+ * @returns {*}
+ */
 function toDateOnly(value) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!value) return null;
   if (value instanceof Date) return value.toISOString().slice(0, 10);
   const str = String(value);
   return str.length >= 10 ? str.slice(0, 10) : str;
 }
 
+/**
+ * derive compliance status.
+ * @param {object} params
+ * @returns {*}
+ */
 function deriveComplianceStatus({ expiresAt, statusHint = null, todayStr = null }) {
+  // Status / lifecycle guard before mutating domain state.
   if (statusHint === 'missing') return 'missing';
   const today = todayStr || new Date().toISOString().slice(0, 10);
   const expires = toDateOnly(expiresAt);
+  // Hold-expiry / timing branch.
   if (expires && expires < today) return 'expired';
+  // Status / lifecycle guard before mutating domain state.
   if (statusHint === 'expired' && !expires) return 'expired';
   return 'valid';
 }
 
+/**
+ * Map a DB/API row into the domain shape used by callers (mapComplianceItem).
+ * @param {object} row
+ * @returns {*}
+ */
 function mapComplianceItem(row) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) return null;
   const itemType = row.item_type;
   const documentStorageKey = row.document_storage_key || null;
@@ -42,7 +65,13 @@ function mapComplianceItem(row) {
   };
 }
 
+/**
+ * Transform helper: to public compliance item.
+ * @param {*} item
+ * @returns {*}
+ */
 function toPublicComplianceItem(item) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!item) return null;
   return {
     id: item.id,
@@ -62,6 +91,12 @@ function toPublicComplianceItem(item) {
   };
 }
 
+/**
+ * List by car id from SQL.
+ * @param {string|number} carId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function listByCarId(carId, client = null) {
   const result = await clientQuery(
     client,
@@ -83,6 +118,13 @@ async function listByCarId(carId, client = null) {
   return result.rows.map(mapComplianceItem);
 }
 
+/**
+ * Find by id via SQL; returns null when missing.
+ * @param {string|number} carId
+ * @param {string|number} itemId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findById(carId, itemId, client = null) {
   const result = await clientQuery(
     client,
@@ -97,6 +139,13 @@ async function findById(carId, itemId, client = null) {
   return mapComplianceItem(result.rows[0]);
 }
 
+/**
+ * Find latest by type via SQL; returns null when missing.
+ * @param {string|number} carId
+ * @param {*} itemType
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findLatestByType(carId, itemType, client = null) {
   const result = await clientQuery(
     client,
@@ -112,6 +161,13 @@ async function findLatestByType(carId, itemType, client = null) {
   return mapComplianceItem(result.rows[0]);
 }
 
+/**
+ * Insert a new row and return the mapped result.
+ * @param {string|number} carId
+ * @param {*} payload
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function create(carId, payload, client = null) {
   const status = deriveComplianceStatus({
     expiresAt: payload.expiresAt,
@@ -154,6 +210,14 @@ async function create(carId, payload, client = null) {
   return mapComplianceItem(result.rows[0]);
 }
 
+/**
+ * Update or upsert row; returns null when not found.
+ * @param {string|number} carId
+ * @param {string|number} itemId
+ * @param {*} payload
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function update(carId, itemId, payload, client = null) {
   const status = deriveComplianceStatus({
     expiresAt: payload.expiresAt,
@@ -198,8 +262,17 @@ async function update(carId, itemId, payload, client = null) {
   return mapComplianceItem(result.rows[0]);
 }
 
+/**
+ * Update or upsert by type; returns null when not found.
+ * @param {string|number} carId
+ * @param {*} itemType
+ * @param {*} payload
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function upsertByType(carId, itemType, payload, client = null) {
   const existing = await findLatestByType(carId, itemType, client);
+  // Idempotency guard: return early when work was already applied.
   if (existing) {
     return update(
       carId,
@@ -239,6 +312,13 @@ async function upsertByType(carId, itemType, payload, client = null) {
   );
 }
 
+/**
+ * Delete row; returns whether a row was affected.
+ * @param {string|number} carId
+ * @param {string|number} itemId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function remove(carId, itemId, client = null) {
   const result = await clientQuery(
     client,
@@ -252,6 +332,12 @@ async function remove(carId, itemId, client = null) {
   return mapComplianceItem(result.rows[0]);
 }
 
+/**
+ * sync car expiry cache.
+ * @param {string|number} carId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function syncCarExpiryCache(carId, client = null) {
   const insurance = await findLatestByType(carId, 'civil_insurance', client);
   const inspection = await findLatestByType(carId, 'technical_inspection', client);
@@ -270,6 +356,11 @@ async function syncCarExpiryCache(carId, client = null) {
   );
 }
 
+/**
+ * List open compliance for alerts from SQL.
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function listOpenComplianceForAlerts(client = null) {
   const result = await clientQuery(
     client,

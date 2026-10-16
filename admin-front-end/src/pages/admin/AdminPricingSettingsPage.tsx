@@ -1,3 +1,7 @@
+/**
+ * Pricing admin hub composing seasons, fees, extras, and preview.
+ * Per-car day rates remain on the Cars pages; this page owns global rules only.
+ */
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getAdminPricing } from '../../api/admin/pricing';
@@ -11,6 +15,7 @@ import { PricingPreviewSection } from './pricing/PricingPreviewSection';
 import { SeasonsSection } from './pricing/SeasonsSection';
 import { WeekendSection } from './pricing/WeekendSection';
 
+/** Pricing admin hub composing seasons, fees, extras, and preview. Per-car day rates remain on the Cars pages; this page owns global rules only. */
 export function AdminPricingSettingsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'pricing'],

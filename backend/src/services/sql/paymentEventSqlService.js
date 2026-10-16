@@ -1,3 +1,6 @@
+/**
+ * SQL for payment_events monitoring feed (recent Stripe/payment activity).
+ */
 const { clientQuery } = require('../../db/transaction');
 
 const REFUND_INBOX_EVENT_TYPES = [
@@ -19,7 +22,13 @@ const PAYMENT_EVENT_COLUMNS = `
   updated_at
 `;
 
+/**
+ * Normalize reservation id before persistence or comparison.
+ * @param {*} value
+ * @returns {*}
+ */
 function normalizeReservationId(value) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (value == null || value === '') {
     return null;
   }
@@ -27,6 +36,13 @@ function normalizeReservationId(value) {
   return Number.isInteger(id) && id > 0 ? id : null;
 }
 
+/**
+ * Insert a payment_events inbox row (webhook/reconcile processing).
+ * @param {object} params
+ * @param {object|null} [client]
+ * @returns {Promise<object|null>}
+ * @throws {Error} when eventType is missing
+ */
 async function insertPaymentEvent(
   { eventId, eventType, stripeSessionId, reservationId, status = 'received', payload = null },
   client = null
@@ -62,7 +78,14 @@ async function insertPaymentEvent(
   return result.rows[0] || null;
 }
 
+/**
+ * Find by event id via SQL; returns null when missing.
+ * @param {string|number} eventId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findByEventId(eventId, client = null) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!eventId) return null;
   const result = await clientQuery(
     client,
@@ -77,6 +100,13 @@ async function findByEventId(eventId, client = null) {
   return result.rows[0] || null;
 }
 
+/**
+ * Update or upsert payment event status; returns null when not found.
+ * @param {string|number} id
+ * @param {string} status
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function updatePaymentEventStatus(id, status, client = null) {
   const result = await clientQuery(
     client,
@@ -91,6 +121,12 @@ async function updatePaymentEventStatus(id, status, client = null) {
   return result.rows[0] || null;
 }
 
+/**
+ * Refund webhook events stuck in 'received' longer than the threshold (reconcile sweep).
+ * @param {{ olderThanMinutes?: number, limit?: number }} [params]
+ * @param {object|null} [client]
+ * @returns {Promise<object[]>}
+ */
 async function listStuckReceivedRefundEvents(
   { olderThanMinutes = 5, limit = 50 } = {},
   client = null
@@ -113,6 +149,12 @@ async function listStuckReceivedRefundEvents(
   return result.rows;
 }
 
+/**
+ * List recent payment events from SQL.
+ * @param {object} params
+ * @param {object|null} [client] Optional DB client/transaction
+ * @returns {Promise<*>}
+ */
 async function listRecentPaymentEvents({ limit = 50, offset = 0 } = {}, client = null) {
   const result = await clientQuery(
     client,

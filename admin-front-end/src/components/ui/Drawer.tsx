@@ -1,7 +1,19 @@
+/**
+ * Side drawer overlay with escape-to-close and scroll/focus lock.
+ */
 import type { ReactNode } from 'react';
 import { useEffect, useId, useRef } from 'react';
 import { useOverlayLock } from './useOverlayLock';
 
+/**
+ * Slide-in drawer panel (left or right) with backdrop dismiss and Escape.
+ *
+ * @param open - Whether the drawer is visible
+ * @param onClose - Called on backdrop click, Escape, or Close button
+ * @param title - Header title (falls back to “Details”)
+ * @param children - Scrollable drawer body
+ * @param side - Which edge the panel anchors to (default right)
+ */
 export function Drawer({
   open,
   onClose,
@@ -19,6 +31,7 @@ export function Drawer({
   const panelRef = useRef<HTMLElement>(null);
   useOverlayLock(open, panelRef);
 
+  // Escape closes while open.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -30,6 +43,7 @@ export function Drawer({
 
   if (!open) return null;
 
+  // Border + slide animation depend on which edge is used.
   const sideClass =
     side === 'left'
       ? 'justify-start border-r animate-[lux-drawer_0.35s_var(--ease-out)_both]'

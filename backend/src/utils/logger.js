@@ -1,3 +1,8 @@
+/**
+ * Shared Pino logger for the LuxRide API.
+ * Production uses structured JSON; non-production pretty-prints and redacts sensitive fields.
+ */
+
 const pino = require('pino');
 const { version } = require('../../package.json');
 

@@ -1,5 +1,13 @@
+/**
+ * Persistence for the notifications outbox table.
+ *
+ * claimDueNotifications uses FOR UPDATE SKIP LOCKED so multiple workers can
+ * process safely. Inserts are idempotent via unique idempotency_key.
+ */
+
 const { clientQuery } = require('../../db/transaction');
 
+/** Map DB row to camelCase DTO. */
 function mapRow(row) {
   if (!row) return null;
   return {
@@ -27,6 +35,7 @@ function mapRow(row) {
  * Insert pending notification. Returns row if inserted, null if idempotency conflict.
  */
 async function insertNotification(data, client = null) {
+  // ON CONFLICT DO NOTHING + RETURNING → null when the key already exists.
   const result = await clientQuery(
     client,
     `
@@ -59,7 +68,13 @@ async function insertNotification(data, client = null) {
   return mapRow(result.rows[0]);
 }
 
+/**
+ * Atomically claim due pending rows as processing (requires a transaction).
+ * @param {{ limit?: number }} [opts]
+ */
 async function claimDueNotifications({ limit = 50 } = {}, client = null) {
+  // CTE selects due pending rows under SKIP LOCKED, then flips them to processing.
+  // Must run inside a transaction so the lock is held until commit.
   const result = await clientQuery(
     client,
     `
@@ -85,6 +100,7 @@ async function claimDueNotifications({ limit = 50 } = {}, client = null) {
   return result.rows.map(mapRow);
 }
 
+/** Mark notification successfully delivered. */
 async function markSent(id, client = null) {
   await clientQuery(
     client,
@@ -97,6 +113,7 @@ async function markSent(id, client = null) {
   );
 }
 
+/** Mark notification failed and store truncated error text. */
 async function markFailed(id, errorMessage, client = null) {
   await clientQuery(
     client,
@@ -109,6 +126,7 @@ async function markFailed(id, errorMessage, client = null) {
   );
 }
 
+/** Return a stuck processing row to pending for retry. */
 async function requeuePending(id, client = null) {
   await clientQuery(
     client,
@@ -121,6 +139,7 @@ async function requeuePending(id, client = null) {
   );
 }
 
+/** Admin list, newest first. */
 async function listNotifications({ limit = 50, offset = 0, status = null } = {}, client = null) {
   const params = [];
   const where = [];
@@ -147,6 +166,7 @@ async function listNotifications({ limit = 50, offset = 0, status = null } = {},
   return result.rows.map(mapRow);
 }
 
+/** Count for pagination. */
 async function countNotifications({ status = null } = {}, client = null) {
   const params = [];
   let where = '';

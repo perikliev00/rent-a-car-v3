@@ -1,3 +1,6 @@
+/**
+ * Admin user CRUD and role-assignment handlers.
+ */
 const userAdminService = require('../../../services/admin/userAdminService');
 const rbacService = require('../../../services/rbac/rbacService');
 const { logAdminAction } = require('../../../services/admin/adminAuditService');
@@ -5,6 +8,13 @@ const apiResponse = require('../../../utils/apiResponse');
 const asyncHandler = require('../../../utils/asyncHandler');
 const { forwardControllerError } = require('../../../utils/controllerError');
 
+/**
+ * Map known user-service errors to API responses; return the response if handled.
+ * Side effects: may write an API error response when `err` has status/code.
+ * @param {Error&{status?: number, code?: string}} err
+ * @param {import('express').Response} res
+ * @returns {import('express').Response|null}
+ */
 function mapServiceError(err, res) {
   if (err?.status && err?.code) {
     return apiResponse.error(res, err.code, err.message, err.status);
@@ -12,6 +22,14 @@ function mapServiceError(err, res) {
   return null;
 }
 
+/**
+ * List users for admin management.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.listUsers = asyncHandler(async (req, res, next) => {
   try {
     const users = await userAdminService.listUsers();
@@ -24,6 +42,14 @@ exports.listUsers = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Return a user by id.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.getUser = asyncHandler(async (req, res, next) => {
   try {
     const user = await userAdminService.getUser(req.params.id);
@@ -38,10 +64,19 @@ exports.getUser = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Create a staff/customer user.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.createUser = asyncHandler(async (req, res, next) => {
   try {
     const { email, password, roleIds } = req.body || {};
     const user = await userAdminService.createStaffUser({ email, password, roleIds });
+    // Record an admin audit entry for this mutation.
     await logAdminAction(req, {
       action: 'user.create',
       entityType: 'user',
@@ -59,11 +94,20 @@ exports.createUser = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Update user profile fields.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.updateUser = asyncHandler(async (req, res, next) => {
   try {
     const user = await userAdminService.updateStaffUser(req.params.id, {
       email: req.body?.email,
     });
+    // Record an admin audit entry for this mutation.
     await logAdminAction(req, {
       action: 'user.update',
       entityType: 'user',
@@ -81,6 +125,14 @@ exports.updateUser = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Replace all roles for a user.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.putUserRoles = asyncHandler(async (req, res, next) => {
   try {
     const roleIds = req.body?.roleIds || [];
@@ -89,6 +141,7 @@ exports.putUserRoles = asyncHandler(async (req, res, next) => {
       roleIds,
       req.session?.user?.id
     );
+    // Record an admin audit entry for this mutation.
     await logAdminAction(req, {
       action: 'user.roles.replace',
       entityType: 'user',
@@ -106,6 +159,14 @@ exports.putUserRoles = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Assign a single role to a user.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.assignUserRole = asyncHandler(async (req, res, next) => {
   try {
     const result = await rbacService.assignUserRole(
@@ -113,6 +174,7 @@ exports.assignUserRole = asyncHandler(async (req, res, next) => {
       req.params.roleId,
       req.session?.user?.id
     );
+    // Record an admin audit entry for this mutation.
     await logAdminAction(req, {
       action: 'user.role.assign',
       entityType: 'user',
@@ -130,9 +192,18 @@ exports.assignUserRole = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Revoke a single role from a user.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.revokeUserRole = asyncHandler(async (req, res, next) => {
   try {
     const result = await rbacService.revokeUserRole(req.params.id, req.params.roleId);
+    // Record an admin audit entry for this mutation.
     await logAdminAction(req, {
       action: 'user.role.revoke',
       entityType: 'user',

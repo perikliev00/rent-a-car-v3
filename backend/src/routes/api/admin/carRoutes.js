@@ -1,3 +1,6 @@
+/**
+ * Admin fleet car CRUD plus service, damage, documents, and compliance sub-resources.
+ */
 const express = require('express');
 const carController = require('../../../controllers/api/admin/carController');
 const orderController = require('../../../controllers/api/admin/orderController');
@@ -27,12 +30,16 @@ const {
 
 const router = express.Router();
 
+// Fleet inventory list.
 router.get('/', canManageCars, carController.listCars);
 
+// Aggregated fleet alert feed (expiry, maintenance, etc.).
 router.get('/fleet-alerts', canManageFleetAlerts, carController.getFleetAlerts);
 
+// Recompute / sync fleet alerts from source tables.
 router.post('/fleet-alerts/reconcile', canManageFleetAlerts, carController.reconcileFleetAlerts);
 
+// Availability windows for admin booking UI.
 router.get(
   '/:id/availability',
   canManageCars,
@@ -42,6 +49,7 @@ router.get(
   orderController.getCarAvailability
 );
 
+// Change operational fleet status (available / blocked / etc.).
 router.post(
   '/:id/status',
   canManageCars,
@@ -51,6 +59,7 @@ router.post(
   carController.changeFleetStatus
 );
 
+// Service history CRUD.
 router.get(
   '/:id/service-records',
   canManageCars,
@@ -84,6 +93,7 @@ router.delete(
   carController.deleteServiceRecord
 );
 
+// Damage reports + photo uploads.
 router.get(
   '/:id/damage-reports',
   canManageCars,
@@ -117,6 +127,7 @@ router.delete(
   carController.deleteDamageReport
 );
 
+// Private car documents (registration, insurance scans, etc.).
 router.get(
   '/:id/documents',
   canManageCars,
@@ -148,6 +159,7 @@ router.delete(
   carController.deleteDocument
 );
 
+// Compliance items (inspection, insurance expiry tracking).
 router.get(
   '/:id/compliance',
   canManageCars,
@@ -191,7 +203,9 @@ router.delete(
   carController.deleteCompliance
 );
 
+// Car detail.
 router.get('/:id', canManageCars, adminCarIdParamValidation, carController.getCarById);
+// Create car with optional public image upload.
 router.post(
   '/',
   canManageCars,
@@ -199,6 +213,7 @@ router.post(
   createCarValidationRules,
   carController.createCar
 );
+// Update car fields / replace image.
 router.put(
   '/:id',
   canManageCars,
@@ -207,6 +222,7 @@ router.put(
   editCarValidationRules,
   carController.updateCar
 );
+// Soft or hard delete depending on controller policy.
 router.delete('/:id', canManageCars, adminCarIdParamValidation, carController.deleteCar);
 
 module.exports = router;

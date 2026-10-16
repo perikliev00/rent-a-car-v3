@@ -1,3 +1,7 @@
+/**
+ * Guest reservation holds: create/release/rehold, availability checks,
+ * abandoned-hold cleanup, and reconcile of processing Stripe sessions whose holds expired.
+ */
 const {
   HOLD_WINDOW_MS,
   getSessionId,
@@ -13,15 +17,22 @@ const logger = require('../utils/logger');
 const logEvent = require('../monitoring/logEvent');
 const metrics = require('../monitoring/metrics');
 
+/** Active hold for the browse session cookie, if any. */
 async function findActiveReservationBySession(req) {
   return reservationRepository.findActiveBySessionId(getSessionId(req));
 }
 
+/**
+ * Cancel the session's active hold (e.g. guest releases or checkout cancel).
+ * @param {import('express').Request} req
+ * @param {{ reason?: string, skipAudit?: boolean }} [options]
+ */
 async function releaseActiveReservationForSession(req, options = {}) {
   const reason = options.reason || 'session_release';
   const skipAudit = Boolean(options.skipAudit);
   const reservation = await findActiveReservationBySession(req);
 
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!reservation) {
     return { cancelled: false, reservation: null };
   }
@@ -39,6 +50,7 @@ async function releaseActiveReservationForSession(req, options = {}) {
     reason,
   });
 
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!skipAudit) {
     const action =
       reason === 'checkout_cancel'
@@ -55,7 +67,9 @@ async function releaseActiveReservationForSession(req, options = {}) {
   return { cancelled: true, reservation: updated };
 }
 
+/** Refresh hold TTL in memory (caller persists via changeStatus patch). */
 function extendReservationHold(reservation) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!reservation) {
     return reservation;
   }
@@ -64,12 +78,17 @@ function extendReservationHold(reservation) {
   return reservation;
 }
 
+/**
+ * Check holds, open physical rentals, and booked calendar overlaps for a range.
+ * @returns {Promise<{ overlappingReservation: *, openPhysicalRental: *, bookedOverlap: * }>}
+ */
 async function checkCarAvailabilityForRange({
   carId,
   startDate,
   endDate,
   now = new Date(),
 }) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!carId || !(startDate instanceof Date) || !(endDate instanceof Date)) {
     throw new Error('checkCarAvailabilityForRange: invalid arguments');
   }
@@ -94,6 +113,11 @@ async function checkCarAvailabilityForRange({
   };
 }
 
+/**
+ * Create a pending_payment hold with availability check; records initial status history.
+ * @param {object} payload
+ * @param {import('express').Request|null} [req]
+ */
 async function createPendingReservation(payload, req = null) {
   const userId = req?.session?.user?.id ?? null;
   const result = await reservationRepository.createWithAvailabilityCheck({
@@ -144,7 +168,13 @@ async function createPendingReservation(payload, req = null) {
   return result;
 }
 
+/**
+ * attach car name to reservation.
+ * @param {object} reservation
+ * @returns {Promise<*>}
+ */
 async function attachCarNameToReservation(reservation) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!reservation) {
     return reservation;
   }
@@ -154,11 +184,13 @@ async function attachCarNameToReservation(reservation) {
       ? reservation.carId.id
       : reservation.carId;
 
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!rawCarId) {
     return reservation;
   }
 
   const car = await carRepository.findById(rawCarId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!car) {
     return reservation;
   }
@@ -169,8 +201,14 @@ async function attachCarNameToReservation(reservation) {
   };
 }
 
+/**
+ * For processing holds past TTL: finalize if Stripe paid, expire if session expired,
+ * keep if Checkout is still open.
+ * @param {Date} [now]
+ */
 async function reconcileProcessingStripeReservations(now = new Date()) {
   const candidates = await reservationRepository.findProcessingWithExpiredHold(now);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!candidates.length) {
     return { checked: 0, expired: 0, finalized: 0, kept: 0 };
   }
@@ -181,10 +219,12 @@ async function reconcileProcessingStripeReservations(now = new Date()) {
 
   for (const reservation of candidates) {
     const stripeSessionId = reservation.stripeSessionId;
+    // Stripe / payment-related branch.
     if (!stripeSessionId) {
       continue;
     }
 
+    // Protected block: isolate failure modes.
     try {
       const session = await retrieveStripeCheckoutSession(stripeSessionId);
 
@@ -242,7 +282,11 @@ async function reconcileProcessingStripeReservations(now = new Date()) {
   return { checked: candidates.length, expired, finalized, kept };
 }
 
+/**
+ * Job: expire holds whose browse sessions died, then reconcile Stripe processing holds.
+ */
 async function cleanUpAbandonedReservations() {
+  // Protected block: isolate failure modes.
   try {
     const nowUTC = new Date();
     const activeSids = await sessionSql.listActiveSessionIds();
@@ -283,6 +327,7 @@ async function cleanUpAbandonedReservations() {
     }
 
     const stripeReconcile = await reconcileProcessingStripeReservations(nowUTC);
+    // Stripe / payment-related branch.
     if (stripeReconcile.finalized || stripeReconcile.expired) {
       logger.info(stripeReconcile, 'Reconciled processing Stripe checkout reservations');
     }
@@ -291,11 +336,18 @@ async function cleanUpAbandonedReservations() {
   }
 }
 
+/**
+ * publish rehold side effects.
+ * @param {*} result
+ * @returns {*}
+ */
 function publishReholdSideEffects(result) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!result?.ok || !result.reservation) {
     return;
   }
 
+  // Protected block: isolate failure modes.
   try {
     const {
       publishLiveEvent,
@@ -321,6 +373,9 @@ function publishReholdSideEffects(result) {
   }
 }
 
+/**
+ * Atomically release the current session hold and create a new one (car/date change).
+ */
 async function releaseAndReholdForSession(req, {
   carId,
   startDate,

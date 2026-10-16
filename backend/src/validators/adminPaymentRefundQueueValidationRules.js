@@ -1,3 +1,6 @@
+/**
+ * Query-string validation for the admin payment refund queue.
+ */
 const { query } = require('express-validator');
 const { REFUNDABLE_STATUSES } = require('../services/payment/refund/refundPolicy');
 

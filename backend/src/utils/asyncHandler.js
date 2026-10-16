@@ -1,11 +1,19 @@
-// Обвивка за асинхронни controller функции – автоматично подава rejections към error middleware.
+/**
+ * Express async handler wrapper — forwards promise rejections to error middleware via `next`.
+ */
+
+/**
+ * Wraps an async route/controller handler so thrown errors and rejected promises reach `next`.
+ *
+ * @param {(req: import('express').Request, res: import('express').Response, next: import('express').NextFunction) => unknown} handler
+ * @returns {import('express').RequestHandler}
+ * @throws {never} Errors from `handler` are forwarded to `next`, not thrown synchronously
+ */
 function asyncHandler(handler) {
-  // Връщаме нова функция със сигнатурата на Express middleware (req, res, next).
   return function wrappedAsyncHandler(req, res, next) {
-    // Promise.resolve гарантира, че резултатът е Promise; .catch(next) предава грешките на next.
+    // Promise.resolve ensures the result is a Promise; .catch(next) forwards failures to Express.
     Promise.resolve(handler(req, res, next)).catch(next);
   };
 }
 
-// Експорт – единствената експортирана функция от този модул.
 module.exports = asyncHandler;

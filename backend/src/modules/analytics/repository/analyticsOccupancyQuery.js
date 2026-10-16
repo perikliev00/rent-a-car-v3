@@ -1,9 +1,23 @@
+/**
+ * Fleet occupancy / utilization SQL.
+ *
+ * Rented days = sum of Sofia-date overlaps between rentals and the report range.
+ * Maintenance days come from maintenance car_date_blocks on active cars.
+ */
+
 const { clientQuery } = require('../../../db/transaction');
 const { OCCUPANCY_STATUSES, overlapDaysSql } = require('../analytics.domain');
 
+/**
+ * Fleet-level rented days, active car count, and maintenance days for the range.
+ * @param {{ from: string, to: string }} range Inclusive Sofia date bounds
+ * @param {import('pg').PoolClient|null} [client]
+ */
 async function getOccupancyStats({ from, to }, client = null) {
+  // Overlap expression shared with other occupancy queries (param $1/$2 = from/to).
   const overlap = overlapDaysSql('r.pickup_date', 'r.return_date', 1, 2);
 
+  // Step 1: sum overlapping rental days for occupancy-eligible statuses.
   const rented = await clientQuery(
     client,
     `
@@ -16,6 +30,7 @@ async function getOccupancyStats({ from, to }, client = null) {
     [from, to, OCCUPANCY_STATUSES]
   );
 
+  // Step 2: denominator — active (non-deleted, non-inactive) fleet size.
   const fleet = await clientQuery(
     client,
     `
@@ -26,6 +41,7 @@ async function getOccupancyStats({ from, to }, client = null) {
     `
   );
 
+  // Step 3: maintenance block overlap days on the same active fleet.
   const maintenance = await clientQuery(
     client,
     `
@@ -56,8 +72,14 @@ async function getOccupancyStats({ from, to }, client = null) {
   };
 }
 
+/**
+ * Top cars by booking count / rented overlap days in the range.
+ * @param {{ from: string, to: string, limit?: number }} args
+ * @param {import('pg').PoolClient|null} [client]
+ */
 async function getMostRentedCars({ from, to, limit = 10 }, client = null) {
   const overlap = overlapDaysSql('r.pickup_date', 'r.return_date', 1, 2);
+  // Rank by booking count first, then rented overlap days as tie-breaker.
   const result = await clientQuery(
     client,
     `
@@ -81,8 +103,14 @@ async function getMostRentedCars({ from, to, limit = 10 }, client = null) {
   return result.rows;
 }
 
+/**
+ * Per-car booked + maintenance days for utilization tables.
+ * @param {{ from: string, to: string }} range
+ * @param {import('pg').PoolClient|null} [client]
+ */
 async function getUtilizationByCar({ from, to }, client = null) {
   const overlap = overlapDaysSql('r.pickup_date', 'r.return_date', 1, 2);
+  // Inline Sofia-date overlap for maintenance blocks (same bounds as rented).
   const maintOverlap = `
     GREATEST(
       0,
@@ -93,6 +121,7 @@ async function getUtilizationByCar({ from, to }, client = null) {
     )
   `;
 
+  // CTE: active fleet LEFT JOIN rented days + maintenance days per car.
   const result = await clientQuery(
     client,
     `

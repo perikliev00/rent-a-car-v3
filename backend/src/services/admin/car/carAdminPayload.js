@@ -1,3 +1,7 @@
+/**
+ * Build create/update car payloads and form redisplay state from admin form bodies.
+ * Bridges legacy availability checkbox ↔ fleet status enum.
+ */
 const { CAR_STATUSES, FUEL_LEVELS } = require('../../../constants/carEnums');
 const {
   parsePriceTier,
@@ -9,7 +13,15 @@ const {
   parseOptionalInt,
 } = require('./carAdminHelpers');
 
+/**
+ * Resolve fleet status from explicit status or legacy availability toggle.
+ * Turning availability off forces inactive; turning it on only promotes inactive → available
+ * so operational statuses (rented, damaged, etc.) are not clobbered.
+ * @param {object} payload
+ * @param {object|null} [existingCar]
+ */
 function resolveFleetStatus(payload, existingCar) {
+  // Status / lifecycle guard before mutating domain state.
   if (payload.status && CAR_STATUSES.includes(payload.status)) {
     return payload.status;
   }
@@ -19,6 +31,7 @@ function resolveFleetStatus(payload, existingCar) {
     ? payload.availability === 'on' || payload.availability === true || payload.availability === 'true'
     : null;
 
+  // Idempotency guard: return early when work was already applied.
   if (existingCar) {
     const current = existingCar.status || (existingCar.availability ? 'available' : 'inactive');
     if (availabilityOn === false) return 'inactive';
@@ -33,6 +46,11 @@ function resolveFleetStatus(payload, existingCar) {
   return 'available';
 }
 
+/**
+ * Merge body over existing car for form redisplay after validation errors.
+ * @param {object} [body]
+ * @param {object|null} [existingCar]
+ */
 function buildCarFormState(body = {}, existingCar = null) {
   const car = existingCar ?? {};
 
@@ -40,6 +58,7 @@ function buildCarFormState(body = {}, existingCar = null) {
     if (Object.prototype.hasOwnProperty.call(body, key) && body[key] !== '') {
       return body[key];
     }
+    // Idempotency guard: return early when work was already applied.
     if (existingCar && car[key] !== undefined) {
       return car[key];
     }
@@ -50,6 +69,7 @@ function buildCarFormState(body = {}, existingCar = null) {
     if (Object.prototype.hasOwnProperty.call(body, 'availability')) {
       return body.availability === 'on';
     }
+    // Idempotency guard: return early when work was already applied.
     if (existingCar) return !!car.availability;
     return true;
   };
@@ -58,6 +78,7 @@ function buildCarFormState(body = {}, existingCar = null) {
     if (Object.prototype.hasOwnProperty.call(body, key)) {
       return body[key] === '' ? undefined : body[key];
     }
+    // Idempotency guard: return early when work was already applied.
     if (existingCar && car[key] !== undefined) return car[key];
     return undefined;
   };
@@ -82,6 +103,12 @@ function buildCarFormState(body = {}, existingCar = null) {
   };
 }
 
+/**
+ * Validate and assemble the repository create/update payload (tiers, image, fleet fields).
+ * @param {object} payload
+ * @param {object|null} file
+ * @param {object|null} [existingCar]
+ */
 function buildCarPayload(payload, file, existingCar = null) {
   const tierShort = parsePriceTier(payload.priceTier_1_3);
   const tierMedium = parsePriceTier(payload.priceTier_7_31);
@@ -113,6 +140,7 @@ function buildCarPayload(payload, file, existingCar = null) {
   });
 
   const seats = parseInt(payload.seats, 10);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(seats) || seats <= 0) {
     throw new Error('Seats must be a positive number.');
   }
@@ -124,6 +152,7 @@ function buildCarPayload(payload, file, existingCar = null) {
         ? existingCar.price
         : undefined;
 
+  // Guard: early-return or throw when required input is missing/invalid.
   if (price === undefined) {
     throw new Error('At least one price tier is required.');
   }
@@ -134,12 +163,14 @@ function buildCarPayload(payload, file, existingCar = null) {
       ? existingCar.image
       : buildImagePath(file);
 
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!image) {
     throw new Error('Car image is required.');
   }
 
   const status = resolveFleetStatus(payload, existingCar);
   const fuelLevel = emptyToNull(payload.fuelLevel);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (fuelLevel && !FUEL_LEVELS.includes(fuelLevel)) {
     throw new Error('Invalid fuel level.');
   }
@@ -148,6 +179,7 @@ function buildCarPayload(payload, file, existingCar = null) {
     if (Object.prototype.hasOwnProperty.call(payload, key)) {
       return emptyToNull(payload[key]);
     }
+    // Idempotency guard: return early when work was already applied.
     if (existingCar && existingCar[existingKey] !== undefined) {
       return existingCar[existingKey] ?? null;
     }

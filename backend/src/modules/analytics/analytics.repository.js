@@ -1,3 +1,7 @@
+/**
+ * Analytics repository facade over revenue, bookings, occupancy, and car-performance SQL.
+ */
+
 const {
   getRevenueTotals,
   getRevenueSeries,

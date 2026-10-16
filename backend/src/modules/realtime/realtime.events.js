@@ -1,3 +1,10 @@
+/**
+ * Live admin event shapes, toast copy, and mappers from domain contexts.
+ *
+ * Status changes map to high-signal toast types when known; otherwise a
+ * generic reservation_updated event is emitted for real transitions only.
+ */
+
 const LIVE_EVENT_TYPES = Object.freeze([
   'new_booking',
   'payment_succeeded',
@@ -43,19 +50,32 @@ const TOAST_MESSAGES = Object.freeze({
 
 let eventSeq = 0;
 
+/** Monotonic-ish event id (timestamp + process sequence) for SSE Last-Event-ID. */
 function nextEventId() {
   eventSeq += 1;
   return `${Date.now()}-${eventSeq}`;
 }
 
+/**
+ * Normalize car id from populated or scalar reservation.carId.
+ * @param {object|null|undefined} reservation
+ * @returns {string|null}
+ */
 function resolveCarId(reservation) {
   if (!reservation) return null;
   const carId = reservation.carId;
   if (carId == null) return null;
+  // Populated car document: prefer nested id.
   if (typeof carId === 'object' && carId.id != null) return String(carId.id);
   return String(carId);
 }
 
+/**
+ * Resolve display car name from fallback or populated reservation.carId.
+ * @param {object|null|undefined} reservation
+ * @param {string|null} [fallback]
+ * @returns {string|null}
+ */
 function resolveCarName(reservation, fallback = null) {
   if (fallback) return fallback;
   if (!reservation) return null;
@@ -64,11 +84,17 @@ function resolveCarName(reservation, fallback = null) {
   return null;
 }
 
+/**
+ * Build a normalized live event DTO with toast message.
+ * @param {string} type One of LIVE_EVENT_TYPES
+ * @param {object} [partial]
+ */
 function buildLiveEvent(type, partial = {}) {
   if (!LIVE_EVENT_TYPES.includes(type)) {
     throw new Error(`Unknown live event type: ${type}`);
   }
 
+  // Coerce ids to strings for stable SSE JSON / client equality checks.
   const reservationId =
     partial.reservationId != null ? String(partial.reservationId) : null;
   const orderId = partial.orderId != null ? String(partial.orderId) : null;
@@ -77,6 +103,7 @@ function buildLiveEvent(type, partial = {}) {
     reservationId,
     carName: partial.carName || null,
   };
+  // Prefer caller-supplied message; otherwise use type-specific toast template.
   const messageFn = TOAST_MESSAGES[type];
   const message =
     partial.message ||
@@ -98,6 +125,10 @@ function buildLiveEvent(type, partial = {}) {
   };
 }
 
+/**
+ * Extract live-event context fields from a reservation status-change payload.
+ * @param {object} event
+ */
 function contextFromStatusChange(event) {
   const reservation = event?.reservation || null;
   return {
@@ -118,21 +149,26 @@ function contextFromStatusChange(event) {
 /**
  * Map a reservation status-change listener event to zero or more live admin events.
  * High-signal statuses keep dedicated types; all other real changes emit reservation_updated.
+ * @param {object} event
+ * @returns {object[]}
  */
 function mapStatusChangeToEvents(event) {
   const newStatus = event?.newStatus;
   if (!newStatus) return [];
 
   const base = contextFromStatusChange(event);
+  // High-signal statuses may emit multiple dedicated toast types (e.g. paid).
   const types = STATUS_TO_EVENT_TYPES[newStatus];
   if (types && types.length > 0) {
     return types.map((type) => buildLiveEvent(type, base));
   }
 
+  // Ignore no-op status "changes" (same old/new).
   if (event.oldStatus === newStatus) {
     return [];
   }
 
+  // Generic catch-all for other real transitions.
   return [
     buildLiveEvent('reservation_updated', {
       ...base,
@@ -143,6 +179,7 @@ function mapStatusChangeToEvents(event) {
   ];
 }
 
+/** Build new_booking from order/reservation confirmation context. */
 function buildNewBookingEvent({ order, reservation, carName } = {}) {
   const reservationId = reservation?.id || order?.reservationId || null;
   const orderId = order?.id || null;
@@ -162,6 +199,7 @@ function buildNewBookingEvent({ order, reservation, carName } = {}) {
   });
 }
 
+/** Build payment_failed with Stripe/failure metadata in meta. */
 function buildPaymentFailedEvent(context = {}) {
   return buildLiveEvent('payment_failed', {
     reservationId: context.reservationId || null,
@@ -181,6 +219,7 @@ function buildPaymentFailedEvent(context = {}) {
   });
 }
 
+/** Build calendar_updated; action/entity stored in meta for client refetch hints. */
 function buildCalendarUpdatedEvent({
   action = null,
   entityType = null,

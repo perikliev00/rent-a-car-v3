@@ -1,3 +1,7 @@
+/**
+ * Customer document vault: upload identity docs, download, and delete.
+ * Uploads use multipart FormData via the account API.
+ */
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
@@ -15,12 +19,19 @@ import { Select } from '../../components/ui/Select';
 import { toast } from '../../components/ui/toastStore';
 import { ApiError } from '../../api/client';
 
+/** Human labels for each uploadable document category. */
 const DOC_LABELS: Record<CustomerDocType, string> = {
   driver_license: 'Driver license',
   passport_id: 'Passport / ID card',
   other: 'Other',
 };
 
+/**
+ * Manage uploaded customer identity documents.
+ *
+ * @returns Upload form plus list of documents with download/delete actions.
+ * @remarks Side effects: uploads/deletes via API; invalidates the documents query; shows toasts.
+ */
 export function AccountDocumentsPage() {
   const queryClient = useQueryClient();
   const [docType, setDocType] = useState<CustomerDocType>('driver_license');

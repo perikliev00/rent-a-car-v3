@@ -1,3 +1,6 @@
+/**
+ * Drawer that loads and routes event details by event kind.
+ */
 import { useQuery } from '@tanstack/react-query';
 import { getCalendarEventDetails } from '../../../api/admin/calendar';
 import { useAuth } from '../../../auth/useAuth';
@@ -9,6 +12,7 @@ import { ReservationEventDetails } from './eventDetails/ReservationEventDetails'
 import { TaskEventDetails } from './eventDetails/TaskEventDetails';
 import { useCalendarEventActions } from './eventDetails/useCalendarEventActions';
 
+/** Drawer that loads and routes event details by event kind. */
 export function EventDetailsDrawer({
   eventId,
   open,

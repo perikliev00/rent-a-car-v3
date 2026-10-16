@@ -1,3 +1,7 @@
+/**
+ * Post-Stripe success landing. Confirms the session via the API and polls while
+ * payment is recorded but the booking is not yet marked confirmed (webhook lag).
+ */
 import { useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -6,6 +10,12 @@ import { StaticPageHero } from '../../components/static/StaticPageHero';
 import { Button } from '../../components/ui/Button';
 import { PageLoader } from '../../components/ui/Loading';
 
+/**
+ * Confirmation page after returning from Stripe Checkout.
+ *
+ * @returns Success/error/empty-session UI based on `session_id` and API state.
+ * @remarks Side effect: polls {@link checkoutSuccess} every 2s until `confirmed` is true.
+ */
 export function CheckoutSuccessPage() {
   const [params] = useSearchParams();
   const sessionId = params.get('session_id');
@@ -26,6 +36,7 @@ export function CheckoutSuccessPage() {
     if (!sessionId) return;
   }, [sessionId]);
 
+  // Deep-link without a session id cannot confirm anything.
   if (!sessionId) {
     return (
       <div>

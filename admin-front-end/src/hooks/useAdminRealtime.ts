@@ -1,3 +1,7 @@
+/**
+ * Staff-only SSE realtime: maps domain events to toasts and React Query
+ * invalidation. Suppresses echo toasts shortly after local mutations.
+ */
 import { useEffect, useState } from 'react';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
@@ -20,6 +24,7 @@ const TOAST_TYPE_BY_EVENT: Partial<Record<AdminRealtimeEventType, ToastType>> = 
   paid_but_not_confirmed: 'info',
 };
 
+/** Window after a local write during which matching SSE echoes are ignored. */
 export const LOCAL_MUTATION_ECHO_MS = 1500;
 
 const RESERVATION_ECHO_EVENT_TYPES = new Set<string>([
@@ -28,6 +33,7 @@ const RESERVATION_ECHO_EVENT_TYPES = new Set<string>([
   'car_returned',
 ]);
 
+/** Query-key prefixes invalidated per realtime event type. */
 const KEYS = {
   reservations: ['admin', 'reservations'],
   dashboard: ['admin', 'dashboard'],
@@ -41,19 +47,33 @@ const KEYS = {
 
 let lastLocalMutationAt = 0;
 
+/**
+ * Call after a successful local admin mutation to suppress SSE echo noise.
+ * @param at - Timestamp of the local mutation (default now)
+ */
 export function noteLocalAdminMutation(at = Date.now()) {
   lastLocalMutationAt = at;
 }
 
+/**
+ * True when a reservation echo should be ignored (recent local mutation).
+ * @param type - SSE event type
+ * @param now - Comparison timestamp (default now)
+ */
 export function shouldSuppressReservationEcho(type: string, now = Date.now()) {
   if (!RESERVATION_ECHO_EVENT_TYPES.has(type)) return false;
   const elapsed = now - lastLocalMutationAt;
   return elapsed >= 0 && elapsed < LOCAL_MUTATION_ECHO_MS;
 }
 
+/**
+ * Parse SSE `data` JSON into an {@link AdminRealtimeEvent}, or null if invalid.
+ * @param raw - MessageEvent data string
+ */
 function parseEventData(raw: string): AdminRealtimeEvent | null {
   try {
     const parsed = JSON.parse(raw) as AdminRealtimeEvent;
+    // Require a plain object with a string `type`.
     if (!parsed || typeof parsed !== 'object' || typeof parsed.type !== 'string') {
       return null;
     }
@@ -63,6 +83,10 @@ function parseEventData(raw: string): AdminRealtimeEvent | null {
   }
 }
 
+/**
+ * Map an SSE event type to the React Query key prefixes that should invalidate.
+ * @param type - Domain event type string
+ */
 export function queryKeysForRealtimeEvent(type: string): readonly (readonly string[])[] {
   switch (type) {
     case 'new_booking':
@@ -91,8 +115,14 @@ export function queryKeysForRealtimeEvent(type: string): readonly (readonly stri
   }
 }
 
+/**
+ * Invalidate all React Query caches associated with a realtime event type.
+ * @param queryClient - App QueryClient
+ * @param type - Domain event type string
+ */
 export function invalidateAdminCachesForEvent(queryClient: QueryClient, type: string) {
   for (const queryKey of queryKeysForRealtimeEvent(type)) {
+    // Spread into a mutable array — invalidateQueries expects QueryKey.
     void queryClient.invalidateQueries({ queryKey: [...queryKey] });
   }
 }
@@ -109,6 +139,7 @@ export function useAdminRealtime(): AdminRealtimeConnectionState {
   const [state, setState] = useState<AdminRealtimeConnectionState>('idle');
 
   useEffect(() => {
+    // Guests/non-staff never open the stream.
     if (!isStaff) {
       setState('idle');
       return;
@@ -119,6 +150,7 @@ export function useAdminRealtime(): AdminRealtimeConnectionState {
     setState('connecting');
 
     try {
+      // Cookie session via withCredentials.
       source = new EventSource(getAdminRealtimeStreamUrl(), { withCredentials: true });
     } catch {
       setState('offline');
@@ -133,18 +165,21 @@ export function useAdminRealtime(): AdminRealtimeConnectionState {
       if (!closed) setState('offline');
     };
 
+    // Heartbeat keeps the UI in “live” even without domain events.
     const onPing = () => {
       if (!closed) setState('live');
     };
 
     source.addEventListener('ping', onPing);
 
+    // One listener per catalogued event type.
     const handlers = ADMIN_REALTIME_EVENT_TYPES.map((type) => {
       const handler = (evt: Event) => {
         const message = evt as MessageEvent<string>;
         const payload = parseEventData(message.data);
         if (!payload) return;
 
+        // Skip toast/invalidation when we just wrote locally (echo suppression).
         if (shouldSuppressReservationEcho(type)) {
           return;
         }

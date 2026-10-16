@@ -1,6 +1,16 @@
+/**
+ * Reservation SQL for calendar range queries and day-ops sections.
+ *
+ * Day sections use Europe/Sofia date casting so local pickup/return days match ops.
+ */
+
 const { clientQuery } = require('../../../db/transaction');
 const { TERMINAL_STATUSES } = require('../../../domain/reservationStatus');
 
+/**
+ * Active (non-terminal) reservations overlapping [from, to).
+ * @param {{ from: Date|string, to: Date|string, carIds?: Array|null, statuses?: string[]|null }} opts
+ */
 async function listReservationsInRange({ from, to, carIds = null, statuses = null }, client = null) {
   const params = [from, to];
   const where = [
@@ -36,6 +46,7 @@ async function listReservationsInRange({ from, to, carIds = null, statuses = nul
   return result.rows;
 }
 
+/** @param {string|number} reservationId */
 async function findReservationById(reservationId, client = null) {
   const id = Number(reservationId);
   if (!Number.isInteger(id) || id <= 0) return null;
@@ -53,6 +64,10 @@ async function findReservationById(reservationId, client = null) {
   return result.rows[0] || null;
 }
 
+/**
+ * Day board sections: Sofia-local pickups/returns plus paid-not-confirmed near term.
+ * @param {string} dateIso YYYY-MM-DD
+ */
 async function getDayReservationSections(dateIso, client = null) {
   const pickups = await clientQuery(
     client,

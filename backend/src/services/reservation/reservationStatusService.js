@@ -1,3 +1,8 @@
+/**
+ * Single entrypoint for reservation status transitions.
+ * Enforces domain transition rules, blocks unsafe changes during pending refunds,
+ * writes status history, syncs car fleet / booking calendar, and notifies auditors.
+ */
 const { runWithTransaction } = require('../../db/transaction');
 const reservationSql = require('../sql/reservationSqlService');
 const historySql = require('../sql/reservationStatusHistorySqlService');
@@ -9,18 +14,30 @@ const logger = require('../../utils/logger');
 
 const statusChangeListeners = [];
 
+/**
+ * Register a listener invoked after a successful status change (outside the DB write).
+ * @param {(event: object) => void|Promise<void>} listener
+ * @returns {() => void} Unsubscribe function
+ */
 function registerStatusChangeListener(listener) {
   if (typeof listener === 'function') {
     statusChangeListeners.push(listener);
   }
   return () => {
     const idx = statusChangeListeners.indexOf(listener);
+    // Status / lifecycle guard before mutating domain state.
     if (idx >= 0) statusChangeListeners.splice(idx, 1);
   };
 }
 
+/**
+ * notify listeners.
+ * @param {*} event
+ * @returns {Promise<*>}
+ */
 async function notifyListeners(event) {
   for (const listener of statusChangeListeners) {
+    // Protected block: isolate failure modes.
     try {
       await listener(event);
     } catch (err) {
@@ -29,6 +46,11 @@ async function notifyListeners(event) {
   }
 }
 
+/**
+ * audit status change.
+ * @param {*} event
+ * @returns {Promise<*>}
+ */
 async function auditStatusChange(event) {
   const { actor, reservationId, oldStatus, newStatus, reason, metadata } = event;
   const payload = {
@@ -43,6 +65,7 @@ async function auditStatusChange(event) {
     },
   };
 
+  // Protected block: isolate failure modes.
   try {
     if (actor?.type === 'admin' && actor.req) {
       await logAdminAction(actor.req, payload);
@@ -58,6 +81,9 @@ async function auditStatusChange(event) {
 
 registerStatusChangeListener(auditStatusChange);
 
+/**
+ * Transactional core: lock row, validate, apply status/patch, history, calendar side effects.
+ */
 async function changeStatusCore({
   reservationId,
   newStatus,
@@ -68,6 +94,7 @@ async function changeStatusCore({
   client,
 }) {
   const reservation = await reservationSql.findByIdForUpdate(reservationId, client);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!reservation) {
     const err = new Error('Reservation not found');
     err.code = 'NOT_FOUND';
@@ -77,8 +104,10 @@ async function changeStatusCore({
 
   const oldStatus = reservation.status;
 
+  // Pending refund: only allow transitions that complete or stay in refund-safe statuses.
   if (oldStatus !== newStatus) {
     const activeRefund = await refundOpSql.findActiveByReservationId(reservationId, client);
+    // Status / lifecycle guard before mutating domain state.
     if (activeRefund?.status === 'pending' && !isAllowedDuringPendingRefund(newStatus)) {
       const err = new Error(
         'A refund is pending for this reservation. Pickup and cancellation are blocked until the refund completes.'
@@ -91,6 +120,7 @@ async function changeStatusCore({
 
   assertTransition(oldStatus, newStatus);
 
+  // Status / lifecycle guard before mutating domain state.
   if (oldStatus === newStatus && !patch) {
     return { reservation, changed: false, oldStatus, newStatus };
   }
@@ -166,6 +196,17 @@ async function changeStatusCore({
 
 /**
  * Validates transition, updates reservation status, writes history in one transaction.
+ * Pass an existing `client` to participate in an outer transaction.
+ *
+ * @param {object} params
+ * @param {string|number} params.reservationId
+ * @param {string} params.newStatus
+ * @param {string|null} [params.reason]
+ * @param {object|null} [params.metadata]
+ * @param {{ type?: string, req?: object, userId?: * }} [params.actor]
+ * @param {object|null} [params.patch] - Extra field updates applied with the status change
+ * @param {object|null} [params.client]
+ * @returns {Promise<{ reservation: object, changed: boolean, oldStatus: string, newStatus: string, event?: object }>}
  */
 async function changeStatus({
   reservationId,
@@ -176,6 +217,7 @@ async function changeStatus({
   patch = null,
   client = null,
 } = {}) {
+  // Status / lifecycle guard before mutating domain state.
   if (!reservationId || !newStatus) {
     throw new Error('changeStatus requires reservationId and newStatus');
   }

@@ -1,11 +1,26 @@
-// =============================================================================
-// carFilters.js – обща нормализация и филтри за gallery (home) и search
-// =============================================================================
+/**
+ * Shared car filter normalization for gallery (home) and search endpoints.
+ * Parses raw query/body fields into typed criteria and applies post-pricing price filters.
+ */
 
+/**
+ * Normalize a value to a trimmed lowercase string.
+ *
+ * @param {unknown} v
+ * @returns {string}
+ * @throws {never}
+ */
 function norm(v) {
   return String(v ?? '').trim().toLowerCase();
 }
 
+/**
+ * Parse a value as a finite number, or return undefined when empty/invalid.
+ *
+ * @param {unknown} v
+ * @returns {number | undefined}
+ * @throws {never}
+ */
 function toNumOrUndef(v) {
   if (v === undefined || v === null) return undefined;
   const s = String(v).trim();
@@ -14,12 +29,21 @@ function toNumOrUndef(v) {
   return Number.isFinite(n) ? n : undefined;
 }
 
+/**
+ * Resolve category id from `categoryId` or legacy `category` query fields.
+ *
+ * @param {Record<string, unknown>} raw
+ * @returns {number | undefined}
+ * @throws {never}
+ */
 function parseCategoryId(raw) {
+  // Prefer the modern categoryId field.
   const direct = toNumOrUndef(raw?.categoryId);
   if (direct !== undefined && direct >= 1) {
     return direct;
   }
 
+  // Legacy clients sent `category` as a numeric id.
   const legacyCategory = toNumOrUndef(raw?.category);
   if (legacyCategory !== undefined && legacyCategory >= 1) {
     return legacyCategory;
@@ -29,9 +53,9 @@ function parseCategoryId(raw) {
 }
 
 /**
- * Нормализира сурови полета (query или body) до ефективни критерии за кола.
+ * Normalize raw filter fields (query or body) into effective car search criteria.
  *
- * @param {Record<string, unknown>} raw
+ * @param {Record<string, unknown>} [raw={}]
  * @returns {{
  *   categoryId?: number,
  *   transmission: string,
@@ -41,6 +65,7 @@ function parseCategoryId(raw) {
  *   priceMin?: number,
  *   priceMax?: number
  * }}
+ * @throws {never}
  */
 function parseCarFilterRaw(raw = {}) {
   const {
@@ -52,6 +77,7 @@ function parseCarFilterRaw(raw = {}) {
     priceMax,
   } = raw;
 
+  // Coerce strings to typed criteria; empty strings become '' / undefined as appropriate.
   return {
     categoryId: parseCategoryId(raw),
     transmission: norm(transmission),
@@ -64,12 +90,15 @@ function parseCarFilterRaw(raw = {}) {
 }
 
 /**
- * Точен филтър по дневна/unit цена след computeBookingPrice.
+ * Exact filter by daily/unit price after `computeBookingPrice`.
  *
  * @param {Array<Record<string, unknown>>} cars
  * @param {ReturnType<typeof parseCarFilterRaw>} criteria
+ * @returns {Array<Record<string, unknown>>}
+ * @throws {never}
  */
 function filterCarsByComputedUnitPrice(cars, criteria) {
+  // No price bounds → return the list unchanged.
   if (criteria.priceMin === undefined && criteria.priceMax === undefined) {
     return cars;
   }
@@ -86,10 +115,12 @@ function filterCarsByComputedUnitPrice(cars, criteria) {
 }
 
 /**
- * Стойности за API `filters` при gallery/search.
+ * String view-model values for API `filters` on gallery/search responses.
  *
  * @param {ReturnType<typeof parseCarFilterRaw>} criteria
- * @param {Record<string, unknown>} [raw] – оригинални низове при липсващи числа
+ * @param {Record<string, unknown>} [raw] - Original strings when numeric parse failed
+ * @returns {Record<string, string>}
+ * @throws {never}
  */
 function filtersViewModel(criteria, raw = {}) {
   const r = raw || {};

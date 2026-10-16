@@ -16,6 +16,13 @@ const {
   runCommand,
 } = require('./dbCliUtils');
 
+/**
+ * Create a plain SQL backup using pg_dump.
+ *
+ * @param {*} [argv] - argv = process.argv.slice(2)
+ * @returns {Promise<*>}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 async function backup(argv = process.argv.slice(2)) {
   const databaseUrl = requireDatabaseUrl();
   const options = parseCliArgs(argv);

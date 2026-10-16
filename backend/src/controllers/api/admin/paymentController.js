@@ -1,3 +1,6 @@
+/**
+ * Admin payment monitoring, refund queue, reconcile, and Stripe stub helpers.
+ */
 const { validationResult } = require('express-validator');
 const paymentAdminService = require('../../../services/admin/paymentAdminService');
 const { logAdminAction } = require('../../../services/admin/adminAuditService');
@@ -6,6 +9,14 @@ const asyncHandler = require('../../../utils/asyncHandler');
 const { forwardControllerError } = require('../../../utils/controllerError');
 const stripeTestStub = require('../../../services/payment/stripeTestStub');
 
+/**
+ * Return the payment refund queue.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.getPaymentRefundQueue = asyncHandler(async (req, res, next) => {
   try {
     const data = await paymentAdminService.listPaymentRefundQueue({
@@ -25,6 +36,14 @@ exports.getPaymentRefundQueue = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Return payment monitoring summary.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.getPaymentMonitoring = asyncHandler(async (req, res, next) => {
   try {
     const data = await paymentAdminService.getPaymentMonitoringData();
@@ -37,8 +56,18 @@ exports.getPaymentMonitoring = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Reconcile payments against Stripe / local records.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.reconcilePayments = asyncHandler(async (req, res, next) => {
+  // Collect express-validator results for this request.
   const errors = validationResult(req);
+  // Validation failed — respond before running domain logic.
   if (!errors.isEmpty()) {
     return apiResponse.error(
       res,
@@ -51,6 +80,7 @@ exports.reconcilePayments = asyncHandler(async (req, res, next) => {
   try {
     const dryRun = req.body.dryRun === 'true' || req.body.dryRun === true;
     await paymentAdminService.runPaymentReconciliation({ dryRun });
+    // Record an admin audit entry for this mutation.
     await logAdminAction(req, {
       action: 'admin.ran_payment_reconcile',
       entityType: 'payment',
@@ -66,6 +96,14 @@ exports.reconcilePayments = asyncHandler(async (req, res, next) => {
 });
 
 /** STRIPE_STUB-only: mark a checkout session paid without finalizing (for reconcile e2e). */
+/**
+ * Test-only: mark a stub Stripe session as paid.
+ * Side effects: may read/write domain state via services and send an API JSON response.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.markStubSessionPaid = asyncHandler(async (req, res, next) => {
   if (!stripeTestStub.isStubEnabled()) {
     return apiResponse.error(res, 'NOT_FOUND', 'Not found.', 404);

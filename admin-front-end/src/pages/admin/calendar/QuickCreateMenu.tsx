@@ -1,5 +1,18 @@
+/**
+ * Context menu to create block/task/reservation from a slot.
+ */
 import { useEffect, useRef } from 'react';
 
+/**
+ * Floating context menu for creating a task/block or opening day ops at (x, y).
+ * Dismisses on Escape or outside click.
+ *
+ * @param open - Menu visibility
+ * @param x / y - Viewport coordinates for positioning
+ * @param canCreateBlock / canCreateTask - RBAC gates for menu items
+ * @param onCreateTask / onCreateBlock / onOpenDay - Menu actions
+ * @param onClose - Dismiss handler
+ */
 export function QuickCreateMenu({
   open,
   x,
@@ -23,6 +36,7 @@ export function QuickCreateMenu({
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
+  // Escape + outside mousedown while open.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {

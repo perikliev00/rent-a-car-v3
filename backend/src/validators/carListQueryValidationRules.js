@@ -1,3 +1,6 @@
+/**
+ * Query-string validation for public car gallery/list filters and pagination.
+ */
 const { query } = require('express-validator');
 const {
   FUEL_TYPES,

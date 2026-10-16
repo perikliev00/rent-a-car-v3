@@ -1,9 +1,13 @@
+/**
+ * Detail panel UI for reservation calendar events.
+ */
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../../../../components/ui/Button';
 import { opsReservationUrl } from '../reservationDeepLink';
 import { Field, Section } from './EventDetailsPrimitives';
 import { fmt } from './formatEventDate';
 
+/** Detail panel UI for reservation calendar events. */
 export function ReservationEventDetails({
   reservation,
   documents,

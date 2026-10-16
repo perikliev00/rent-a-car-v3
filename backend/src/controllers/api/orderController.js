@@ -1,3 +1,8 @@
+/**
+ * Customer order creation handler (booking flow).
+ * Creates or reuses a pending reservation hold for the browser session, then
+ * returns an order view-model for the checkout step.
+ */
 const { validationResult } = require('express-validator');
 const carRepository = require('../../repositories/carRepository');
 const { computeBookingPriceAsync } = require('../../utils/pricing');
@@ -24,6 +29,15 @@ const { forwardControllerError } = require('../../utils/controllerError');
 const { NotFoundError } = require('../../utils/appError');
 const metrics = require('../../monitoring/metrics');
 
+/**
+ * Create a customer order / reservation hold from booking input.
+ * Side effects: may create/update a pending reservation, bump conflict metrics,
+ * and mutate pricing on an existing session hold when only addons change.
+ * @param {import('express').Request} req - Body: carId, dates, times, locations, extras?, hotel*
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.createOrder = asyncHandler(async (req, res, next) => {
   const errors = validationResult(req);
   const {
@@ -36,6 +50,7 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
     returnTime,
   } = req.body || {};
 
+  // Load car early so validation failures can still shape an order-page payload.
   const car = carId ? await carRepository.findById(carId) : null;
   const pickupDateDisplay = formatDateForDisplay(pickupDateISO);
   const returnDateDisplay = formatDateForDisplay(returnDateISO);
@@ -49,6 +64,11 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
     totalPrice: 0,
   };
 
+  /**
+   * Build the SPA order view-model using current pricing + display fields.
+   * @param {{ message?: string|null, existingReservation?: object|null }} [overrides]
+   * @returns {object}
+   */
   const buildOrderData = (overrides = {}) => {
     const basePayload = buildBaseOrderPayload({
       pickupDateISO,
@@ -71,6 +91,7 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
     });
   };
 
+  // Validation failed: prefer 422 when car exists; otherwise treat as missing car.
   if (!errors.isEmpty()) {
     const message = errors.array()[0].msg;
     if (car) {
@@ -97,6 +118,7 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
     });
 
     if (!isValid || !startDate || !endDate) {
+      // Still compute price when dates parse so the UI can show a partial breakdown.
       if (startDate && endDate) {
         pricing = await computeBookingPriceAsync(car, startDate, endDate, pickupLocation, returnLocation);
       }
@@ -109,6 +131,7 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
     }
 
     const extras = Array.isArray(req.body.extras) ? req.body.extras : [];
+    // hotelName alone implies hotel delivery for legacy clients.
     const hotelDelivery = Boolean(req.body.hotelDelivery) || Boolean(req.body.hotelName);
 
     pricing = await computeBookingPriceAsync(
@@ -131,6 +154,12 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
     const sessionId = getSessionId(req);
     const now = new Date();
 
+    /**
+     * Handle an existing unpaid hold for this session: reuse when params match
+     * (optionally refreshing addon pricing), otherwise return 409 conflict.
+     * @param {object} existingForSession
+     * @returns {Promise<import('express').Response>}
+     */
     const respondForExistingSessionHold = async (existingForSession) => {
       const existingCarId = existingForSession.carId?.id || existingForSession.carId;
       const sameReservationParams =
@@ -150,6 +179,7 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
         const prevHotel = Boolean(existingForSession.hotelDelivery);
         const nextHotel = Boolean(hotelDelivery);
 
+        // Same trip params but addons/hotel changed → patch pricing without new hold.
         if (prevExtras !== nextExtras || prevHotel !== nextHotel) {
           await changeStatus({
             reservationId: existingForSession.id,
@@ -206,11 +236,13 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
         req
       );
 
+    // Race: another request created a session hold while we were inserting.
     if (existingActiveReservation) {
       return respondForExistingSessionHold(existingActiveReservation);
     }
 
     if (overlappingReservation) {
+      // Prefer session-hold conflict messaging when our session somehow obtained a hold.
       const sessionHoldAfterOverlap = await findActiveReservationBySession(req);
       if (sessionHoldAfterOverlap) {
         return respondForExistingSessionHold(sessionHoldAfterOverlap);

@@ -1,3 +1,6 @@
+/**
+ * Paginated audit trail with actor/entity filters.
+ */
 import { useState, Fragment } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -46,10 +49,12 @@ const ACTION_LABELS: Record<string, string> = {
   'customer.cancelled_checkout': 'Cancelled checkout',
 };
 
+/** Format Action Label. */
 function formatActionLabel(action: string) {
   return ACTION_LABELS[action] || action;
 }
 
+/** Format Actor. */
 function formatActor(log: AuditLogRow) {
   if (log.actorType === 'system') return 'System';
   if (log.actorType === 'customer') {
@@ -62,11 +67,13 @@ function formatActor(log: AuditLogRow) {
   return 'Admin';
 }
 
+/** Format Entity. */
 function formatEntity(log: AuditLogRow) {
   if (!log.entityId) return log.entityType;
   return `${log.entityType} #${log.entityId}`;
 }
 
+/** Format Summary. */
 function formatSummary(log: AuditLogRow) {
   if (!log.metadata || typeof log.metadata !== 'object') return '—';
   const keys = Object.keys(log.metadata);
@@ -77,6 +84,7 @@ function formatSummary(log: AuditLogRow) {
     .join(', ');
 }
 
+/** Format Time. */
 function formatTime(value: string) {
   try {
     return new Date(value).toLocaleString();
@@ -85,6 +93,7 @@ function formatTime(value: string) {
   }
 }
 
+/** Paginated audit trail with actor/entity filters. */
 export function AdminAuditLogsPage() {
   const [filters, setFilters] = useState({
     from: '',

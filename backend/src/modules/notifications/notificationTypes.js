@@ -1,3 +1,7 @@
+/**
+ * Canonical notification type and channel enums for enqueue validation.
+ */
+
 const NOTIFICATION_TYPES = Object.freeze([
   'reservation_confirmation',
   'payment_failed',

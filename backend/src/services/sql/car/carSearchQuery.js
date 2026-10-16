@@ -1,3 +1,6 @@
+/**
+ * Build parameterized car search/list SQL for catalog and admin filters.
+ */
 const pool = require('../../../db/pool');
 const { parseSofiaDate } = require('../../../utils/timeZone');
 const { clientQuery } = require('../../../db/transaction');
@@ -7,6 +10,11 @@ const { CAR_SELECT, mapPublicCar, mapSqlCar, parsePage } = require('./carMapper'
 
 const DEFAULT_PER_PAGE = 3;
 
+/**
+ * Resolve search date range from inputs / Stripe / DB.
+ * @param {object} [options]
+ * @returns {*}
+ */
 function resolveSearchDateRange(options = {}) {
   const {
     startDate,
@@ -37,11 +45,22 @@ function resolveSearchDateRange(options = {}) {
   return null;
 }
 
+/**
+ * add param.
+ * @param {*} params
+ * @param {*} value
+ * @returns {*}
+ */
 function addParam(params, value) {
   params.push(value);
   return `$${params.length}`;
 }
 
+/**
+ * Load price expression.
+ * @param {*} rentalDays
+ * @returns {*}
+ */
 function getPriceExpression(rentalDays) {
   const rd = Math.max(1, Number(rentalDays) || 1);
 
@@ -56,6 +75,13 @@ function getPriceExpression(rentalDays) {
   return 'COALESCE(c.price_tier_31_plus, c.price)';
 }
 
+/**
+ * Transform helper: build car where.
+ * @param {*} [criteria]
+ * @param {*} [rentalDays]
+ * @param {object} [options]
+ * @returns {*}
+ */
 function buildCarWhere(criteria = {}, rentalDays = 1, options = {}) {
   const params = [];
   const where = ['c.is_deleted = FALSE'];
@@ -103,25 +129,31 @@ function buildCarWhere(criteria = {}, rentalDays = 1, options = {}) {
     where.push(`LOWER(c.fuel_type) = LOWER(${addParam(params, criteria.fuelType)})`);
   }
 
+  // Guard: early-return or throw when required input is missing/invalid.
   if (criteria.seatsMin !== undefined) {
     where.push(`c.seats >= ${addParam(params, criteria.seatsMin)}`);
   }
 
+  // Guard: early-return or throw when required input is missing/invalid.
   if (criteria.seatsMax !== undefined) {
     where.push(`c.seats <= ${addParam(params, criteria.seatsMax)}`);
   }
 
+  // Guard: early-return or throw when required input is missing/invalid.
   if (criteria.categoryId !== undefined) {
     where.push(`c.category_id = ${addParam(params, criteria.categoryId)}`);
   }
 
+  // Guard: early-return or throw when required input is missing/invalid.
   if (criteria.priceMin !== undefined || criteria.priceMax !== undefined) {
     const priceExpr = getPriceExpression(rentalDays);
 
+    // Guard: early-return or throw when required input is missing/invalid.
     if (criteria.priceMin !== undefined) {
       where.push(`${priceExpr} >= ${addParam(params, criteria.priceMin)}`);
     }
 
+    // Guard: early-return or throw when required input is missing/invalid.
     if (criteria.priceMax !== undefined) {
       where.push(`${priceExpr} <= ${addParam(params, criteria.priceMax)}`);
     }
@@ -133,6 +165,12 @@ function buildCarWhere(criteria = {}, rentalDays = 1, options = {}) {
   };
 }
 
+/**
+ * paginate sql cars.
+ * @param {*} [criteria]
+ * @param {object} [options]
+ * @returns {Promise<*>}
+ */
 async function paginateSqlCars(criteria = {}, options = {}) {
   const {
     page: requestedPage = 1,
@@ -204,9 +242,17 @@ async function paginateSqlCars(criteria = {}, options = {}) {
   };
 }
 
+/**
+ * Load sql car by id.
+ * @param {string|number} id
+ * @param {*} [{ includeDeleted]
+ * @param {*} [publicView]
+ * @returns {Promise<*>}
+ */
 async function fetchSqlCarById(id, { includeDeleted = false, publicView = false } = {}) {
   const carId = Number(id);
 
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(carId) || carId <= 0) {
     return null;
   }
@@ -226,6 +272,7 @@ async function fetchSqlCarById(id, { includeDeleted = false, publicView = false 
   );
 
   const row = result.rows[0];
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) {
     return null;
   }
@@ -235,14 +282,29 @@ async function fetchSqlCarById(id, { includeDeleted = false, publicView = false 
   return publicView ? mapPublicCar(row, dates) : mapSqlCar(row, dates);
 }
 
+/**
+ * Load sql public car by id.
+ * @param {string|number} id
+ * @returns {Promise<*>}
+ */
 async function getSqlPublicCarById(id) {
   return fetchSqlCarById(id, { includeDeleted: false, publicView: true });
 }
 
+/**
+ * Load sql admin car by id.
+ * @param {string|number} id
+ * @returns {Promise<*>}
+ */
 async function getSqlAdminCarById(id) {
   return fetchSqlCarById(id, { includeDeleted: true, publicView: false });
 }
 
+/**
+ * List all cars from SQL.
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function listAllCars(client = null) {
   const result = await clientQuery(
     client,
@@ -259,6 +321,11 @@ async function listAllCars(client = null) {
   return result.rows.map((row) => mapSqlCar(row));
 }
 
+/**
+ * List all car image urls from SQL.
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function listAllCarImageUrls(client = null) {
   const result = await clientQuery(
     client,
@@ -274,6 +341,11 @@ async function listAllCarImageUrls(client = null) {
   return result.rows.map((row) => row.image);
 }
 
+/**
+ * List available cars from SQL.
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function listAvailableCars(client = null) {
   const result = await clientQuery(
     client,
@@ -292,6 +364,12 @@ async function listAvailableCars(client = null) {
   return result.rows.map((row) => mapSqlCar(row));
 }
 
+/**
+ * Lightweight filtered car list for admin widgets / related picks (not full search).
+ * @param {object} [filters]
+ * @param {object|null} [client]
+ * @returns {Promise<object[]>}
+ */
 async function listCarsByFilter({
   categoryId,
   fuelType,
@@ -304,6 +382,7 @@ async function listCarsByFilter({
   const params = [];
   const where = ['c.is_deleted = FALSE'];
 
+  // Exclude hard-unbookable statuses when onlyAvailable is requested.
   if (onlyAvailable) {
     params.push(HARD_UNBOOKABLE_STATUSES);
     where.push(`c.status <> ALL($${params.length}::text[])`);
@@ -324,11 +403,13 @@ async function listCarsByFilter({
     where.push(`LOWER(c.transmission) = LOWER($${params.length})`);
   }
 
+  // Guard: early-return or throw when required input is missing/invalid.
   if (seatsMin !== undefined && seatsMin !== null && seatsMin !== '') {
     params.push(Number(seatsMin));
     where.push(`c.seats >= $${params.length}`);
   }
 
+  // Guard: early-return or throw when required input is missing/invalid.
   if (seatsMax !== undefined && seatsMax !== null && seatsMax !== '') {
     params.push(Number(seatsMax));
     where.push(`c.seats <= $${params.length}`);

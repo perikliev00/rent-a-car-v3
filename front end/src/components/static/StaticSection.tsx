@@ -1,3 +1,4 @@
+/** Constrained content section with optional title for static pages. */
 import type { ReactNode } from 'react';
 
 interface StaticSectionProps {
@@ -8,6 +9,16 @@ interface StaticSectionProps {
   subtitle?: string;
 }
 
+/**
+ * Constrained content section with optional title/subtitle for static pages.
+ *
+ * @param props.children - Section body content.
+ * @param props.className - Extra classes on the `<section>`.
+ * @param props.narrow - When true, uses `max-w-3xl` instead of `max-w-7xl`.
+ * @param props.title - Optional section heading.
+ * @param props.subtitle - Optional supporting copy under the title.
+ * @returns A horizontally padded, vertically spaced content section.
+ */
 export function StaticSection({
   children,
   className = '',

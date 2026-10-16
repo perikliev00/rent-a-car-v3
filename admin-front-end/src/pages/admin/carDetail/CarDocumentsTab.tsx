@@ -1,3 +1,6 @@
+/**
+ * Car document upload/download/delete UI.
+ */
 import { Button } from '../../../components/ui/Button';
 import { Card, CardBody } from '../../../components/ui/Card';
 import { Input } from '../../../components/ui/Input';
@@ -9,6 +12,7 @@ type DocItem = {
   hasFile?: boolean;
 };
 
+/** Car document upload/download/delete UI. */
 export function CarDocumentsTab({
   docName,
   setDocName,

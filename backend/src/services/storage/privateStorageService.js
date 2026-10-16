@@ -1,5 +1,13 @@
+/**
+ * Private document storage facade selected by PRIVATE_STORAGE_DRIVER (local | s3).
+ * Used for customer docs and other non-public files (never served as static URLs).
+ */
 const { wrapStorageMetrics } = require('./wrapStorageMetrics');
 
+/**
+ * Insert private storage service and return the mapped result.
+ * @returns {*}
+ */
 function createPrivateStorageService() {
   const driver = (process.env.PRIVATE_STORAGE_DRIVER || 'local').toLowerCase();
 

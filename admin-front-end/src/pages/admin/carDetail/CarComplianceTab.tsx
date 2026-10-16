@@ -1,3 +1,6 @@
+/**
+ * Compliance items UI (insurance, vignette, equipment, etc.).
+ */
 import {
   COMPLIANCE_TYPE_OPTIONS,
   complianceTypeHasExpiry,
@@ -18,6 +21,7 @@ type ComplianceItem = {
   status: string;
 };
 
+/** Compliance items UI (insurance, vignette, equipment, etc.). */
 export function CarComplianceTab({
   complianceForm,
   setComplianceForm,

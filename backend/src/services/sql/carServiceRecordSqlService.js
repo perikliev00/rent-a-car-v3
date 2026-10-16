@@ -1,6 +1,15 @@
+/**
+ * SQL for car service/maintenance history records.
+ */
 const { clientQuery } = require('../../db/transaction');
 
+/**
+ * Map a DB/API row into the domain shape used by callers (mapServiceRecord).
+ * @param {object} row
+ * @returns {*}
+ */
 function mapServiceRecord(row) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) return null;
   return {
     id: Number(row.id),
@@ -21,6 +30,12 @@ function mapServiceRecord(row) {
   };
 }
 
+/**
+ * List by car id from SQL.
+ * @param {string|number} carId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function listByCarId(carId, client = null) {
   const result = await clientQuery(
     client,
@@ -35,6 +50,13 @@ async function listByCarId(carId, client = null) {
   return result.rows.map(mapServiceRecord);
 }
 
+/**
+ * Find by id via SQL; returns null when missing.
+ * @param {string|number} carId
+ * @param {string|number} recordId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findById(carId, recordId, client = null) {
   const result = await clientQuery(
     client,
@@ -49,6 +71,13 @@ async function findById(carId, recordId, client = null) {
   return mapServiceRecord(result.rows[0]);
 }
 
+/**
+ * Insert a new row and return the mapped result.
+ * @param {string|number} carId
+ * @param {*} payload
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function create(carId, payload, client = null) {
   const result = await clientQuery(
     client,
@@ -80,6 +109,14 @@ async function create(carId, payload, client = null) {
   return mapServiceRecord(result.rows[0]);
 }
 
+/**
+ * Update or upsert row; returns null when not found.
+ * @param {string|number} carId
+ * @param {string|number} recordId
+ * @param {*} payload
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function update(carId, recordId, payload, client = null) {
   const result = await clientQuery(
     client,
@@ -110,6 +147,13 @@ async function update(carId, recordId, payload, client = null) {
   return mapServiceRecord(result.rows[0]);
 }
 
+/**
+ * Delete row; returns whether a row was affected.
+ * @param {string|number} carId
+ * @param {string|number} recordId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function remove(carId, recordId, client = null) {
   const result = await clientQuery(
     client,

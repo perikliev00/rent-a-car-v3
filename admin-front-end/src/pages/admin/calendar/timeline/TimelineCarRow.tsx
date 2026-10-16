@@ -1,3 +1,6 @@
+/**
+ * One car lane in the fleet timeline with event bars.
+ */
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import type { CalendarCar, CalendarEvent } from '../calendar.types';
 import { TimelineEventBar } from './TimelineEventBar';
@@ -9,6 +12,7 @@ import {
   type TimelineGhost,
 } from './timelineLayout';
 
+/** One car lane in the fleet timeline with event bars. */
 export function TimelineCarRow({
   car,
   events,

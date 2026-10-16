@@ -1,5 +1,15 @@
+/**
+ * Append/list reservation_status_history for audit and ops detail views.
+ */
 const { clientQuery } = require('../../db/transaction');
 
+/**
+ * Append a reservation_status_history row for audit / ops timelines.
+ * @param {object} params
+ * @param {object|null} [client]
+ * @returns {Promise<{ id: *, created_at: * }>}
+ * @throws {Error} when reservationId or newStatus is missing
+ */
 async function insertStatusHistory(
   {
     reservationId,
@@ -45,6 +55,13 @@ async function insertStatusHistory(
   return result.rows[0];
 }
 
+/**
+ * List history for reservation from SQL.
+ * @param {string|number} reservationId
+ * @param {number} [{ limit]
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function listHistoryForReservation(reservationId, { limit = 50 } = {}, client = null) {
   const result = await clientQuery(
     client,

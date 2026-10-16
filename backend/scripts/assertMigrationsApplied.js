@@ -12,6 +12,12 @@ const { requireDatabaseUrl } = require('../sql/dbCliUtils');
 
 const MIGRATIONS_DIR = path.join(__dirname, '..', 'migrations');
 
+/**
+ * CLI entry point for this script.
+ *
+ * @returns {Promise<*>}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 async function main() {
   requireDatabaseUrl();
 

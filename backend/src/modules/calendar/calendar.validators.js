@@ -1,6 +1,13 @@
+/**
+ * express-validator chains for calendar routes.
+ *
+ * Keep request shape validation here; domain rules live in services.
+ */
+
 const { body, param, query } = require('express-validator');
 const { TASK_TYPES, TASK_STATUSES } = require('./calendar.taskDomain');
 
+/** ISO8601 from/to query pair for range endpoints. */
 const rangeQuery = [
   query('from').isISO8601().withMessage('from is required'),
   query('to').isISO8601().withMessage('to is required'),
@@ -12,6 +19,7 @@ const carParam = [param('carId').isInt({ min: 1 }).withMessage('Invalid car id')
 
 const eventIdParam = [param('id').isString().notEmpty()];
 
+/** Body for move and resize (start/end required; carId/force optional). */
 const moveBody = [
   body('start').isISO8601().withMessage('start is required'),
   body('end').isISO8601().withMessage('end is required'),
@@ -73,6 +81,7 @@ const taskPatchBody = [
   body('locationText').optional({ nullable: true }).isString().isLength({ max: 500 }),
 ];
 
+/** List filters; `types` accepts comma-separated or repeated query values. */
 const taskListQuery = [
   query('from').optional().isISO8601(),
   query('to').optional().isISO8601(),

@@ -1,3 +1,6 @@
+/**
+ * Map orders SQL rows to camelCase order documents.
+ */
 const ORDER_SELECT = `
   o.id,
   o.reservation_id,
@@ -33,20 +36,37 @@ const ORDER_SELECT = `
 
 const ALLOWED_STATUSES = ['active', 'pending', 'expired', 'cancelled'];
 
+/**
+ * Normalize id before persistence or comparison.
+ * @param {*} value
+ * @returns {*}
+ */
 function normalizeId(value) {
   const id = Number(value);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(id) || id <= 0) {
     return null;
   }
   return id;
 }
 
+/**
+ * Transform helper: to number or zero.
+ * @param {*} value
+ * @returns {*}
+ */
 function toNumberOrZero(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number : 0;
 }
 
+/**
+ * Map a DB/API row into the domain shape used by callers (mapSqlOrder).
+ * @param {object} row
+ * @returns {*}
+ */
 function mapSqlOrder(row) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) {
     return null;
   }
@@ -85,7 +105,14 @@ function mapSqlOrder(row) {
   };
 }
 
+/**
+ * attach car to order.
+ * @param {object} order
+ * @param {*} car
+ * @returns {*}
+ */
 function attachCarToOrder(order, car) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!order) {
     return null;
   }

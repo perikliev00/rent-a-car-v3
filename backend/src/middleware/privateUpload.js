@@ -1,3 +1,7 @@
+/**
+ * Private document/image multer stacks with magic-byte validation for account and admin uploads.
+ * Soft failures set `req.fileValidationError`; chains end with a 422 converter.
+ */
 const path = require('path');
 const multer = require('multer');
 const fileStorage = require('../services/storage');
@@ -23,10 +27,21 @@ const DOC_EXTENSION_TO_MIMETYPES = {
   '.pdf': ['application/pdf'],
 };
 
+/**
+ * Detect PDF magic header (`%PDF-`).
+ * @param {Buffer} buffer - File head bytes
+ * @returns {boolean}
+ */
 function matchesPdfMagic(buffer) {
   return buffer && buffer.length >= 5 && buffer.toString('ascii', 0, 5) === '%PDF-';
 }
 
+/**
+ * Detect image magic bytes for jpg/png/webp.
+ * @param {Buffer} buffer - File head bytes
+ * @param {string} ext - Normalized extension including the leading dot
+ * @returns {boolean}
+ */
 function matchesImageMagic(buffer, ext) {
   if (ext === '.jpg' || ext === '.jpeg') {
     return buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
@@ -59,6 +74,13 @@ const diskStorage = multer.diskStorage({
   },
 });
 
+/**
+ * Build a multer fileFilter that soft-rejects disallowed extensions/MIME types.
+ * Side effects: may set `req.fileRejected` and `req.fileRejectedMessage`.
+ * @param {Set<string>} allowedExtensions - Allowed lowercase extensions with dots
+ * @param {string} rejectedMessage - Message stored when soft-rejecting
+ * @returns {multer.Options['fileFilter']}
+ */
 function createFileFilter(allowedExtensions, rejectedMessage) {
   return function fileFilter(req, file, cb) {
     const ext = getNormalizedExtension(file.originalname);
@@ -95,6 +117,14 @@ const imageUpload = multer({
   limits: { fileSize: 5 * 1024 * 1024 },
 });
 
+/**
+ * Verify a single private document via extension + magic bytes; delete and set validation error on failure.
+ * Side effects: may delete temp file and set `req.fileValidationError`.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<void>}
+ */
 async function validatePrivateDocument(req, res, next) {
   const file = req.file;
   if (!file) {
@@ -130,8 +160,17 @@ async function validatePrivateDocument(req, res, next) {
   }
 }
 
+/**
+ * Validate all uploaded private images (fields or array); remove all on first failure.
+ * Side effects: may delete temps and set `req.fileValidationError`.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<void>}
+ */
 async function validatePrivateImages(req, res, next) {
   const files = [];
+  // Normalize multer shapes: array, fields object, or single file.
   if (Array.isArray(req.files)) {
     files.push(...req.files);
   } else if (req.files && typeof req.files === 'object') {
@@ -173,6 +212,14 @@ async function validatePrivateImages(req, res, next) {
   }
 }
 
+/**
+ * Turn `req.fileValidationError` into a 422 API response when present.
+ * Side effects: may write a 422 JSON error.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {void|import('express').Response}
+ */
 function rejectIfFileValidationFailed(req, res, next) {
   if (req.fileValidationError) {
     return apiResponse.error(res, 'VALIDATION_ERROR', req.fileValidationError, 422);
@@ -180,6 +227,7 @@ function rejectIfFileValidationFailed(req, res, next) {
   return next();
 }
 
+/** Middleware chain for customer account document uploads. */
 const customerDocumentUpload = [
   accountUploadLimiter || adminUploadLimiter,
   documentUpload.single('file'),
@@ -189,6 +237,7 @@ const customerDocumentUpload = [
   rejectIfFileValidationFailed,
 ];
 
+/** Middleware chain for admin private document uploads. */
 const adminPrivateDocumentUpload = [
   adminUploadLimiter,
   documentUpload.single('file'),
@@ -198,6 +247,7 @@ const adminPrivateDocumentUpload = [
   rejectIfFileValidationFailed,
 ];
 
+/** Middleware chain for checklist photos and signature image fields. */
 const checklistUpload = [
   adminUploadLimiter,
   imageUpload.fields([

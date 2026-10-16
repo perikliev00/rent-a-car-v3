@@ -1,7 +1,19 @@
+/**
+ * Centered dialog overlay with escape-to-close and scroll/focus lock.
+ */
 import type { ReactNode } from 'react';
 import { useEffect, useId, useRef } from 'react';
 import { useOverlayLock } from './useOverlayLock';
 
+/**
+ * Modal dialog that locks body scroll/focus while open.
+ *
+ * @param open - Whether the dialog is visible
+ * @param onClose - Called on backdrop click, Escape, or Close button
+ * @param title - Optional sticky header title (also wired to aria-labelledby)
+ * @param children - Dialog body
+ * @param wide - When true, uses `max-w-4xl` instead of `max-w-lg`
+ */
 export function Modal({
   open,
   onClose,
@@ -19,6 +31,7 @@ export function Modal({
   const panelRef = useRef<HTMLDivElement>(null);
   useOverlayLock(open, panelRef);
 
+  // Escape closes the dialog while it is open.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -30,6 +43,7 @@ export function Modal({
 
   if (!open) return null;
 
+  // Backdrop + panel; backdrop click dismisses.
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <button

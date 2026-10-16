@@ -1,3 +1,6 @@
+/**
+ * HH:MM time picker in 15-minute steps with portal positioning.
+ */
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -19,6 +22,10 @@ interface TimeSelectProps {
   tone?: FieldTone;
 }
 
+/**
+ * Parse `HH:MM`; falls back to 10:00 when the value is malformed.
+ * @param value - Controlled time string
+ */
 function parseHHMM(value: string): { hour: string; minute: string } {
   const match = value.match(/^(\d{2}):(\d{2})$/);
   if (!match) return { hour: '10', minute: '00' };
@@ -28,11 +35,18 @@ function parseHHMM(value: string): { hour: string; minute: string } {
 const triggerClass =
   'flex min-h-11 w-full min-w-0 items-center justify-between rounded-xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] px-3.5 py-2.5 text-left text-sm text-[var(--color-ink)] shadow-sm transition-[border-color,box-shadow] focus:border-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/25';
 
+/**
+ * Position the time popup under (or above) the trigger within the viewport.
+ * @param anchor - Trigger getBoundingClientRect()
+ * @param popupHeight - Measured popup height
+ * @param popupWidth - Desired popup width
+ */
 function computePopupPos(anchor: DOMRect, popupHeight: number, popupWidth: number) {
   const width = Math.min(Math.max(popupWidth, 12 * 16), window.innerWidth - 16);
   const left = Math.min(Math.max(8, anchor.left), Math.max(8, window.innerWidth - width - 8));
   const spaceBelow = window.innerHeight - anchor.bottom - 8;
   const spaceAbove = anchor.top - 8;
+  // Flip above when there is more room above than below.
   const placeAbove = spaceBelow < popupHeight && spaceAbove > spaceBelow;
   const top = placeAbove
     ? Math.max(8, anchor.top - popupHeight - 6)
@@ -40,6 +54,7 @@ function computePopupPos(anchor: DOMRect, popupHeight: number, popupWidth: numbe
   return { top, left, width };
 }
 
+/** HH:MM time picker in 15-minute steps with portal positioning. */
 export function TimeSelect({
   label,
   value,

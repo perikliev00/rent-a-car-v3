@@ -1,3 +1,7 @@
+/**
+ * Keep linked order ↔ reservation fields in sync after calendar moves,
+ * admin order edits, or reservation cancellation (soft-delete order).
+ */
 const orderSql = require('../../sql/orderSqlService');
 const carRepository = require('../../../repositories/carRepository');
 const reservationRepository = require('../../../repositories/reservationRepository');
@@ -7,6 +11,7 @@ const { applyPricingToOrder } = require('./orderMapper');
 /**
  * After a calendar move/resize updated reservation dates/car, sync the linked order
  * and return pricing to apply back onto the reservation.
+ * Recomputes price so calendar drag does not leave stale totals on the order.
  */
 async function syncLinkedOrderAfterReservationMove({
   reservationId,
@@ -22,6 +27,7 @@ async function syncLinkedOrderAfterReservationMove({
   client = null,
 }) {
   const car = await carRepository.findByIdForAdmin(carId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!car) {
     const err = new Error('Car not found');
     err.code = 'CAR_NOT_FOUND';
@@ -66,11 +72,13 @@ async function syncLinkedOrderAfterReservationMove({
  * so calendar/ops stay consistent with the order + date blocks.
  */
 async function syncLinkedReservationAfterOrderUpdate(order, { client = null } = {}) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!order?.reservationId) {
     return { reservationSynced: false, reservation: null };
   }
 
   const reservation = await reservationRepository.findById(order.reservationId, client);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!reservation) {
     return { reservationSynced: false, reservation: null };
   }
@@ -106,6 +114,7 @@ async function syncLinkedReservationAfterOrderUpdate(order, { client = null } = 
  */
 async function softDeleteOrderForReservation(reservationId, client = null) {
   const order = await orderSql.findOrderByReservationId(reservationId, client);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!order || order.isDeleted) {
     return null;
   }

@@ -1,3 +1,8 @@
+/**
+ * Destructive cleanup: delete known demo cars/users and related reservation/order rows.
+ * Intended for development databases after replacing demo fleet with realistic seed data.
+ */
+
 require('dotenv').config();
 const pool = require('../src/db/pool');
 
@@ -11,6 +16,12 @@ const DEMO_CAR_NAMES = [
 
 const DEMO_USER_EMAILS = ['admin@luxride.local', 'demo@luxride.local'];
 
+/**
+ * CLI entry point for this script.
+ *
+ * @returns {Promise<*>}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 async function main() {
   const client = await pool.connect();
 

@@ -1,5 +1,9 @@
+/**
+ * Shared layout primitives for calendar event detail panels.
+ */
 import { type ReactNode } from 'react';
 
+/** Shared layout primitives for calendar event detail panels. */
 export function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="space-y-2">
@@ -11,6 +15,7 @@ export function Section({ title, children }: { title: string; children: ReactNod
   );
 }
 
+/** Shared layout primitives for calendar event detail panels. */
 export function Field({ label, value }: { label: string; value: string }) {
   return (
     <div>

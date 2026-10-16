@@ -1,3 +1,9 @@
+/**
+ * Pre-checkout hold step: creates a soft reservation for the selected car
+ * using trip criteria from the URL. When dates/locations/addons change, the
+ * hold is recreated. CONFLICT responses offer release or release-and-rehold
+ * so the customer can recover from an existing active hold.
+ */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
@@ -12,13 +18,21 @@ import { ApiError } from '../../api/client';
 import { bookingQueryString, parseSearchFromUrl, searchParamsToQuery } from '../../utils/searchParams';
 import type { OrderPageData } from '../../types/api';
 
+/**
+ * Order review page that places/refreshes the car hold before checkout.
+ *
+ * @returns Hold review UI, conflict recovery actions, or missing-params fallback.
+ * @remarks Side effects: creates/refreshes soft holds via {@link createOrder}; may release/rehold on conflict.
+ */
 export function OrderPage() {
   const { carId } = useParams<{ carId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const [orderData, setOrderData] = useState<OrderPageData | null>(null);
   const [conflictError, setConflictError] = useState<string | null>(null);
+  /** Survives re-renders so CONFLICT handling can ignore errors after a successful hold. */
   const orderDataRef = useRef<OrderPageData | null>(null);
+  /** Tracks trip+car identity so we reset local state when criteria change. */
   const holdKeyRef = useRef<string>('');
 
   const search = useMemo(() => parseSearchFromUrl(searchParams), [searchParams]);
@@ -44,6 +58,7 @@ export function OrderPage() {
       setConflictError(null);
     },
     onError: (err) => {
+      // Ignore conflicts once we already have a successful hold payload.
       if (orderDataRef.current) return;
       if (err instanceof ApiError && err.code === 'CONFLICT') {
         setConflictError(err.message);
@@ -53,6 +68,7 @@ export function OrderPage() {
 
   const releaseMutation = useMutation({
     mutationFn: releaseReservation,
+    // After releasing the old hold, immediately retry creating this order.
     onSuccess: () => orderMutation.mutate(),
   });
 
@@ -72,6 +88,7 @@ export function OrderPage() {
     onSuccess: () => orderMutation.mutate(),
   });
 
+  // Identity string for the current trip window + add-ons (excludes car until combined below).
   const searchKey = search
     ? `${search.pickupDate}|${search.returnDate}|${search.pickupLocation}|${search.returnLocation}|${extras.join(',')}|${hotelDelivery}`
     : '';
@@ -79,6 +96,7 @@ export function OrderPage() {
   useEffect(() => {
     if (!search || !carId) return;
     const holdKey = `${searchKey}|${carId}`;
+    // Criteria changed — drop stale order state before requesting a new hold.
     if (holdKeyRef.current !== holdKey) {
       holdKeyRef.current = holdKey;
       orderDataRef.current = null;
@@ -90,6 +108,7 @@ export function OrderPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchKey, carId]);
 
+  /** Persist add-on choices into the URL (replace) so refresh keeps them. */
   const updateAddOns = (next: { extras: string[]; hotelDelivery: boolean }) => {
     if (!search) return;
     const merged = { ...search, extras: next.extras, hotelDelivery: next.hotelDelivery };
@@ -110,6 +129,7 @@ export function OrderPage() {
     );
   }
 
+  // First load — show a full-page spinner until we have order data.
   if (orderMutation.isPending && !orderData) return <PageLoader />;
 
   if (conflictError) {

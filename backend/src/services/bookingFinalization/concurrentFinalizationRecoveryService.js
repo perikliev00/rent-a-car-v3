@@ -1,3 +1,8 @@
+/**
+ * Recovery paths when paid finalization races another writer or hits an overlap.
+ * Resolves concurrent "already confirmed" outcomes, and routes paid+overlap
+ * conflicts to manual review instead of rejecting money that Stripe already took.
+ */
 const reservationRepository = require('../../repositories/reservationRepository');
 const orderSql = require('../sql/orderSqlService');
 const { isOpsLifecycleStatus } = require('../../domain/reservationStatus');
@@ -11,6 +16,10 @@ const {
   resolveStripePaymentStatus,
 } = require('./stripeSessionResolutionService');
 
+/**
+ * After a race, check whether another worker already created the order / confirmed.
+ * @returns {Promise<object|null>} already_confirmed result or null if still unresolved
+ */
 async function resolveConcurrentFinalizationResult({
   reservation,
   stripeSessionId,
@@ -21,6 +30,7 @@ async function resolveConcurrentFinalizationResult({
     (await orderSql.findOrderByStripeSessionId(stripeSessionId, client)) ||
     (await orderSql.findOrderByReservationId(reservation.id, client));
 
+  // Idempotency guard: return early when work was already applied.
   if (existingOrder) {
     if (logPrefix) {
       logger.info(
@@ -47,6 +57,7 @@ async function resolveConcurrentFinalizationResult({
     (await reservationRepository.findByStripeSessionId(stripeSessionId, client)) ||
     (await reservationRepository.findById(reservation.id, client));
 
+  // Status / lifecycle guard before mutating domain state.
   if (latest?.status === 'confirmed' || isOpsLifecycleStatus(latest?.status)) {
     return {
       found: true,
@@ -60,6 +71,10 @@ async function resolveConcurrentFinalizationResult({
   return null;
 }
 
+/**
+ * Handle unique/overlap errors from finalization: prefer concurrent success,
+ * else escalate paid overlaps to manual review (do not drop paid bookings).
+ */
 async function handleFinalizationOverlap(
   err,
   { reservation, stripeSessionId, options, paymentStatus, logPrefix, client }
@@ -87,6 +102,7 @@ async function handleFinalizationOverlap(
     throw err;
   }
 
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!err || err.code !== 'OVERLAP') {
     throw err;
   }
@@ -96,6 +112,7 @@ async function handleFinalizationOverlap(
     isStripeSessionPaid(paymentStatus) ||
     isStripeSessionPaid(options.stripeSessionPaymentStatus);
 
+  // Unpaid overlap is a normal conflict; paid overlap needs ops intervention.
   if (!isPaidContext) {
     throw new ConflictError(
       'The requested booking overlaps with an existing reservation.'
@@ -117,6 +134,10 @@ async function handleFinalizationOverlap(
   });
 }
 
+/**
+ * Finalize even when the hold TTL expired, because Stripe reports paid.
+ * Uses a savepoint so overlap recovery can roll back only the finalize attempt.
+ */
 async function finalizePaidExpiredHold({
   reservation,
   stripeSessionId,
@@ -126,6 +147,7 @@ async function finalizePaidExpiredHold({
   const { logPrefix, paidAmount } = options;
   const holdExpiresAt = reservation.holdExpiresAt ? new Date(reservation.holdExpiresAt) : null;
 
+  // Protected block: isolate failure modes.
   try {
     const hasTxClient = Boolean(client && typeof client.query === 'function');
 

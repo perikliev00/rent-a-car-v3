@@ -1,3 +1,6 @@
+/**
+ * Body validation for the public contact form submission.
+ */
 const { body } = require('express-validator');
 
 const contactBodyValidationRules = [

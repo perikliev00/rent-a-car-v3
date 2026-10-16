@@ -1,3 +1,6 @@
+/**
+ * Per-location delivery fee editor.
+ */
 import { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -10,8 +13,13 @@ import { toast } from '../../../components/ui/toastStore';
 import { LOCATION_LABELS } from './pricingConstants';
 import { PricingSection } from './PricingSection';
 
+/**
+ * Editable per-location delivery fees with a local draft until Save.
+ * @param fees - Delivery fee rows from the pricing bundle
+ */
 export function DeliveryFeesSection({ fees }: { fees: PricingDeliveryFee[] }) {
   const queryClient = useQueryClient();
+  // Local edit buffer; null means “show server values”.
   const [feeDraft, setFeeDraft] = useState<Record<string, string> | null>(null);
 
   const feesMutation = useMutation({
@@ -24,6 +32,7 @@ export function DeliveryFeesSection({ fees }: { fees: PricingDeliveryFee[] }) {
     onError: (e) => toast((e as Error).message, 'error'),
   });
 
+  // Prefer draft strings while editing; otherwise mirror server fees.
   const feeValues = useMemo(() => {
     if (feeDraft) return feeDraft;
     return Object.fromEntries(fees.map((f) => [f.locationId, String(f.fee)]));

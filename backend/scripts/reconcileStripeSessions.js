@@ -12,6 +12,11 @@ const {
   reconcileStripeSessions,
 } = require('../src/services/payment/reconcileStripeSessionsService');
 
+/**
+ * @param {string[]} argv
+ * @returns {{ dryRun: boolean, limit: number }}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function parseArgs(argv) {
   const options = { dryRun: false, limit: 50 };
 
@@ -29,6 +34,12 @@ function parseArgs(argv) {
   return options;
 }
 
+/**
+ * CLI entry point for this script.
+ *
+ * @returns {Promise<*>}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 async function main() {
   const options = parseArgs(process.argv.slice(2));
 

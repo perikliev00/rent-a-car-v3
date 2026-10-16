@@ -1,9 +1,19 @@
+/**
+ * Admin audit-log listing handler.
+ */
 const { validationResult } = require('express-validator');
 const { listAuditLogs } = require('../../../services/admin/adminAuditService');
 const apiResponse = require('../../../utils/apiResponse');
 const asyncHandler = require('../../../utils/asyncHandler');
 const { forwardControllerError } = require('../../../utils/controllerError');
 
+/**
+ * Respond with 422 VALIDATION_ERROR for validation failures.
+ * Side effects: writes a 422 JSON API error.
+ * @param {import('express').Response} res
+ * @param {import('express-validator').Result} errors
+ * @returns {import('express').Response}
+ */
 function validationErrorResponse(res, errors) {
   return apiResponse.error(
     res,
@@ -13,6 +23,14 @@ function validationErrorResponse(res, errors) {
   );
 }
 
+/**
+ * List audit log entries with query filters.
+ * Side effects: none beyond DB reads.
+ * @param {import('express').Request} req - Query: from, to, actorType, action*, entity*, page, limit
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ * @returns {Promise<import('express').Response|void>}
+ */
 exports.listAuditLogs = asyncHandler(async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {

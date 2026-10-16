@@ -1,3 +1,6 @@
+/**
+ * Low-level car admin CRUD SQL (create/update/soft-delete) used by carSqlService.
+ */
 const { clientQuery } = require('../../../db/transaction');
 const {
   fetchCarRowById,
@@ -5,6 +8,12 @@ const {
   normalizeCarId,
 } = require('./carMapper');
 
+/**
+ * Insert admin car and return the mapped result.
+ * @param {*} payload
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function createAdminCar(payload, client = null) {
   const status = payload.status || (payload.availability === false ? 'inactive' : 'available');
   const availability = status === 'available';
@@ -63,8 +72,16 @@ async function createAdminCar(payload, client = null) {
   return mapSqlCar(row);
 }
 
+/**
+ * Update or upsert admin car; returns null when not found.
+ * @param {string|number} id
+ * @param {*} payload
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function updateAdminCar(id, payload, client = null) {
   const carId = normalizeCarId(id);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!carId) {
     throw new Error('Invalid car id');
   }
@@ -126,6 +143,7 @@ async function updateAdminCar(id, payload, client = null) {
     ]
   );
 
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!result.rowCount) {
     return null;
   }
@@ -134,8 +152,15 @@ async function updateAdminCar(id, payload, client = null) {
   return mapSqlCar(row);
 }
 
+/**
+ * Delete car by id; returns whether a row was affected.
+ * @param {string|number} id
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function deleteCarById(id, client = null) {
   const carId = normalizeCarId(id);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!carId) {
     throw new Error('Invalid car id');
   }

@@ -1,8 +1,12 @@
+/**
+ * Liveness/readiness payloads for health endpoints (uptime, DB, Stripe, migrations).
+ */
 const { version } = require('../../package.json');
 const { config } = require('../config/env');
 const { getMigrationStatus } = require('../db/migrationStatus');
 const metrics = require('../monitoring/metrics');
 
+/** Process is up (no dependency checks). */
 function getLiveStatus() {
   return {
     status: 'ok',
@@ -12,6 +16,10 @@ function getLiveStatus() {
   };
 }
 
+/**
+ * Load stripe config status.
+ * @returns {*}
+ */
 function getStripeConfigStatus() {
   const hasSecret = Boolean(config.stripeSecret);
   const hasWebhookSecret = Boolean(config.stripeWebhookSecret);
@@ -24,6 +32,11 @@ function getStripeConfigStatus() {
   };
 }
 
+/**
+ * Readiness: DB ping, Stripe secrets present, migrations applied.
+ * @param {import('pg').Pool} pool
+ * @returns {Promise<{ status: string, checks: object, timestamp: string }>}
+ */
 async function getReadyStatus(pool) {
   const checks = {
     database: { ok: false },
@@ -32,6 +45,7 @@ async function getReadyStatus(pool) {
     migrations: { ok: false, pending: [] },
   };
 
+  // Protected block: isolate failure modes.
   try {
     await pool.query('SELECT 1');
     checks.database = {
@@ -49,6 +63,7 @@ async function getReadyStatus(pool) {
     };
   }
 
+  // Protected block: isolate failure modes.
   try {
     const migrationStatus = await getMigrationStatus(pool);
     checks.migrations = {

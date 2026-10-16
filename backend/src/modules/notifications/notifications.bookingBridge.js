@@ -1,3 +1,10 @@
+/**
+ * Booking confirmation bridge from order/payment flows into notifications + realtime.
+ *
+ * Enqueues customer/admin emails with idempotency, attempts immediate send,
+ * and publishes a live new-booking event for the admin UI.
+ */
+
 const {
   enqueueReservationConfirmation,
   enqueueAdminNewBooking,
@@ -10,6 +17,7 @@ const { publishNewBooking } = require('../realtime/realtime.publisher');
 
 /**
  * Replaces direct bookingEmailService sends: enqueue + send with idempotency.
+ * @param {{ order: object, reservation?: object, carName?: string }} args
  */
 async function sendBookingConfirmationEmails({ order, reservation, carName }) {
   if (!order?.email) {

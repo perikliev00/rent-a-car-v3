@@ -1,9 +1,18 @@
+/**
+ * Read-side SQL listing active fleet alerts for the admin dashboard.
+ */
 const { clientQuery } = require('../../db/transaction');
 const storeSql = require('./carFleetAlertStoreSqlService');
 
 const SEVERITY_ORDER = { critical: 0, warning: 1, info: 2 };
 
+/**
+ * Transform helper: to date only.
+ * @param {*} value
+ * @returns {*}
+ */
 function toDateOnly(value) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!value) return null;
   if (value instanceof Date) return value.toISOString().slice(0, 10);
   const str = String(value);
@@ -21,6 +30,7 @@ function buildAlertsForCar(row, todayStr) {
   const status = row.status || 'available';
   const nextService = toDateOnly(row.next_service_date);
 
+  // Status / lifecycle guard before mutating domain state.
   if (status === 'damaged') {
     alerts.push({
       id: `status_damaged:${carId}`,
@@ -78,6 +88,11 @@ function buildAlertsForCar(row, todayStr) {
   return alerts;
 }
 
+/**
+ * summarize alerts.
+ * @param {*} alerts
+ * @returns {*}
+ */
 function summarizeAlerts(alerts) {
   const summary = { total: alerts.length, critical: 0, warning: 0, info: 0 };
   for (const alert of alerts) {
@@ -88,6 +103,11 @@ function summarizeAlerts(alerts) {
   return summary;
 }
 
+/**
+ * sort alerts.
+ * @param {*} alerts
+ * @returns {*}
+ */
 function sortAlerts(alerts) {
   return [...alerts].sort((a, b) => {
     const sev = (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9);
@@ -96,6 +116,11 @@ function sortAlerts(alerts) {
   });
 }
 
+/**
+ * Load fleet alert rows.
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function fetchFleetAlertRows(client = null) {
   const result = await clientQuery(
     client,
@@ -121,6 +146,11 @@ async function fetchFleetAlertRows(client = null) {
   return result.rows;
 }
 
+/**
+ * Map a DB/API row into the domain shape used by callers (mapPersistedForApi).
+ * @param {*} alert
+ * @returns {*}
+ */
 function mapPersistedForApi(alert) {
   return {
     id: `persisted:${alert.id}`,
@@ -133,6 +163,11 @@ function mapPersistedForApi(alert) {
   };
 }
 
+/**
+ * List fleet alerts from SQL.
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function listFleetAlerts(client = null) {
   const rows = await fetchFleetAlertRows(client);
   const todayStr =
@@ -144,6 +179,7 @@ async function listFleetAlerts(client = null) {
     alerts.push(...buildAlertsForCar(row, todayStr));
   }
 
+  // Protected block: isolate failure modes.
   try {
     const persisted = await storeSql.listActive(client);
     for (const alert of persisted) {

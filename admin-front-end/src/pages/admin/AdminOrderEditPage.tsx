@@ -1,3 +1,6 @@
+/**
+ * Edit an existing admin order (dates, car, customer, locations).
+ */
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -11,6 +14,7 @@ import { PageLoader } from '../../components/ui/Loading';
 import { toast } from '../../components/ui/toastStore';
 import { getCarIdString } from '../../types/api';
 
+/** Edit an existing admin order (dates, car, customer, locations). */
 export function AdminOrderEditPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();

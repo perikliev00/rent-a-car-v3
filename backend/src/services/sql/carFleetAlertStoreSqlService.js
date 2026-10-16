@@ -1,9 +1,19 @@
+/**
+ * Write-side fleet alert store: upsert active alerts and resolve stale ones.
+ */
 const { clientQuery } = require('../../db/transaction');
 
+/**
+ * Map a DB/API row into the domain shape used by callers (mapAlertRow).
+ * @param {object} row
+ * @returns {*}
+ */
 function mapAlertRow(row) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) return null;
   let meta = row.meta;
   if (typeof meta === 'string') {
+    // Protected block: isolate failure modes.
     try {
       meta = JSON.parse(meta);
     } catch {
@@ -28,10 +38,12 @@ function mapAlertRow(row) {
   };
 }
 
+/** Natural key used to match desired vs stored active alerts during reconcile. */
 function alertKey(alert) {
   return `${alert.carId}:${alert.type}:${alert.sourceKind}:${alert.sourceId}`;
 }
 
+/** Active alerts for non-deleted cars. */
 async function listActive(client = null) {
   const result = await clientQuery(
     client,
@@ -94,7 +106,9 @@ async function upsertActive(alert, client = null) {
   return mapAlertRow(result.rows[0]);
 }
 
+/** Mark specific active alert ids as resolved. */
 async function resolveByIds(ids, resolvedAt = null, client = null) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!ids?.length) return 0;
   const result = await clientQuery(
     client,

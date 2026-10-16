@@ -1,3 +1,6 @@
+/**
+ * Query-string validation for the admin order list filters.
+ */
 const { query } = require('express-validator');
 const { ALLOWED_STATUSES } = require('../services/sql/orderSqlService');
 

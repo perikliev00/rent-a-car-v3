@@ -1,3 +1,6 @@
+/**
+ * Admin car availability query validation (pickup/return dates and times).
+ */
 const { query } = require('express-validator');
 const { validateBookingDates } = require('../utils/bookingValidation');
 const { queryTimeRule } = require('./timeFieldRules');

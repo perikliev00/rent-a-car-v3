@@ -1,6 +1,16 @@
+/**
+ * Renders a server-computed {@link PriceBreakdown}: line items, total, and
+ * optional deposit collected at pickup (not charged at checkout).
+ */
 import type { PriceBreakdown } from '../../types/api';
 import { formatPrice } from '../../utils/format';
 
+/**
+ * Display priced line items from the backend quote.
+ *
+ * @param props.breakdown - Server-computed lines, total, and deposit.
+ * @returns Stacked price rows with a bold total and optional deposit note.
+ */
 export function PriceBreakdownView({ breakdown }: { breakdown: PriceBreakdown }) {
   return (
     <div className="min-w-0 space-y-2 border-t border-[var(--color-line)] pt-4 text-sm">

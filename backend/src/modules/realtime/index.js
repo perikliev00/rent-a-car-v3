@@ -1,3 +1,7 @@
+/**
+ * Public entry for the admin realtime (SSE) module.
+ */
+
 const { initRealtime, shutdownRealtime } = require('./realtime.listeners');
 const {
   publishLiveEvent,

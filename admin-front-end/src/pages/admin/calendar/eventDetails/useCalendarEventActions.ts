@@ -1,3 +1,6 @@
+/**
+ * Permission-aware actions (cancel, edit, status) from event details.
+ */
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -9,6 +12,7 @@ import {
 import { changeReservationStatus } from '../../../../api/admin/reservations';
 import { toast } from '../../../../components/ui/toastStore';
 
+/** Permission-aware actions (cancel, edit, status) from event details. */
 export function useCalendarEventActions({
   reservation,
   task,
@@ -23,6 +27,7 @@ export function useCalendarEventActions({
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
 
+  /** Mark Status. */
   async function markStatus(next: 'picked_up' | 'returned') {
     if (!reservation?.id) return;
     setBusy(true);
@@ -38,6 +43,7 @@ export function useCalendarEventActions({
     }
   }
 
+  /** Set Task Status. */
   async function setTaskStatus(next: string) {
     if (!task?.id) return;
     setBusy(true);
@@ -54,6 +60,7 @@ export function useCalendarEventActions({
     }
   }
 
+  /** Remove Task. */
   async function removeTask() {
     if (!task?.id) return;
     if (!window.confirm('Delete this task?')) return;
@@ -70,6 +77,7 @@ export function useCalendarEventActions({
     }
   }
 
+  /** Remove Block. */
   async function removeBlock() {
     const rawId = eventId?.startsWith('blocked:') ? eventId.slice('blocked:'.length) : null;
     if (!rawId) return;
@@ -87,6 +95,7 @@ export function useCalendarEventActions({
     }
   }
 
+  /** Cancel Reservation. */
   async function cancelReservation() {
     if (!reservation?.id) return;
     if (
@@ -111,6 +120,7 @@ export function useCalendarEventActions({
     }
   }
 
+  /** Copy Phone. */
   async function copyPhone() {
     const phone = reservation?.phoneNumber ? String(reservation.phoneNumber) : '';
     if (!phone) return;

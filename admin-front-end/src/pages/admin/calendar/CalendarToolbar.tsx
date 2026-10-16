@@ -1,8 +1,24 @@
+/**
+ * Calendar range navigation, density/view switcher, and quick actions.
+ */
 import { Button } from '../../../components/ui/Button';
 import { DateSelect } from '../../../components/ui/DateSelect';
 import type { CalendarViewMode } from './calendar.types';
 import { formatCalendarRangeTitle } from './formatCalendarRangeTitle';
 
+/**
+ * Calendar range navigation, density/view switcher, and optional agenda preference.
+ *
+ * @param view - day | week | month
+ * @param anchor - Anchor date string for the date picker
+ * @param from - Visible range start
+ * @param to - Visible range end
+ * @param onViewChange - Switch view mode
+ * @param onPrev / onNext / onToday - Range navigation
+ * @param onAnchorChange - Jump to a picked date
+ * @param preferAgenda - Optional day-agenda preference toggle
+ * @param onPreferAgendaChange - Persist agenda preference
+ */
 export function CalendarToolbar({
   view,
   anchor,

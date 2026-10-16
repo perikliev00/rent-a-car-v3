@@ -1,3 +1,10 @@
+/**
+ * Express routes for the staff calendar API.
+ *
+ * Permission middleware is applied per route; task status updates allow
+ * VIEW/VIEW_OWN/CREATE_TASKS — finer assignee checks live in the service.
+ */
+
 const express = require('express');
 const calendarController = require('./calendar.controller');
 const { requireStaffApi, requireAnyPermission, requirePermission } = require('../../middleware/auth');

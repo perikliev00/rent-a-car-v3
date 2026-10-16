@@ -1,3 +1,6 @@
+/**
+ * Facade for order SQL (query/write/populate/mapper) used by admin and booking sync.
+ */
 const {
   ALLOWED_STATUSES,
   mapSqlOrder,

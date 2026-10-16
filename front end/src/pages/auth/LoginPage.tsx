@@ -1,3 +1,7 @@
+/**
+ * Customer login. After success, staff users are sent to the admin frontend
+ * (when configured); everyone else returns to the protected `from` path or `/account`.
+ */
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../auth/useAuth';
@@ -8,10 +12,17 @@ import { Button } from '../../components/ui/Button';
 import { ErrorAlert } from '../../components/ui/Toast';
 import { ApiError } from '../../api/client';
 
+/**
+ * Email/password login form for the public site.
+ *
+ * @returns Auth shell with login form and signup link.
+ * @remarks Side effects: establishes a session via {@link useAuth}; may hard-redirect staff to the admin SPA.
+ */
 export function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  // Set by ProtectedRoute so post-login navigation resumes the intended page.
   const from =
     (location.state as { from?: { pathname: string } })?.from?.pathname ??
     '/account';
@@ -21,12 +32,14 @@ export function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  /** Authenticate and route customers vs staff appropriately. */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
       const user = await login(email, password);
+      // Staff belongs in the admin app when its URL is configured.
       if (isStaffUser(user)) {
         const adminUrl = import.meta.env.VITE_ADMIN_FRONTEND_URL?.replace(/\/+$/, '');
         if (adminUrl) {
@@ -39,6 +52,7 @@ export function LoginPage() {
       navigate(from || '/account', { replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
+        // Session already exists — treat as success and continue.
         if (err.code === 'ALREADY_LOGGED_IN') {
           navigate(from, { replace: true });
           return;

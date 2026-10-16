@@ -1,5 +1,14 @@
+/**
+ * Car listing queries for calendar resource columns and day-ops warnings.
+ */
+
 const { clientQuery } = require('../../../db/transaction');
 
+/**
+ * List non-deleted cars for the calendar grid, optionally scoped by carIds/filters.
+ * @param {{ filters?: object, carIds?: Array<string|number>|null }} [opts]
+ * @param {import('pg').PoolClient|null} [client]
+ */
 async function listCarsForCalendar({ filters = {}, carIds = null } = {}, client = null) {
   const where = ['c.is_deleted = FALSE'];
   const params = [];
@@ -58,6 +67,10 @@ async function listCarsForCalendar({ filters = {}, carIds = null } = {}, client 
   }));
 }
 
+/**
+ * Cars with insurance or technical inspection expiring within 14 days of dateIso.
+ * @param {string} dateIso YYYY-MM-DD
+ */
 async function listInsuranceWarnings(dateIso, client = null) {
   const result = await clientQuery(
     client,

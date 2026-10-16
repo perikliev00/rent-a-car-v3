@@ -1,6 +1,15 @@
+/**
+ * SQL for customer cancellation_requests (pending list, find, review).
+ */
 const { clientQuery } = require('../../db/transaction');
 
+/**
+ * Map a DB/API row into the domain shape used by callers (mapRequest).
+ * @param {object} row
+ * @returns {*}
+ */
 function mapRequest(row) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) return null;
   return {
     id: Number(row.id),
@@ -20,6 +29,12 @@ function mapRequest(row) {
   };
 }
 
+/**
+ * Insert a new row and return the mapped result.
+ * @param {object} params
+ * @param {object|null} [client] Optional DB client/transaction
+ * @returns {Promise<*>}
+ */
 async function create({ reservationId, userId, reason }, client = null) {
   const result = await clientQuery(
     client,
@@ -35,6 +50,12 @@ async function create({ reservationId, userId, reason }, client = null) {
   return mapRequest(result.rows[0]);
 }
 
+/**
+ * Find pending for reservation via SQL; returns null when missing.
+ * @param {string|number} reservationId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findPendingForReservation(reservationId, client = null) {
   const result = await clientQuery(
     client,
@@ -48,6 +69,12 @@ async function findPendingForReservation(reservationId, client = null) {
   return mapRequest(result.rows[0]);
 }
 
+/**
+ * Find by id via SQL; returns null when missing.
+ * @param {string|number} id
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findById(id, client = null) {
   const result = await clientQuery(
     client,
@@ -67,6 +94,12 @@ async function findById(id, client = null) {
   return mapRequest(result.rows[0]);
 }
 
+/**
+ * List pending from SQL.
+ * @param {object} params
+ * @param {object|null} [client] Optional DB client/transaction
+ * @returns {Promise<*>}
+ */
 async function listPending({ limit = 50 } = {}, client = null) {
   const result = await clientQuery(
     client,
@@ -87,6 +120,12 @@ async function listPending({ limit = 50 } = {}, client = null) {
   return result.rows.map(mapRequest);
 }
 
+/**
+ * review.
+ * @param {object} params
+ * @param {object|null} [client] Optional DB client/transaction
+ * @returns {Promise<*>}
+ */
 async function review({ id, status, adminNote, reviewedByUserId }, client = null) {
   const result = await clientQuery(
     client,
@@ -106,6 +145,13 @@ async function review({ id, status, adminNote, reviewedByUserId }, client = null
   return mapRequest(result.rows[0]);
 }
 
+/**
+ * Find latest for reservation via SQL; returns null when missing.
+ * @param {string|number} reservationId
+ * @param {string|number} [userId]
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findLatestForReservation(reservationId, userId = null, client = null) {
   const params = [Number(reservationId)];
   let userClause = '';

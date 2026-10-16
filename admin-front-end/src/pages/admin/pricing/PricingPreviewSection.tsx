@@ -1,3 +1,6 @@
+/**
+ * Live quote preview against current pricing rules.
+ */
 import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
@@ -12,12 +15,17 @@ import { formatPrice } from '../../../utils/format';
 import { LOCATION_LABELS } from './pricingConstants';
 import { PricingSection } from './PricingSection';
 
+/**
+ * Live quote preview form against current pricing rules (no order created).
+ * @param extras - Active extras to offer as preview checkboxes
+ */
 export function PricingPreviewSection({ extras }: { extras: PricingExtra[] }) {
   const { data: carsData } = useQuery({
     queryKey: ['admin', 'cars'],
     queryFn: getAdminCars,
   });
 
+  // Quote inputs mirrored to {@link previewPricing}.
   const [preview, setPreview] = useState({
     carId: '',
     pickupDate: '',
@@ -36,6 +44,7 @@ export function PricingPreviewSection({ extras }: { extras: PricingExtra[] }) {
   const previewMutation = useMutation({
     mutationFn: previewPricing,
     onSuccess: (res) => {
+      // Keep a compact local result for the breakdown UI.
       setPreviewResult({
         lines: res.pricing.lines,
         totalPrice: res.pricing.totalPrice,

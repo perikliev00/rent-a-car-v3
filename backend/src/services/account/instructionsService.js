@@ -1,11 +1,24 @@
+/**
+ * Guest-facing pickup/return instruction copy for My Account reservation detail.
+ */
 const { LOCATION_LABELS } = require('../../constants/locations');
 const { formatLocationName } = require('../../utils/dateFormatter');
 
+/**
+ * location label.
+ * @param {string|number} id
+ * @returns {*}
+ */
 function locationLabel(id) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!id) return 'the agreed location';
   return LOCATION_LABELS[id] || formatLocationName(id) || id;
 }
 
+/**
+ * @param {object} reservation
+ * @returns {string[]}
+ */
 function buildPickupInstructions(reservation) {
   const place = locationLabel(reservation.pickupLocation);
   const time = reservation.pickupTime || 'the scheduled time';
@@ -17,6 +30,10 @@ function buildPickupInstructions(reservation) {
   ];
 }
 
+/**
+ * @param {object} reservation
+ * @returns {string[]}
+ */
 function buildReturnInstructions(reservation) {
   const place = locationLabel(reservation.returnLocation);
   const time = reservation.returnTime || 'the scheduled time';

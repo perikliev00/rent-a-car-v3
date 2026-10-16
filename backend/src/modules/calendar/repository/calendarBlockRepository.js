@@ -1,5 +1,14 @@
+/**
+ * Persistence for staff-created car_date_blocks (manual / maintenance / other).
+ * Booking-synced rows are excluded from list/update/delete here.
+ */
+
 const { clientQuery } = require('../../../db/transaction');
 
+/**
+ * List overlapping staff blocks in range (excludes booking type).
+ * @param {{ from: Date|string, to: Date|string, carIds?: Array|null }} opts
+ */
 async function listManualBlocksInRange({ from, to, carIds = null }, client = null) {
   const params = [from, to];
   const where = [
@@ -25,6 +34,7 @@ async function listManualBlocksInRange({ from, to, carIds = null }, client = nul
   return result.rows;
 }
 
+/** @param {string|number} blockId */
 async function findBlockById(blockId, client = null) {
   const id = Number(blockId);
   if (!Number.isInteger(id) || id <= 0) return null;
@@ -36,6 +46,10 @@ async function findBlockById(blockId, client = null) {
   return result.rows[0] || null;
 }
 
+/**
+ * Insert a staff block row.
+ * @param {object} payload carId, start, end, blockType, reason, notes, createdByUserId
+ */
 async function createManualBlock(payload, client = null) {
   const result = await clientQuery(
     client,
@@ -59,6 +73,9 @@ async function createManualBlock(payload, client = null) {
   return result.rows[0];
 }
 
+/**
+ * Update a staff block; WHERE restricts to editable block_types only.
+ */
 async function updateManualBlock(
   blockId,
   { start, end, carId, blockType, reason, notes },
@@ -91,6 +108,7 @@ async function updateManualBlock(
   return result.rows[0] || null;
 }
 
+/** Delete staff block only (booking rows untouched). */
 async function deleteManualBlock(blockId, client = null) {
   const id = Number(blockId);
   const result = await clientQuery(

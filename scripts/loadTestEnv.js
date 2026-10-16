@@ -1,8 +1,18 @@
+/**
+ * Load `.env.test` into `process.env` for test/CI database commands.
+ * Existing non-empty env vars are left unchanged (do not override).
+ */
+
 const fs = require('fs');
 const path = require('path');
 
 const TEST_ENV_PATH = path.resolve(__dirname, '..', '.env.test');
 
+/**
+ * Parse KEY=VALUE lines from `.env.test` into process.env.
+ * @returns {{ loaded: boolean, path: string }}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function loadTestEnv() {
   if (!fs.existsSync(TEST_ENV_PATH)) {
     return { loaded: false, path: TEST_ENV_PATH };
@@ -30,6 +40,13 @@ function loadTestEnv() {
   return { loaded: true, path: TEST_ENV_PATH };
 }
 
+/**
+ * Ensure DATABASE_URL is set (after loading `.env.test`), else exit with guidance.
+ *
+ * @param {string} commandLabel - Shown in the error message (e.g. npm script name)
+ * @returns {string}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function requireTestDatabaseUrl(commandLabel) {
   loadTestEnv();
   if (process.env.DATABASE_URL) return process.env.DATABASE_URL;

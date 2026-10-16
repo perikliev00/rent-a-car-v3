@@ -1,3 +1,7 @@
+/**
+ * Submit pickup checklist: store photos/signatures, upsert checklist row,
+ * then advance reservation toward picked_up / active_rental as appropriate.
+ */
 const pickupSql = require('../../sql/pickupChecklistSqlService');
 const reservationSql = require('../../sql/reservationSqlService');
 const { changeStatus } = require('../../reservation/reservationStatusService');
@@ -10,8 +14,16 @@ const {
   cleanupTemp,
 } = require('./checklistUploadHelpers');
 
+/**
+ * Validate, upload assets, persist checklist, and transition reservation status.
+ * Cleans up temp uploads on validation/storage failure.
+ * @param {import('express').Request} req
+ * @param {number|string} reservationId
+ * @param {object} body
+ */
 async function submitPickupChecklist(req, reservationId, body) {
   const reservation = await reservationSql.findById(reservationId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!reservation) {
     const err = new Error('Reservation not found');
     err.code = 'NOT_FOUND';
@@ -19,6 +31,7 @@ async function submitPickupChecklist(req, reservationId, body) {
     throw err;
   }
 
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!FUEL_LEVELS.has(body.fuelLevel)) {
     await cleanupTemp(req);
     const err = new Error('Invalid fuel level.');
@@ -28,6 +41,7 @@ async function submitPickupChecklist(req, reservationId, body) {
   }
 
   const mileage = Number(body.mileage);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(mileage) || mileage < 0) {
     await cleanupTemp(req);
     const err = new Error('Mileage must be a non-negative integer.');
@@ -40,6 +54,7 @@ async function submitPickupChecklist(req, reservationId, body) {
   let photoKeys;
   let customerSignatureKey;
   let employeeSignatureKey;
+  // Protected block: isolate failure modes.
   try {
     photoKeys = await storeUploads(photos, 'checklists');
     customerSignatureKey = await storeUpload(customerSignature, 'signatures');
@@ -77,8 +92,10 @@ async function submitPickupChecklist(req, reservationId, body) {
   }
 
   let statusResult = null;
+  // Status / lifecycle guard before mutating domain state.
   if (reservation.status === 'car_prepared' || reservation.status === 'confirmed') {
     const from = reservation.status === 'confirmed' ? 'car_prepared' : reservation.status;
+    // Status / lifecycle guard before mutating domain state.
     if (reservation.status === 'confirmed') {
       await changeStatus({
         reservationId,

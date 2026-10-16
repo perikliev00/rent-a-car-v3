@@ -1,6 +1,14 @@
+/**
+ * Idempotent notification enqueue helpers.
+ *
+ * Every insert requires an idempotencyKey so retries do not duplicate sends.
+ * Domain helpers build keys from order/reservation/failure identities.
+ */
+
 const repo = require('./notifications.repository');
 const { NOTIFICATION_TYPES } = require('./notificationTypes');
 
+/** Coerce id-like values (number, string, or { id }) to a positive integer or null. */
 function normalizeId(value) {
   if (value == null) return null;
   if (typeof value === 'object' && value.id != null) {
@@ -11,6 +19,10 @@ function normalizeId(value) {
   return Number.isInteger(n) && n > 0 ? n : null;
 }
 
+/**
+ * Insert a notification row if the idempotency key is new.
+ * @returns {Promise<object|null>} Mapped row or null on conflict
+ */
 async function enqueue({
   type,
   channel = 'email',
@@ -24,9 +36,11 @@ async function enqueue({
   idempotencyKey,
   status = 'pending',
 }) {
+  // Reject unknown types early so typos do not pollute the outbox.
   if (!NOTIFICATION_TYPES.includes(type)) {
     throw new Error(`Unknown notification type: ${type}`);
   }
+  // Idempotency key is mandatory — duplicates return null from insert.
   if (!idempotencyKey) {
     throw new Error('idempotencyKey is required');
   }
@@ -46,6 +60,7 @@ async function enqueue({
   });
 }
 
+/** Customer confirmation email keyed by order id. */
 async function enqueueReservationConfirmation({ order, reservation, carName }) {
   if (!order?.email) return null;
   const orderId = order.id;
@@ -73,6 +88,7 @@ async function enqueueReservationConfirmation({ order, reservation, carName }) {
   });
 }
 
+/** Admin alert to ADMIN_EMAIL for a newly confirmed booking. */
 async function enqueueAdminNewBooking({ order, reservation, carName }) {
   const adminEmail = process.env.ADMIN_EMAIL;
   if (!adminEmail) return null;
@@ -97,6 +113,7 @@ async function enqueueAdminNewBooking({ order, reservation, carName }) {
   });
 }
 
+/** Payment-failure notice; prefers failureId for a stable idempotency key. */
 async function enqueuePaymentFailed({
   reservationId,
   email,

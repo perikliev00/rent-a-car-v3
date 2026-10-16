@@ -1,7 +1,21 @@
+/**
+ * Side drawer overlay (mobile nav). Shares scroll-lock/focus behavior with Modal.
+ */
 import type { ReactNode } from 'react';
 import { useEffect, useId, useRef } from 'react';
 import { useOverlayLock } from './useOverlayLock';
 
+/**
+ * Side drawer overlay for mobile navigation and detail panels.
+ *
+ * @param props.open - When false, render nothing.
+ * @param props.onClose - Called on backdrop click, Escape, or the Close control.
+ * @param props.title - Header title; falls back to `"Details"` when omitted.
+ * @param props.children - Drawer body content.
+ * @param props.side - Which edge the panel anchors to (`left` | `right`, default `right`).
+ * @returns The drawer overlay, or `null` when closed.
+ * @remarks Side effects: scroll lock + focus trap via {@link useOverlayLock}; Escape listener while open.
+ */
 export function Drawer({
   open,
   onClose,
@@ -30,6 +44,7 @@ export function Drawer({
 
   if (!open) return null;
 
+  // Border + slide-in animation differ by anchor edge.
   const sideClass =
     side === 'left'
       ? 'justify-start border-r animate-[lux-drawer_0.35s_var(--ease-out)_both]'

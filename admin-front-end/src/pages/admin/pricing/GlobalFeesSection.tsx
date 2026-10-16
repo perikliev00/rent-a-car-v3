@@ -1,3 +1,6 @@
+/**
+ * Global flat/per-day fee editors (hotel, late, fuel, etc.).
+ */
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -9,6 +12,10 @@ import { Input } from '../../../components/ui/Input';
 import { toast } from '../../../components/ui/toastStore';
 import { PricingSection } from './PricingSection';
 
+/**
+ * Global flat/per-day fee editors (hotel, late return, fuel, etc.).
+ * @param fees - Global fee rows from the pricing bundle
+ */
 export function GlobalFeesSection({ fees }: { fees: PricingBundle['globalFees'] }) {
   const queryClient = useQueryClient();
 
@@ -46,6 +53,12 @@ export function GlobalFeesSection({ fees }: { fees: PricingBundle['globalFees'] 
   );
 }
 
+/**
+ * Single global-fee row with local amount/active state until Save.
+ * @param fee - Fee definition from the bundle
+ * @param onSave - Persist current local edits
+ * @param saving - Disable Save while the mutation is in flight
+ */
 function GlobalFeeRow({
   fee,
   onSave,

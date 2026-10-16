@@ -1,3 +1,10 @@
+/**
+ * Shared API/domain types for the customer-facing frontend.
+ * Mirrors backend contracts for cars, booking, checkout, contacts, and RBAC users.
+ * Prefer these types over ad-hoc shapes when calling `api/*` helpers.
+ */
+
+/** Bookable pickup/return location identifiers used in search and orders. */
 export type LocationId =
   | 'office'
   | 'sunny-beach'
@@ -17,6 +24,7 @@ export type Transmission = 'Automatic' | 'Manual';
 export type FuelType = 'Petrol' | 'Diesel' | 'Hybrid' | 'Electric';
 export type OrderStatus = 'pending' | 'active' | 'expired' | 'cancelled';
 export type ContactStatus = 'new' | 'ready' | 'done';
+/** Legacy role field on users; RBAC uses `roles` / `permissions` arrays instead. */
 export type UserRole = 'user' | 'staff' | 'admin';
 
 export interface RoleSummary {
@@ -35,16 +43,19 @@ export interface PermissionSummary {
   category?: string | null;
 }
 
+/** Successful API envelope unwrapped by the HTTP client. */
 export interface ApiSuccess<T> {
   success: true;
   data: T;
 }
 
+/** Failed API envelope; `error.code` maps to {@link ApiError}. */
 export interface ApiErrorBody {
   success: false;
   error: { code: string; message: string };
 }
 
+/** Discriminated union for all JSON API responses. */
 export type ApiResponse<T> = ApiSuccess<T> | ApiErrorBody;
 
 export interface LocationOption {
@@ -113,6 +124,10 @@ export interface CarDateBlock {
   endDate: string;
 }
 
+/**
+ * Fleet vehicle as returned by list/detail endpoints.
+ * Tier fields drive duration-based day rates; search responses add trip totals via {@link SearchCar}.
+ */
 export interface Car {
   id: string;
   name: string;
@@ -180,6 +195,7 @@ export interface CarDocument {
   createdAt?: string;
 }
 
+/** Car plus trip-scoped pricing from `/api/cars/search`. */
 export interface SearchCar extends Car {
   rentalDays: number;
   deliveryPrice: number;
@@ -204,6 +220,10 @@ export interface Pagination {
   totalPages: number;
 }
 
+/**
+ * Signed-in user from `/api/auth/me`.
+ * Gate staff UI with `roles` / `permissions`, not the legacy `role` field alone.
+ */
 export interface User {
   id: string;
   email: string;
@@ -237,6 +257,7 @@ export interface ExistingReservationSummary {
   totalPrice: string | null;
 }
 
+/** Single line in a server-computed price breakdown (base, delivery, extras, fees). */
 export interface PriceLine {
   code: string;
   label: string;
@@ -244,6 +265,7 @@ export interface PriceLine {
   type: string;
 }
 
+/** Displayable quote returned with order/checkout payloads. */
 export interface PriceBreakdown {
   lines: PriceLine[];
   totalPrice: number;
@@ -251,6 +273,7 @@ export interface PriceBreakdown {
   currency: string;
 }
 
+/** Persisted breakdown snapshot stored on the order for later display. */
 export interface PriceSnapshot extends PriceBreakdown {
   rentalDays?: number;
   dayPrice?: number;
@@ -258,6 +281,10 @@ export interface PriceSnapshot extends PriceBreakdown {
   hotelDelivery?: boolean;
 }
 
+/**
+ * Pre-checkout order page payload after a hold is created.
+ * Includes display labels, pricing, and any conflicting existing reservation.
+ */
 export interface OrderPageData {
   title: string;
   car: Car | null;
@@ -366,6 +393,7 @@ export interface PaymentFailureRow {
   created_at: string;
 }
 
+/** Body for creating a soft hold / pending order before checkout. */
 export interface CreateOrderBody {
   carId: number;
   pickupDate: string;
@@ -378,6 +406,7 @@ export interface CreateOrderBody {
   hotelDelivery?: boolean;
 }
 
+/** Order body plus customer contact fields required to start Stripe Checkout. */
 export interface CheckoutBody extends CreateOrderBody {
   fullName: string;
   phoneNumber: string;
@@ -388,6 +417,7 @@ export interface CheckoutBody extends CreateOrderBody {
   fuelFee?: boolean;
 }
 
+/** Confirmation payload after returning from Stripe with a session id. */
 export interface CheckoutSuccessData {
   title: string;
   confirmed: boolean;
@@ -402,6 +432,7 @@ export interface CheckoutSuccessData {
   message: string;
 }
 
+/** Trip criteria shared across search, detail, order, and checkout URLs. */
 export interface SearchParams {
   pickupDate: string;
   returnDate: string;
@@ -413,6 +444,7 @@ export interface SearchParams {
   hotelDelivery?: boolean;
 }
 
+/** When `order.carId` is populated, return the nested car; otherwise null. */
 export function getCarFromOrder(order: Order): Car | null {
   if (typeof order.carId === 'object' && order.carId !== null) {
     return order.carId;
@@ -420,6 +452,7 @@ export function getCarFromOrder(order: Order): Car | null {
   return null;
 }
 
+/** Normalize a car id that may be a string or an embedded {@link Car} object. */
 export function getCarIdString(carId: string | Car): string {
   return typeof carId === 'object' ? carId.id : carId;
 }

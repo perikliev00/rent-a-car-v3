@@ -1,3 +1,9 @@
+/**
+ * Checkout success-page fulfillment: verify Stripe paid status, attempt
+ * reservation finalization if the order is not yet created, and return a
+ * guest-facing confirmation / “still processing” payload.
+ * Intentionally soft-fails finalization errors so a paid guest is not shown a hard error.
+ */
 const logger = require('../../utils/logger');
 const { retrieveStripeCheckoutSession } = require('./stripeCheckoutService');
 const logEvent = require('../../monitoring/logEvent');
@@ -11,14 +17,23 @@ const { formatDateForDisplay } = require('../../utils/dateFormatter');
 const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || 'support@rentacar.com';
 const SUPPORT_PHONE = process.env.SUPPORT_PHONE || '';
 
+/**
+ * Handle the browser return from Stripe Checkout success URL.
+ * May finalize synchronously when the webhook has not yet created the order.
+ *
+ * @param {import('express').Request} req - Expects query.session_id and requestId
+ * @returns {Promise<object>} View-model for the success page
+ */
 async function handleCheckoutSuccessFlow(req) {
   const stripeSessionId = req.query.session_id;
+  // Stripe / payment-related branch.
   if (!stripeSessionId) {
     throw new ValidationError('Invalid checkout session.');
   }
 
   const session = await retrieveStripeCheckoutSession(stripeSessionId);
 
+  // Status / lifecycle guard before mutating domain state.
   if (session.payment_status !== 'paid') {
     trackPaymentFailure('payment_not_completed', {
       requestId: req.requestId,
@@ -39,8 +54,10 @@ async function handleCheckoutSuccessFlow(req) {
   let bookingStatus = confirmed ? 'confirmed' : 'processing_payment';
   let reservation = null;
 
+  // Webhook may still be in flight — attempt finalization from the success page path.
   if (!confirmed) {
     const metadata = session.metadata || {};
+    // Protected block: isolate failure modes.
     try {
       const result = await finalizeReservationByStripeSessionId(stripeSessionId, {
         reservationId: metadata.reservationId || session.client_reference_id || null,

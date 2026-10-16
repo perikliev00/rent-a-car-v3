@@ -1,3 +1,7 @@
+/**
+ * Admin order update: contact-only fast path vs calendar move/updateRange/moveRange,
+ * then sync the linked reservation so ops calendar stays consistent.
+ */
 const carRepository = require('../../../repositories/carRepository');
 const orderSql = require('../../sql/orderSqlService');
 const { parseSofiaDate } = require('../../../utils/date/timezone');
@@ -22,8 +26,14 @@ const { buildOrderEditErrorResult } = require('./orderFormService');
 const { syncLinkedReservationAfterOrderUpdate } = require('./orderReservationSync');
 const { acquireCarAdvisoryLocks } = require('../../../db/transaction');
 
+/**
+ * Validate and update an order; returns success+audit or edit error viewModel.
+ * @param {number|string} orderId
+ * @param {object} payload
+ */
 async function updateOrder(orderId, payload) {
   const contactResult = validateOrderContact(payload);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!contactResult.ok) {
     return buildOrderEditErrorResult(
       orderId,
@@ -33,6 +43,7 @@ async function updateOrder(orderId, payload) {
   }
 
   let range;
+  // Protected block: isolate failure modes.
   try {
     range = parseOrderDateRange(
       payload.pickupDate,
@@ -47,6 +58,7 @@ async function updateOrder(orderId, payload) {
     throw err;
   }
 
+  // Protected block: isolate failure modes.
   try {
     const audit = await runWithOptionalTransaction((client) =>
       updateOrderCore({
@@ -75,14 +87,23 @@ async function updateOrder(orderId, payload) {
   }
 }
 
+/** Serialize a date-like value for audit payloads. */
 function toIso(value) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!value) return null;
   if (value instanceof Date) return value.toISOString();
   return String(value);
 }
 
+/**
+ * Transactional update core: lock both cars, adjust calendar ranges, sync reservation.
+ * Uses stored date-block endpoints when removing the previous range so drifted
+ * order fields still clear the correct booked block.
+ * @param {{orderId: number|string, payload: object, contact: object, range: object, client: object}} args
+ */
 async function updateOrderCore({ orderId, payload, contact, range, client }) {
   const existingOrder = await orderSql.findOrderById(orderId, client);
+  // Idempotency guard: return early when work was already applied.
   if (!existingOrder) {
     const err = new Error('Order not found');
     err.status = 404;
@@ -104,6 +125,7 @@ async function updateOrderCore({ orderId, payload, contact, range, client }) {
       ? payload.carId.toString()
       : String(prevCarId);
 
+  // Lock prev + new car so concurrent edits cannot double-book either vehicle.
   await acquireCarAdvisoryLocks(client, [prevCarId, newCarId]);
 
   const { storedStart, storedEnd } = await resolveStoredDateRange(
@@ -114,6 +136,7 @@ async function updateOrderCore({ orderId, payload, contact, range, client }) {
   );
 
   const car = await carRepository.findByIdForAdmin(newCarId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!car) {
     const err = new Error('Car not found');
     err.code = 'CAR_NOT_FOUND';
@@ -143,6 +166,7 @@ async function updateOrderCore({ orderId, payload, contact, range, client }) {
     priceChanged: Boolean(recalculatePrice),
   };
 
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!sameCar || !sameStart || !sameEnd) {
     await assertNoActiveReservationHold(newCarId, range.start, range.end, client);
     await assertNoOpenPhysicalRental(newCarId, client, {
@@ -150,6 +174,7 @@ async function updateOrderCore({ orderId, payload, contact, range, client }) {
     });
   }
 
+  // Contact/location-only path: calendar range unchanged, skip updateRange/moveRange.
   if (sameCar && sameStart && sameEnd) {
     existingOrder.pickupLocation = payload.pickupLocation;
     existingOrder.returnLocation = payload.returnLocation;

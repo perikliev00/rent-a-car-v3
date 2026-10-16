@@ -1,6 +1,15 @@
+/**
+ * Dedicated worker process: runs background jobs and exposes health/metrics only
+ * (no public API routes). Used when API replicas disable in-process jobs via
+ * `RUN_BACKGROUND_JOBS=false`.
+ *
+ * Side effects at load: validates env, initializes Sentry, starts bootstrap IIFE
+ * that connects to Postgres, starts jobs, and listens for health probes.
+ */
 require('dotenv').config();
 
 const env = require('./config/env');
+// Same validation surface as the API process so worker env cannot drift.
 env.validateEnv();
 const { config } = env;
 
@@ -26,10 +35,12 @@ let isShuttingDown = false;
 let gaugePollerTimer = null;
 let heartbeatTimer = null;
 
+// Liveness for orchestration: process is up.
 app.get('/health/live', (_req, res) => {
   res.json(getLiveStatus());
 });
 
+// Readiness: DB must respond; 503 when dependencies are down.
 app.get('/health/ready', async (_req, res, next) => {
   try {
     const payload = await getReadyStatus(pool);
@@ -39,10 +50,12 @@ app.get('/health/ready', async (_req, res, next) => {
   }
 });
 
+// Alias of /health/live.
 app.get('/health', (_req, res) => {
   res.json(getLiveStatus());
 });
 
+// Alias of /health/ready.
 app.get('/ready', async (_req, res, next) => {
   try {
     const payload = await getReadyStatus(pool);
@@ -52,10 +65,12 @@ app.get('/ready', async (_req, res, next) => {
   }
 });
 
+// JSON metrics; token-gated like the API process.
 app.get('/metrics', requireMetricsToken, (_req, res) => {
   res.json(metrics.getSnapshot());
 });
 
+// Prometheus exposition for the worker replica.
 app.get('/prometheus', requireMetricsToken, async (_req, res, next) => {
   try {
     res.set('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
@@ -65,6 +80,14 @@ app.get('/prometheus', requireMetricsToken, async (_req, res, next) => {
   }
 });
 
+/**
+ * Stop jobs, close the health HTTP server and DB pool, then exit.
+ * Idempotent across concurrent signals.
+ * Side effects: clears timers, stops jobs, closes HTTP server and pool, `process.exit`.
+ * @param {string} trigger - Signal or error name that initiated shutdown
+ * @param {Error|null} [error=null] - When set, process exits with code 1
+ * @returns {Promise<void>}
+ */
 async function gracefulShutdown(trigger, error = null) {
   if (isShuttingDown) {
     return;
@@ -78,6 +101,7 @@ async function gracefulShutdown(trigger, error = null) {
     clearInterval(gaugePollerTimer);
     gaugePollerTimer = null;
   }
+  // Heartbeat is worker-only (API process does not emit it).
   if (heartbeatTimer) {
     clearInterval(heartbeatTimer);
     heartbeatTimer = null;
@@ -116,8 +140,10 @@ async function gracefulShutdown(trigger, error = null) {
     const pgResult = await pool.query('SELECT NOW() AS now');
     logger.info({ dbTime: pgResult.rows[0].now }, 'PostgreSQL connected (worker)');
 
+    // This process always runs jobs; API replicas may have them disabled.
     await startBackgroundJobs({ pool });
     gaugePollerTimer = startGaugePoller(pool);
+    // Lets monitoring confirm the dedicated worker is alive.
     heartbeatTimer = startWorkerHeartbeat();
 
     server = app.listen(config.port, () => {

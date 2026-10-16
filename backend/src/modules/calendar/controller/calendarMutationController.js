@@ -1,3 +1,7 @@
+/**
+ * HTTP handlers for move/resize and calendar-initiated reservation cancel.
+ */
+
 const calendarService = require('../calendar.service');
 const { sessionAccess } = require('../calendar.permissions');
 const apiResponse = require('../../../utils/apiResponse');
@@ -5,6 +9,7 @@ const asyncHandler = require('../../../utils/asyncHandler');
 const { forwardControllerError } = require('../../../utils/controllerError');
 const { mapServiceError, requireCalendarView } = require('./calendarControllerHelpers');
 
+/** PATCH /events/:id/move */
 const moveEvent = asyncHandler(async (req, res, next) => {
   try {
     const access = requireCalendarView(req, res);
@@ -27,6 +32,7 @@ const moveEvent = asyncHandler(async (req, res, next) => {
   }
 });
 
+/** PATCH /events/:id/resize */
 const resizeEvent = asyncHandler(async (req, res, next) => {
   try {
     const access = requireCalendarView(req, res);
@@ -49,6 +55,7 @@ const resizeEvent = asyncHandler(async (req, res, next) => {
   }
 });
 
+/** POST /reservations/:id/cancel — calendar-initiated cancel. */
 const cancelReservation = asyncHandler(async (req, res, next) => {
   try {
     const access = sessionAccess(req);

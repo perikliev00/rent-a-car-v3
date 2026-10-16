@@ -1,6 +1,15 @@
+/**
+ * SQL for refund_operations tracking Stripe refund attempts/status.
+ */
 const { clientQuery } = require('../../db/transaction');
 
+/**
+ * Map a DB/API row into the domain shape used by callers (mapRow).
+ * @param {object} row
+ * @returns {*}
+ */
 function mapRow(row) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) return null;
   return {
     id: row.id,
@@ -22,6 +31,12 @@ function mapRow(row) {
   };
 }
 
+/**
+ * Insert a refund_operations row (idempotency_key unique for safe retries).
+ * @param {object} params
+ * @param {object|null} [client]
+ * @returns {Promise<object>}
+ */
 async function insertRefundOperation(
   {
     reservationId,
@@ -74,7 +89,14 @@ async function insertRefundOperation(
   return mapRow(result.rows[0]);
 }
 
+/**
+ * Find by id via SQL; returns null when missing.
+ * @param {string|number} id
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findById(id, client = null) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (id == null) return null;
   const result = await clientQuery(
     client,
@@ -84,6 +106,12 @@ async function findById(id, client = null) {
   return mapRow(result.rows[0]);
 }
 
+/**
+ * Find by idempotency key via SQL; returns null when missing.
+ * @param {string} idempotencyKey
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findByIdempotencyKey(idempotencyKey, client = null) {
   const result = await clientQuery(
     client,
@@ -93,6 +121,12 @@ async function findByIdempotencyKey(idempotencyKey, client = null) {
   return mapRow(result.rows[0]);
 }
 
+/**
+ * Find active by reservation id via SQL; returns null when missing.
+ * @param {string|number} reservationId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findActiveByReservationId(reservationId, client = null) {
   const result = await clientQuery(
     client,
@@ -108,7 +142,14 @@ async function findActiveByReservationId(reservationId, client = null) {
   return mapRow(result.rows[0]);
 }
 
+/**
+ * Find by stripe refund id via SQL; returns null when missing.
+ * @param {string|number} stripeRefundId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findByStripeRefundId(stripeRefundId, client = null) {
+  // Stripe / payment-related branch.
   if (!stripeRefundId) return null;
   const result = await clientQuery(
     client,
@@ -118,7 +159,14 @@ async function findByStripeRefundId(stripeRefundId, client = null) {
   return mapRow(result.rows[0]);
 }
 
+/**
+ * Find by payment intent id via SQL; returns null when missing.
+ * @param {string|number} paymentIntentId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findByPaymentIntentId(paymentIntentId, client = null) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!paymentIntentId) return null;
   const result = await clientQuery(
     client,
@@ -135,6 +183,12 @@ async function findByPaymentIntentId(paymentIntentId, client = null) {
   return mapRow(result.rows[0]);
 }
 
+/**
+ * Find latest by reservation id via SQL; returns null when missing.
+ * @param {string|number} reservationId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findLatestByReservationId(reservationId, client = null) {
   const result = await clientQuery(
     client,
@@ -149,6 +203,12 @@ async function findLatestByReservationId(reservationId, client = null) {
   return mapRow(result.rows[0]);
 }
 
+/**
+ * Failed ops that already have a Stripe refund id — reconcile may mark them succeeded.
+ * @param {{ olderThanMinutes?: number, limit?: number }} [params]
+ * @param {object|null} [client]
+ * @returns {Promise<object[]>}
+ */
 async function findFailedWithRefundIdOlderThan(
   { olderThanMinutes = 5, limit = 50 } = {},
   client = null
@@ -169,6 +229,12 @@ async function findFailedWithRefundIdOlderThan(
   return result.rows.map(mapRow);
 }
 
+/**
+ * Find pending older than via SQL; returns null when missing.
+ * @param {object} params
+ * @param {object|null} [client] Optional DB client/transaction
+ * @returns {Promise<*>}
+ */
 async function findPendingOlderThan({ olderThanMinutes = 5, limit = 50 } = {}, client = null) {
   const minutes = Math.max(0, Number(olderThanMinutes) || 0);
   const result = await clientQuery(
@@ -187,16 +253,31 @@ async function findPendingOlderThan({ olderThanMinutes = 5, limit = 50 } = {}, c
 
 const REGRESSING_RAW_STATUSES = new Set(['pending', 'failed', 'canceled']);
 
+/**
+ * should guard succeeded.
+ * @param {object} patch
+ * @param {boolean} has
+ * @returns {*}
+ */
 function shouldGuardSucceeded(patch, has) {
+  // Status / lifecycle guard before mutating domain state.
   if (has('status') && (patch.status === 'pending' || patch.status === 'failed')) {
     return true;
   }
+  // Status / lifecycle guard before mutating domain state.
   if (has('stripeRawStatus') && REGRESSING_RAW_STATUSES.has(String(patch.stripeRawStatus))) {
     return true;
   }
   return false;
 }
 
+/**
+ * Update or upsert refund operation; returns null when not found.
+ * @param {string|number} id
+ * @param {object} patch
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function updateRefundOperation(id, patch, client = null) {
   const has = (key) => Object.prototype.hasOwnProperty.call(patch, key);
   const guardSucceeded = shouldGuardSucceeded(patch, has);

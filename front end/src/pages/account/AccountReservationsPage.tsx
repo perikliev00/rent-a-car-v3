@@ -1,3 +1,6 @@
+/**
+ * Full list of the signed-in customer's reservations.
+ */
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { listAccountReservations } from '../../api/account';
@@ -5,6 +8,13 @@ import { Button } from '../../components/ui/Button';
 import { PageLoader } from '../../components/ui/Loading';
 import { EmailUnverifiedBanner } from './EmailUnverifiedBanner';
 
+/**
+ * Format a reservation date (and optional time) for list rows.
+ *
+ * @param value - ISO date string or nullish.
+ * @param time - Optional HH:MM time to append.
+ * @returns Locale date string, optionally with time; `—` when missing.
+ */
 function formatWhen(value?: string | null, time?: string | null) {
   if (!value) return '—';
   try {
@@ -15,6 +25,11 @@ function formatWhen(value?: string | null, time?: string | null) {
   }
 }
 
+/**
+ * Account reservations index.
+ *
+ * @returns Loading spinner, empty state, or a list of reservation rows with detail links.
+ */
 export function AccountReservationsPage() {
   const query = useQuery({
     queryKey: ['account', 'reservations'],

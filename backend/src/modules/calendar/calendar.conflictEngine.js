@@ -1,12 +1,42 @@
+/**
+ * Calendar conflict engine.
+ *
+ * Detects schedule conflicts for a car/date range (holds, open rentals, blocks,
+ * cleaning buffer, insurance/inspection expiry, damage). Callers use
+ * assertWritable to enforce hard vs soft (overridable) rules before mutating.
+ */
+
 const { CLEANING_BUFFER_HOURS } = require('./calendar.eventMapper');
 const reservationSql = require('../../services/sql/reservationSqlService');
 const { clientQuery } = require('../../db/transaction');
 const { HARD_UNBOOKABLE_STATUSES } = require('../../constants/carEnums');
 
+/**
+ * Build a single conflict descriptor for API / UI consumption.
+ * @param {string} code Machine-readable conflict code
+ * @param {'block'|'warn'} severity Whether this blocks write or is advisory
+ * @param {string} message Human-readable explanation
+ * @param {object} [meta] Extra fields (overridable, overlapping ids, etc.)
+ */
 function conflict(code, severity, message, meta = {}) {
   return { code, severity, message, ...meta };
 }
 
+/**
+ * Collect all conflicts for scheduling a car between start and end.
+ * Soft conflicts may be overridden with force + OVERRIDE permission;
+ * hard conflicts (overridable: false) always block writes.
+ *
+ * @param {object} opts
+ * @param {string|number} opts.carId
+ * @param {Date|string} opts.start
+ * @param {Date|string} opts.end
+ * @param {string|number|null} [opts.excludeReservationId] Skip self when resizing/moving
+ * @param {string|number|null} [opts.excludeBlockId] Skip self when editing a block
+ * @param {boolean} [opts.force]
+ * @param {import('pg').PoolClient|null} [opts.client] Optional transaction client
+ * @returns {Promise<object[]>}
+ */
 async function checkReservationRangeConflicts({
   carId,
   start,
@@ -22,6 +52,7 @@ async function checkReservationRangeConflicts({
   const hasExcludeBlock =
     Number.isInteger(excludedBlockId) && excludedBlockId > 0;
 
+  // Step 1: load car row — missing car is a hard, non-overridable blocker.
   const carResult = await clientQuery(
     client,
     `
@@ -36,6 +67,7 @@ async function checkReservationRangeConflicts({
     return conflicts;
   }
 
+  // Step 2: fleet status — damaged/inactive/etc. block unless caller forces with override.
   if (HARD_UNBOOKABLE_STATUSES.includes(car.status)) {
     conflicts.push(
       conflict(
@@ -47,6 +79,7 @@ async function checkReservationRangeConflicts({
     );
   }
 
+  // Step 3: active payment holds still occupy the car even if not yet confirmed.
   const hold = await reservationSql.findOverlappingHold(
     {
       carId: carIdNum,
@@ -66,6 +99,7 @@ async function checkReservationRangeConflicts({
     );
   }
 
+  // Step 4: physically out cars cannot accept another booking until returned.
   const openPhysical = await reservationSql.findOpenPhysicalRental(carIdNum, client, {
     excludeReservationId,
   });
@@ -83,9 +117,11 @@ async function checkReservationRangeConflicts({
     );
   }
 
+  // Step 5: overlapping manual date blocks (maintenance, owner use, etc.).
   const blockParams = [carIdNum, start, end];
   let excludeBlockSql = '';
   if (hasExcludeBlock) {
+    // When editing an existing block, skip that row so it does not conflict with itself.
     blockParams.push(excludedBlockId);
     excludeBlockSql = ` AND id <> $${blockParams.length}`;
   }
@@ -112,7 +148,7 @@ async function checkReservationRangeConflicts({
     );
   }
 
-  // Next pickup after this return — sequence check when resizing/moving
+  // Step 6: sequence vs next pickup after our proposed return (resize/move safety).
   const nextPickup = await clientQuery(
     client,
     `
@@ -129,13 +165,12 @@ async function checkReservationRangeConflicts({
       ? [carIdNum, end, Number(excludeReservationId)]
       : [carIdNum, end]
   );
-  // Sequence: if our return is after next pickup start — shouldn't happen if we check end < next.pickup
-  // Cleaning buffer vs next pickup
   if (nextPickup.rows[0]) {
     const nextStart = new Date(nextPickup.rows[0].pickup_date).getTime();
     const ourEnd = new Date(end).getTime();
     const bufferMs = CLEANING_BUFFER_HOURS * 60 * 60 * 1000;
     if (ourEnd > nextStart) {
+      // Hard overlap with the following booking's start.
       conflicts.push(
         conflict('RETURN_AFTER_NEXT_PICKUP', 'block', 'Return is after the next pickup.', {
           overridable: true,
@@ -143,6 +178,7 @@ async function checkReservationRangeConflicts({
         })
       );
     } else if (nextStart - ourEnd < bufferMs) {
+      // Soft: turnaround window between return and next pickup is too short.
       conflicts.push(
         conflict(
           'CLEANING_BUFFER',
@@ -154,6 +190,7 @@ async function checkReservationRangeConflicts({
     }
   }
 
+  // Step 7: insurance / technical inspection must cover the rental window.
   const startDate = new Date(start);
   const endDate = new Date(end);
   if (car.insurance_expiry) {
@@ -189,6 +226,7 @@ async function checkReservationRangeConflicts({
     }
   }
 
+  // Step 8: unresolved damage report only blocks when the car status is also damaged.
   const damage = await clientQuery(
     client,
     `
@@ -209,7 +247,18 @@ async function checkReservationRangeConflicts({
   return conflicts;
 }
 
+/**
+ * Throw CALENDAR_CONFLICT (409) when write is not allowed.
+ * Hard (non-overridable) blockers always fail. Soft blockers require
+ * force && canOverride. Warns alone do not fail unless force without override
+ * permission (reserved path below).
+ *
+ * @param {object[]} conflicts
+ * @param {{ force?: boolean, canOverride?: boolean }} [opts]
+ * @returns {{ conflicts: object[], forced: boolean }}
+ */
 function assertWritable(conflicts, { force = false, canOverride = false } = {}) {
+  // Separate hard blockers (never override) from soft blockers (need force+permission).
   const blockers = conflicts.filter((c) => c.severity === 'block');
   const hard = blockers.filter((c) => c.overridable === false);
   if (hard.length > 0) {
@@ -223,6 +272,7 @@ function assertWritable(conflicts, { force = false, canOverride = false } = {}) 
   const softBlocks = blockers.filter((c) => c.overridable !== false);
   const warns = conflicts.filter((c) => c.severity === 'warn');
 
+  // Soft blocks: allow only when caller both forces and has OVERRIDE permission.
   if (softBlocks.length > 0 && !(force && canOverride)) {
     const err = new Error(softBlocks[0].message);
     err.code = 'CALENDAR_CONFLICT';
@@ -231,13 +281,19 @@ function assertWritable(conflicts, { force = false, canOverride = false } = {}) 
     throw err;
   }
 
+  // Reserved: force without override permission remains blocked on warn-level conflicts.
   if (warns.length > 0 && force && !canOverride) {
-    // force without override permission still blocked on warns that need override
+    // Intentionally no throw yet — reserved path for future stricter warn enforcement.
   }
 
   return { conflicts, forced: Boolean(force && canOverride) };
 }
 
+/**
+ * Read-only conflict collection (no force semantics). Used for preview/UI.
+ * @param {object} opts
+ * @returns {Promise<object[]>}
+ */
 async function collectRangeConflictsForRead({ carId, start, end, excludeReservationId = null }) {
   return checkReservationRangeConflicts({
     carId,

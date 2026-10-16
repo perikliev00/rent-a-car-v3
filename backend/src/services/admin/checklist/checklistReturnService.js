@@ -1,3 +1,7 @@
+/**
+ * Submit return checklist: store assets, upsert checklist, optionally create a
+ * damage report from newDamages, then mark the reservation returned.
+ */
 const returnSql = require('../../sql/returnChecklistSqlService');
 const reservationSql = require('../../sql/reservationSqlService');
 const damageReportSql = require('../../sql/carDamageReportSqlService');
@@ -11,8 +15,14 @@ const {
   cleanupTemp,
 } = require('./checklistUploadHelpers');
 
+/**
+ * @param {import('express').Request} req
+ * @param {number|string} reservationId
+ * @param {object} body
+ */
 async function submitReturnChecklist(req, reservationId, body) {
   const reservation = await reservationSql.findById(reservationId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!reservation) {
     const err = new Error('Reservation not found');
     err.code = 'NOT_FOUND';
@@ -20,6 +30,7 @@ async function submitReturnChecklist(req, reservationId, body) {
     throw err;
   }
 
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!FUEL_LEVELS.has(body.fuelLevel)) {
     await cleanupTemp(req);
     const err = new Error('Invalid fuel level.');
@@ -29,6 +40,7 @@ async function submitReturnChecklist(req, reservationId, body) {
   }
 
   const mileage = Number(body.mileage);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(mileage) || mileage < 0) {
     await cleanupTemp(req);
     const err = new Error('Mileage must be a non-negative integer.');
@@ -41,6 +53,7 @@ async function submitReturnChecklist(req, reservationId, body) {
   let photoKeys;
   let customerSignatureKey;
   let employeeSignatureKey;
+  // Protected block: isolate failure modes.
   try {
     photoKeys = await storeUploads(photos, 'checklists');
     customerSignatureKey = await storeUpload(customerSignature, 'signatures');
@@ -91,7 +104,9 @@ async function submitReturnChecklist(req, reservationId, body) {
   }
 
   let statusResult = null;
+  // Status / lifecycle guard before mutating domain state.
   if (reservation.status === 'picked_up' || reservation.status === 'active_rental') {
+    // Status / lifecycle guard before mutating domain state.
     if (reservation.status === 'picked_up') {
       await changeStatus({
         reservationId,

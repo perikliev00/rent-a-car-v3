@@ -1,3 +1,6 @@
+/**
+ * SQL for public contact-form submissions (list/create/update status).
+ */
 const { clientQuery } = require('../../db/transaction');
 
 const CONTACT_SELECT = `
@@ -14,15 +17,27 @@ const CONTACT_SELECT = `
 
 const ALLOWED_STATUSES = ['new', 'ready', 'done'];
 
+/**
+ * Normalize id before persistence or comparison.
+ * @param {*} value
+ * @returns {*}
+ */
 function normalizeId(value) {
   const id = Number(value);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(id) || id <= 0) {
     return null;
   }
   return id;
 }
 
+/**
+ * Map a DB/API row into the domain shape used by callers (mapSqlContact).
+ * @param {object} row
+ * @returns {*}
+ */
 function mapSqlContact(row) {
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) {
     return null;
   }
@@ -40,6 +55,12 @@ function mapSqlContact(row) {
   };
 }
 
+/**
+ * Insert a public contact-form submission (invalid status coerced to 'new').
+ * @param {object} params
+ * @param {object|null} [client]
+ * @returns {Promise<object>}
+ */
 async function createContact(
   { name, email, phone, subject, message, status = 'new' },
   client = null
@@ -64,6 +85,11 @@ async function createContact(
   return mapSqlContact(result.rows[0]);
 }
 
+/**
+ * List contacts from SQL.
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function listContacts(client = null) {
   const result = await clientQuery(
     client,
@@ -77,12 +103,21 @@ async function listContacts(client = null) {
   return result.rows.map(mapSqlContact);
 }
 
+/**
+ * Update or upsert contact status; returns null when not found.
+ * @param {string|number} contactId
+ * @param {string} status
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function updateContactStatus(contactId, status, client = null) {
   const normalizedId = normalizeId(contactId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedId) {
     return null;
   }
 
+  // Status / lifecycle guard before mutating domain state.
   if (!ALLOWED_STATUSES.includes(status)) {
     throw new Error('Invalid contact status');
   }
@@ -101,8 +136,15 @@ async function updateContactStatus(contactId, status, client = null) {
   return mapSqlContact(result.rows[0]) || null;
 }
 
+/**
+ * Delete contact by id; returns whether a row was affected.
+ * @param {string|number} contactId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function deleteContactById(contactId, client = null) {
   const normalizedId = normalizeId(contactId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedId) {
     return false;
   }

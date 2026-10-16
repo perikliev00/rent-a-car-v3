@@ -1,7 +1,11 @@
 /**
  * Shared status sets and date-range helpers for analytics SQL.
+ *
+ * Revenue/occupancy only count reservations in billable/active-like statuses.
+ * Overlap math uses Europe/Sofia calendar dates for operational reporting.
  */
 
+/** Reservation statuses whose related orders count toward revenue KPIs. */
 const REVENUE_STATUSES = Object.freeze([
   'paid',
   'confirmed',

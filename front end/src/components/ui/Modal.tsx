@@ -1,7 +1,22 @@
+/**
+ * Centered dialog with backdrop click + Escape to close.
+ * Uses {@link useOverlayLock} for body scroll lock and focus trapping.
+ */
 import type { ReactNode } from 'react';
 import { useEffect, useId, useRef } from 'react';
 import { useOverlayLock } from './useOverlayLock';
 
+/**
+ * Centered modal dialog overlay.
+ *
+ * @param props.open - When false, render nothing.
+ * @param props.onClose - Called on backdrop click, Escape, or the Close control.
+ * @param props.title - Optional sticky header title (also wires `aria-labelledby`).
+ * @param props.children - Dialog body content.
+ * @param props.wide - When true, uses a wider max-width (`max-w-4xl`).
+ * @returns The modal portal-like overlay, or `null` when closed.
+ * @remarks Side effects: scroll lock + focus trap via {@link useOverlayLock}; Escape listener while open.
+ */
 export function Modal({
   open,
   onClose,
@@ -21,6 +36,7 @@ export function Modal({
 
   useEffect(() => {
     if (!open) return;
+    // Escape closes the dialog (in addition to focus-trap Tab handling).
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };

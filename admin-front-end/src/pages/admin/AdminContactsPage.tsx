@@ -1,3 +1,6 @@
+/**
+ * Contact-form inbox triage (status updates and delete).
+ */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getContacts, updateContactStatus, deleteContact } from '../../api/admin/contacts';
 import { Button } from '../../components/ui/Button';
@@ -7,6 +10,9 @@ import { PageLoader } from '../../components/ui/Loading';
 import { toast } from '../../components/ui/toastStore';
 import type { ContactStatus } from '../../types/api';
 
+/**
+ * Contact-form inbox: list messages, change status, confirm-delete.
+ */
 export function AdminContactsPage() {
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ['admin', 'contacts'], queryFn: getContacts });

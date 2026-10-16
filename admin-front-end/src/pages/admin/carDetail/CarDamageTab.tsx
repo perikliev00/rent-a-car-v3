@@ -1,3 +1,6 @@
+/**
+ * Damage report list/create/resolve UI for a car.
+ */
 import { Button } from '../../../components/ui/Button';
 import { Card, CardBody } from '../../../components/ui/Card';
 import { Input } from '../../../components/ui/Input';
@@ -13,6 +16,7 @@ type DamageReport = {
   photos?: string[];
 };
 
+/** Damage report list/create/resolve UI for a car. */
 export function CarDamageTab({
   damageForm,
   setDamageForm,

@@ -1,3 +1,6 @@
+/**
+ * Schedule mutations: move, resize, create block/task, conflict force.
+ */
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { moveCalendarEvent, resizeCalendarEvent } from '../../../api/admin/calendar';
@@ -14,15 +17,24 @@ type SchedulePayload = {
   mode: 'move' | 'resize';
 };
 
+/**
+ * Owns move/resize API calls and the two-step conflict override flow:
+ * store the pending payload, show ConflictWarningModal, then retry with `force: true`.
+ */
 export function useCalendarSchedule() {
   const queryClient = useQueryClient();
   const [conflicts, setConflicts] = useState<CalendarConflict[]>([]);
   const [isMoving, setIsMoving] = useState(false);
   const [pendingMove, setPendingMove] = useState<Omit<SchedulePayload, 'force'> | null>(null);
+  /** Block-create uses a callback retry rather than replaying a move payload. */
   const [pendingBlockForce, setPendingBlockForce] = useState<((force: boolean) => void) | null>(
     null
   );
 
+  /**
+   * Execute move or resize; on `CALENDAR_CONFLICT`, stash the payload for a force retry.
+   * @param payload - Target schedule plus mode and optional force flag
+   */
   async function applyScheduleChange(payload: SchedulePayload) {
     setIsMoving(true);
     try {
@@ -38,6 +50,7 @@ export function useCalendarSchedule() {
       setPendingMove(null);
       setConflicts([]);
     } catch (err) {
+      // Surface conflicts for modal confirmation instead of a generic error toast.
       if (err instanceof ApiError && err.code === 'CALENDAR_CONFLICT') {
         setPendingMove(payload);
         setConflicts((err.conflicts as CalendarConflict[]) || []);
@@ -49,17 +62,24 @@ export function useCalendarSchedule() {
     }
   }
 
+  /**
+   * Hook for block-create flows: store conflicts + a retry callback that accepts `force`.
+   * @param c - Conflicts from the create response
+   * @param retry - Caller-supplied retry with force flag
+   */
   function onBlockConflict(c: CalendarConflict[], retry: (force: boolean) => void) {
     setConflicts(c);
     setPendingBlockForce(() => retry);
   }
 
+  /** Dismiss the conflict modal and drop any pending move/block retry. */
   function clearConflicts() {
     setConflicts([]);
     setPendingMove(null);
     setPendingBlockForce(null);
   }
 
+  /** Confirmed by ConflictWarningModal when the user has override permission. */
   function forceOverride() {
     if (pendingBlockForce) {
       pendingBlockForce(true);

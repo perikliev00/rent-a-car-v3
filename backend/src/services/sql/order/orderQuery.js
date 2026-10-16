@@ -1,3 +1,6 @@
+/**
+ * Parameterized order list/find queries including soft-delete and search filters.
+ */
 const { clientQuery } = require('../../../db/transaction');
 const carRepository = require('../../../repositories/carRepository');
 const {
@@ -8,8 +11,15 @@ const {
   attachCarToOrder,
 } = require('./orderMapper');
 
+/**
+ * Find order by id via SQL; returns null when missing.
+ * @param {string|number} orderId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findOrderById(orderId, client = null) {
   const normalizedId = normalizeId(orderId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedId) {
     return null;
   }
@@ -28,8 +38,15 @@ async function findOrderById(orderId, client = null) {
   return mapSqlOrder(result.rows[0]) || null;
 }
 
+/**
+ * Find order by id populated via SQL; returns null when missing.
+ * @param {string|number} orderId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findOrderByIdPopulated(orderId, client = null) {
   const order = await findOrderById(orderId, client);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!order) {
     return null;
   }
@@ -38,8 +55,15 @@ async function findOrderByIdPopulated(orderId, client = null) {
   return attachCarToOrder(order, car);
 }
 
+/**
+ * Find order by reservation id via SQL; returns null when missing.
+ * @param {string|number} reservationId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findOrderByReservationId(reservationId, client = null) {
   const normalizedReservationId = normalizeId(reservationId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedReservationId) {
     return null;
   }
@@ -59,7 +83,14 @@ async function findOrderByReservationId(reservationId, client = null) {
   return mapSqlOrder(result.rows[0]) || null;
 }
 
+/**
+ * Find order by stripe session id via SQL; returns null when missing.
+ * @param {string|number} stripeSessionId
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function findOrderByStripeSessionId(stripeSessionId, client = null) {
+  // Stripe / payment-related branch.
   if (!stripeSessionId) {
     return null;
   }
@@ -79,6 +110,12 @@ async function findOrderByStripeSessionId(stripeSessionId, client = null) {
   return mapSqlOrder(result.rows[0]) || null;
 }
 
+/**
+ * List orders from SQL.
+ * @param {*} [filters]
+ * @param {object|null} [client]
+ * @returns {Promise<*>}
+ */
 async function listOrders(filters = {}, client = null) {
   const conditions = [];
   const params = [];
@@ -89,6 +126,7 @@ async function listOrders(filters = {}, client = null) {
     conditions.push('o.is_deleted = FALSE');
   }
 
+  // Status / lifecycle guard before mutating domain state.
   if (filters.status && ALLOWED_STATUSES.includes(filters.status)) {
     params.push(filters.status);
     conditions.push(`o.status = $${params.length}`);

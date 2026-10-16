@@ -1,5 +1,11 @@
+/**
+ * Widget metadata (titles/keys) for the ops dashboard buckets.
+ */
 import type { OpsReservationRow } from '../../../api/admin/reservations';
 
+/**
+ * Empty widget bucket map used as a loading/error fallback.
+ */
 export function emptyWidgets() {
   return {
     todaysPickups: [] as OpsReservationRow[],
@@ -13,6 +19,7 @@ export function emptyWidgets() {
   };
 }
 
+/** Titles/hints rendered above each ops dashboard widget table. */
 export const WIDGET_META: { key: keyof ReturnType<typeof emptyWidgets>; title: string; hint: string }[] = [
   { key: 'todaysPickups', title: "Today's Pickups", hint: 'Confirmed / prepared for pickup today' },
   { key: 'todaysReturns', title: "Today's Returns", hint: 'Out on rental, due back today' },

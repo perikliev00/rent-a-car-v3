@@ -1,4 +1,8 @@
-// Trim и нормализация на user-entered contact полета преди validation/persistence.
+/**
+ * Normalize and validate guest contact fields before checkout persistence.
+ */
+
+/** Trim user-entered contact fields before validation/persistence. */
 function trimContactDetails(payload = {}) {
   return {
     fullName: (payload.fullName || '').trim(),
@@ -10,8 +14,9 @@ function trimContactDetails(payload = {}) {
 }
 
 /**
- * Проверява дали задължителните contact полета са непълни.
- * fullName, phoneNumber, email, address са задължителни.
+ * Whether required contact fields are missing (fullName, phone, email, address).
+ * @param {object} contact
+ * @returns {boolean}
  */
 function contactFieldsIncomplete(contact) {
   const { fullName, phoneNumber, email, address } = contact || {};

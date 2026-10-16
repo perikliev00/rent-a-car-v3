@@ -1,10 +1,28 @@
+/**
+ * Shared PostgreSQL pool singleton for the API process.
+ * Test mode reuses `global.__luxridePgPool` so suites share one connection pool.
+ */
+
 const { createInstrumentedPool } = require('./instrumentedPool');
 const { resolvePoolOptions, applySessionTimeouts } = require('./poolConfig');
 
+/**
+ * @param {import('pg').Pool | null | undefined} pool
+ * @returns {boolean}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function isUsablePool(pool) {
   return Boolean(pool) && pool.ended !== true && pool.ending !== true;
 }
 
+/**
+ * Wrap `pool.connect` so each client gets session timeout GUCs applied before use.
+ *
+ * @param {import('pg').Pool} pool
+ * @param {{ statementTimeoutMs: number, idleInTransactionTimeoutMs: number, lockTimeoutMs: number }} timeouts
+ * @returns {import('pg').Pool}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function wrapConnectWithTimeouts(pool, timeouts) {
   const originalConnect = pool.connect.bind(pool);
 
@@ -38,6 +56,12 @@ function wrapConnectWithTimeouts(pool, timeouts) {
   return pool;
 }
 
+/**
+ * Create an instrumented pool with session timeout wrapping.
+ *
+ * @returns {import('pg').Pool}
+ * @throws {Error} When pool construction / env resolution fails
+ */
 function createPool() {
   const {
     statementTimeoutMs,
@@ -58,6 +82,11 @@ function createPool() {
   });
 }
 
+/**
+ * Lazy singleton accessor (test vs production caches).
+ * @returns {import('pg').Pool}
+ * @throws {Error} Propagates unexpected failures from callees / I/O
+ */
 function getPool() {
   if (process.env.NODE_ENV === 'test') {
     if (isUsablePool(global.__luxridePgPool)) {

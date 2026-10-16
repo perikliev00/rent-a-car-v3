@@ -1,3 +1,6 @@
+/**
+ * Public car catalog routes (list, search, detail) with optional cars:read API-key scope.
+ */
 const express = require('express');
 const carController = require('../../controllers/api/carController');
 const { searchQueryValidationRules } = require('../../validators/searchQueryValidationRules');
@@ -8,6 +11,7 @@ const { requireApiKeyScope } = require('../../middleware/apiKeyAuth');
 
 const router = express.Router();
 
+// Paginated / filtered catalog listing.
 router.get(
   '/',
   requireApiKeyScope('cars:read'),
@@ -15,6 +19,7 @@ router.get(
   validateRequest,
   carController.getCars
 );
+// Availability search for a date range and filters.
 router.get(
   '/search',
   requireApiKeyScope('cars:read'),
@@ -22,6 +27,7 @@ router.get(
   validateRequest,
   carController.searchCars
 );
+// Single car detail by id.
 router.get(
   '/:carId',
   requireApiKeyScope('cars:read'),

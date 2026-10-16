@@ -1,3 +1,6 @@
+/**
+ * Query-string validation for the admin audit log list endpoint.
+ */
 const { query } = require('express-validator');
 
 const adminAuditLogQueryValidationRules = [

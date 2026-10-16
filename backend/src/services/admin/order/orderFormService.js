@@ -1,7 +1,11 @@
+/**
+ * View-model builders for admin order create/edit forms and validation error pages.
+ */
 const orderSql = require('../../sql/orderSqlService');
 const carRepository = require('../../../repositories/carRepository');
 const { toISODate, toHHMM, applyPayloadToOrder } = require('./orderMapper');
 
+/** Default blank create-form values (today / office / 10:00). */
 function buildInitialOrderDefaults() {
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
@@ -24,6 +28,7 @@ function buildInitialOrderDefaults() {
   };
 }
 
+/** Re-hydrate form defaults from a failed submit payload so fields are not lost. */
 function buildOrderFormDefaultsFromPayload(payload = {}) {
   return {
     pickupDate: payload.pickupDate || '',
@@ -56,10 +61,19 @@ function buildOrderFormDefaultsFromPayload(payload = {}) {
   };
 }
 
+/**
+ * Load cars list.
+ * @returns {Promise<*>}
+ */
 async function getCarsList() {
   return carRepository.listAll();
 }
 
+/**
+ * 422 create-form error viewModel with submitted defaults + car list.
+ * @param {object} payload
+ * @param {string} errorMessage
+ */
 async function buildOrderNewErrorResult(payload, errorMessage) {
   const cars = await getCarsList();
   return {
@@ -73,8 +87,15 @@ async function buildOrderNewErrorResult(payload, errorMessage) {
   };
 }
 
+/**
+ * 422 edit-form error viewModel; overlays payload onto the existing order for redisplay.
+ * @param {number|string} orderId
+ * @param {object} payload
+ * @param {string} errorMessage
+ */
 async function buildOrderEditErrorResult(orderId, payload, errorMessage) {
   const order = await orderSql.findOrderByIdPopulated(orderId);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!order) {
     const err = new Error('Order not found');
     err.status = 404;
@@ -105,6 +126,7 @@ async function buildOrderEditErrorResult(orderId, payload, errorMessage) {
   };
 }
 
+/** Initial create-order page data. */
 async function getCreateOrderForm() {
   const cars = await getCarsList();
   return {
@@ -113,8 +135,13 @@ async function getCreateOrderForm() {
   };
 }
 
+/**
+ * Edit page data with ISO/HH:MM display helpers for date inputs.
+ * @param {number|string} id
+ */
 async function getOrderEditData(id) {
   const order = await orderSql.findOrderByIdPopulated(id);
+  // Guard: early-return or throw when required input is missing/invalid.
   if (!order) {
     return null;
   }

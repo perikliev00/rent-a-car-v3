@@ -1,13 +1,26 @@
+/**
+ * Cron/scheduler jobs that discover due operational alerts and enqueue them.
+ *
+ * Uses Sofia-local dates for pickup/return/maintenance windows. Idempotency
+ * keys include entity + day (or expiry) so daily runs do not duplicate mail.
+ */
+
 const { clientQuery } = require('../../db/transaction');
 const { enqueue } = require('./notifications.enqueue');
 const { RESERVATION_HOLD_MINUTES } = require('../../config/reservationTiming');
 const logger = require('../../utils/logger');
 
+/** Remind while hold is still valid, ~10 minutes before hold expiry (floor 15m). */
 const ABANDONED_REMINDER_MINUTES = Math.max(RESERVATION_HOLD_MINUTES - 10, 15);
 const PAID_NOT_CONFIRMED_HOURS = 2;
 const INSURANCE_ALERT_DAYS = 14;
 
+/**
+ * Confirmed pickups tomorrow (Sofia calendar day).
+ * @returns {Promise<number>} Newly inserted notification count
+ */
 async function enqueuePickupReminders() {
+  // Find confirmed/prepared reservations with pickup tomorrow (Sofia).
   const result = await clientQuery(
     null,
     `
@@ -25,6 +38,7 @@ async function enqueuePickupReminders() {
   );
 
   let created = 0;
+  // Idempotency key includes pickup day so a rebooked day can notify again.
   for (const row of result.rows) {
     const inserted = await enqueue({
       type: 'pickup_reminder',
@@ -49,7 +63,12 @@ async function enqueuePickupReminders() {
   return created;
 }
 
+/**
+ * Active rentals returning tomorrow (Sofia calendar day).
+ * @returns {Promise<number>} Newly inserted notification count
+ */
 async function enqueueReturnReminders() {
+  // Find picked_up/active_rental rows with return tomorrow (Sofia).
   const result = await clientQuery(
     null,
     `
@@ -91,7 +110,12 @@ async function enqueueReturnReminders() {
   return created;
 }
 
+/**
+ * Pending payment holds that are aging but not yet expired.
+ * @returns {Promise<number>} Newly inserted notification count
+ */
 async function enqueueAbandonedCheckoutReminders() {
+  // Hold aged past reminder window but still has time before hold_expires_at.
   const result = await clientQuery(
     null,
     `
@@ -132,10 +156,16 @@ async function enqueueAbandonedCheckoutReminders() {
   return created;
 }
 
+/**
+ * Admin alerts for civil/casco compliance items expiring within INSURANCE_ALERT_DAYS.
+ * @returns {Promise<number>} Newly inserted notification count
+ */
 async function enqueueExpiringInsuranceAlerts() {
+  // No ADMIN_EMAIL configured → skip (local/dev without ops mailbox).
   const adminEmail = process.env.ADMIN_EMAIL;
   if (!adminEmail) return 0;
 
+  // Compliance items expiring between today and +INSURANCE_ALERT_DAYS.
   const result = await clientQuery(
     null,
     `
@@ -172,10 +202,15 @@ async function enqueueExpiringInsuranceAlerts() {
   return created;
 }
 
+/**
+ * Admin alerts for maintenance blocks starting within the next 3 Sofia days.
+ * @returns {Promise<number>} Newly inserted notification count
+ */
 async function enqueueMaintenanceReminders() {
   const adminEmail = process.env.ADMIN_EMAIL;
   if (!adminEmail) return 0;
 
+  // Maintenance blocks whose Sofia start day is within [today, today+3].
   const result = await clientQuery(
     null,
     `
@@ -212,10 +247,15 @@ async function enqueueMaintenanceReminders() {
   return created;
 }
 
+/**
+ * Admin alerts for reservations stuck in paid status past PAID_NOT_CONFIRMED_HOURS.
+ * @returns {Promise<number>} Newly inserted notification count
+ */
 async function enqueuePaidNotConfirmedAlerts() {
   const adminEmail = process.env.ADMIN_EMAIL;
   if (!adminEmail) return 0;
 
+  // Paid but not confirmed for longer than the ops SLA window.
   const result = await clientQuery(
     null,
     `
@@ -248,8 +288,12 @@ async function enqueuePaidNotConfirmedAlerts() {
   return created;
 }
 
+/**
+ * Run all enqueue scanners once; returns per-type insert counts (or null on error).
+ */
 async function runNotificationScheduler() {
   try {
+    // Run scanners sequentially so one slow query does not starve others under pool pressure.
     const counts = {
       pickup: await enqueuePickupReminders(),
       return: await enqueueReturnReminders(),
@@ -264,6 +308,7 @@ async function runNotificationScheduler() {
     }
     return counts;
   } catch (err) {
+    // Fail closed for this tick; cron will retry on the next schedule.
     logger.error({ err, context: 'runNotificationScheduler' }, 'Notification scheduler error');
     return null;
   }

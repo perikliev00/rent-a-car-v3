@@ -1,9 +1,21 @@
+/**
+ * Booking summary card for order/checkout: vehicle, trip window, and pricing.
+ * Prefers live `priceBreakdown`; falls back to a persisted `priceSnapshot` or
+ * a simple rental + delivery/return fee layout when no lines are present.
+ */
 import type { OrderPageData, PriceBreakdown as PriceBreakdownType } from '../../types/api';
 import { formatPrice } from '../../utils/format';
 import { Card, CardBody, CardHeader } from '../ui/Card';
 import { PriceBreakdownView } from './PriceBreakdownView';
 
+/**
+ * Side-panel summary of the pending order and its price quote.
+ *
+ * @param props.order - Order page payload including car, dates, and pricing fields.
+ * @returns Card with vehicle, pickup/return, and price breakdown or fee fallback.
+ */
 export function OrderSummary({ order }: { order: OrderPageData }) {
+  // Prefer the live breakdown; snapshot is used when rehydrating an older order.
   const breakdown: PriceBreakdownType | null =
     order.priceBreakdown ||
     (order.priceSnapshot

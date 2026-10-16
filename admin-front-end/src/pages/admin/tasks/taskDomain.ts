@@ -1,3 +1,6 @@
+/**
+ * Staff task domain types, labels, and role-type mappings.
+ */
 export const TASK_TYPES = [
   'pickup',
   'delivery',
@@ -68,11 +71,18 @@ const TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
   cancelled: [],
 };
 
+/**
+ * Legal next statuses from `from`, with manager reopen of failed/cancelled.
+ *
+ * @param from - Current task status
+ * @param opts.isManager - When true, allow reopen to pending/assigned
+ */
 export function allowedNextStatuses(
   from: TaskStatus,
   opts: { isManager?: boolean } = {}
 ): TaskStatus[] {
   const base = [...(TRANSITIONS[from] || [])];
+  // Managers can reopen terminal failure/cancel states into the workflow again.
   if (opts.isManager && (from === 'failed' || from === 'cancelled')) {
     if (!base.includes('pending')) base.push('pending');
     if (!base.includes('assigned')) base.push('assigned');
@@ -80,10 +90,12 @@ export function allowedNextStatuses(
   return base;
 }
 
+/** Select options for all task types. */
 export function taskTypeOptions() {
   return TASK_TYPES.map((value) => ({ value, label: TASK_TYPE_LABELS[value] }));
 }
 
+/** Select options for all task statuses. */
 export function taskStatusOptions() {
   return TASK_STATUSES.map((value) => ({ value, label: TASK_STATUS_LABELS[value] }));
 }

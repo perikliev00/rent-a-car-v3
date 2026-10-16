@@ -1,3 +1,7 @@
+/**
+ * HTTP handlers for calendar ops tasks and assignable-staff listing.
+ */
+
 const calendarService = require('../calendar.service');
 const { sessionAccess } = require('../calendar.permissions');
 const apiResponse = require('../../../utils/apiResponse');
@@ -5,6 +9,7 @@ const asyncHandler = require('../../../utils/asyncHandler');
 const { forwardControllerError } = require('../../../utils/controllerError');
 const { mapServiceError, requireCalendarView } = require('./calendarControllerHelpers');
 
+/** POST /tasks */
 const createTask = asyncHandler(async (req, res, next) => {
   try {
     const access = requireCalendarView(req, res);
@@ -21,6 +26,7 @@ const createTask = asyncHandler(async (req, res, next) => {
   }
 });
 
+/** GET /tasks — filtered ops-task list (VIEW_OWN scoped in service). */
 const listTasks = asyncHandler(async (req, res, next) => {
   try {
     const access = requireCalendarView(req, res);
@@ -37,6 +43,7 @@ const listTasks = asyncHandler(async (req, res, next) => {
   }
 });
 
+/** GET /assignable-staff — driver/cleaner/receptionist picker list. */
 const listAssignableStaff = asyncHandler(async (req, res, next) => {
   try {
     const access = sessionAccess(req);
@@ -52,6 +59,7 @@ const listAssignableStaff = asyncHandler(async (req, res, next) => {
   }
 });
 
+/** PATCH /tasks/:id */
 const updateTask = asyncHandler(async (req, res, next) => {
   try {
     const access = requireCalendarView(req, res);
@@ -68,6 +76,7 @@ const updateTask = asyncHandler(async (req, res, next) => {
   }
 });
 
+/** DELETE /tasks/:id */
 const deleteTask = asyncHandler(async (req, res, next) => {
   try {
     const access = requireCalendarView(req, res);
@@ -84,6 +93,7 @@ const deleteTask = asyncHandler(async (req, res, next) => {
   }
 });
 
+/** PATCH /tasks/:id/status — status-machine transition. */
 const updateTaskStatus = asyncHandler(async (req, res, next) => {
   try {
     const access = requireCalendarView(req, res);

@@ -1,3 +1,6 @@
+/**
+ * Loads the car header/shared data for all detail tabs.
+ */
 import type { Tab } from './carDetailTypes';
 import { useCarCompliance } from './useCarCompliance';
 import { useCarDamage } from './useCarDamage';
@@ -6,6 +9,13 @@ import { useCarOverview } from './useCarOverview';
 import { useCarPerformance } from './useCarPerformance';
 import { useCarService } from './useCarService';
 
+/**
+ * Facade that composes all car-detail tab hooks into one page-facing object.
+ * Tab-scoped hooks only fetch when their tab is active.
+ *
+ * @param id - Car id from the route
+ * @param tab - Active detail tab
+ */
 export function useAdminCarDetailData({ id, tab }: { id: string; tab: Tab }) {
   const overview = useCarOverview(id);
   const compliance = useCarCompliance(id, tab);

@@ -1,3 +1,6 @@
+/**
+ * Manager task board: assign, filter, and update calendar tasks.
+ */
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { formatISO, addDays, startOfDay } from 'date-fns';
@@ -17,6 +20,7 @@ import {
 } from './taskDomain';
 import { Navigate } from 'react-router-dom';
 
+/** Manager task board: assign, filter, and update calendar tasks. */
 export function ManagerTasksPage() {
   const { user } = useAuth();
   const canManage =

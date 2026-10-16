@@ -1,6 +1,11 @@
 /**
- * Създава base booking payload за order page.
- * Дати, локации, pricing – без contact данни.
+ * Build order-page view models (dates, locations, pricing) for server-rendered checkout.
+ */
+
+/**
+ * Create the base booking payload for the order page (no contact fields).
+ * @param {object} params
+ * @returns {object}
  */
 function buildBaseOrderPayload({
   pickupDateISO,
@@ -45,8 +50,11 @@ function buildBaseOrderPayload({
 }
 
 /**
- * Създава пълен view model за order page.
- * car, basePayload, options (contact, existingReservation, message, title).
+ * Create the full order-page view model (car + base payload + contact/message options).
+ * @param {object} car
+ * @param {object} basePayload
+ * @param {object} [options]
+ * @returns {object}
  */
 function buildOrderViewModel(car, basePayload, options = {}) {
   const {

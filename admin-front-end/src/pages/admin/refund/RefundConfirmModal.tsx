@@ -1,3 +1,6 @@
+/**
+ * Confirm dialog before initiating a reservation refund.
+ */
 import { useEffect, useState } from 'react';
 import type { OpsReservationRow } from '../../../api/admin/reservations';
 import { Button } from '../../../components/ui/Button';
@@ -5,6 +8,7 @@ import { Modal } from '../../../components/ui/Modal';
 import { Textarea } from '../../../components/ui/Textarea';
 import { formatRefundMoney } from './refundFormat';
 
+/** Confirm dialog before initiating a reservation refund. */
 export function RefundConfirmModal({
   open,
   row,
