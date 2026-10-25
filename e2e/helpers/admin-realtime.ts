@@ -36,9 +36,9 @@ export async function waitForAdminSseEvent(
   const eventType = opts.type;
 
   await page.evaluate(() => {
-    (window as unknown as { __sseConnected?: boolean; __ssePayload?: unknown }).__sseConnected =
-      false;
-    (window as unknown as { __ssePayload?: unknown }).__ssePayload = null;
+    const w = window as unknown as { __sseConnected?: boolean; __ssePayload?: unknown };
+    w.__sseConnected = false;
+    w.__ssePayload = null;
   });
 
   await page.evaluate(

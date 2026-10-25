@@ -14,6 +14,67 @@ const { acquireDbSetupLock, releaseDbSetupLock } = require('./dbSetupLock');
 const SCHEMA_DIR = path.join(__dirname, 'schema');
 
 /**
+ * True when versioned migrations have already been applied.
+ * Fresh installs have no ledger yet. Existing databases must not replay
+ * schema seeds: ON CONFLICT DO NOTHING re-inserts revoked role permissions.
+ *
+ * @param {{ query: Function }} client
+ * @returns {Promise<boolean>}
+ */
+async function hasAppliedMigrations(client) {
+  const ledger = await client.query(`
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+        AND table_name = 'schema_migrations'
+    ) AS present
+  `);
+  if (!ledger.rows[0] || ledger.rows[0].present !== true) return false;
+  const applied = await client.query('SELECT 1 FROM schema_migrations LIMIT 1');
+  return applied.rowCount > 0;
+}
+
+/**
+ * Apply fresh-install schema files only when the migration ledger is empty.
+ *
+ * @param {{ query: Function }} client
+ * @param {{ readSchemaFiles?: () => Array<{ name: string, sql: string }> }} [options]
+ * @returns {Promise<{ skipped: boolean, applied: number }>}
+ */
+async function applyFreshSchemaIfNeeded(client, { readSchemaFiles } = {}) {
+  if (await hasAppliedMigrations(client)) {
+    return { skipped: true, applied: 0 };
+  }
+
+  const files = readSchemaFiles ? readSchemaFiles() : readSchemaFilesFromDisk();
+  if (!files.length) {
+    throw new Error(`No schema files found in ${SCHEMA_DIR}`);
+  }
+
+  for (const file of files) {
+    console.log(`→ ${file.name}`);
+    await client.query(file.sql);
+  }
+  return { skipped: false, applied: files.length };
+}
+
+/**
+ * Read sql/schema/*.sql in lexicographic order.
+ * @returns {Array<{ name: string, sql: string }>}
+ */
+function readSchemaFilesFromDisk() {
+  return fs
+    .readdirSync(SCHEMA_DIR)
+    .filter((name) => name.endsWith('.sql'))
+    .sort()
+    .map((name) => ({
+      name,
+      sql: fs.readFileSync(path.join(SCHEMA_DIR, name), 'utf8'),
+    }));
+}
+
+/**
  * Apply all SQL schema files from sql/schema/ in sorted order under the setup lock.
  *
  * @param {object} options - { endPool = true } = {}
@@ -24,16 +85,6 @@ async function applySchema({ endPool = true } = {}) {
   // Fail fast when DATABASE_URL is missing.
   requireDatabaseUrl();
 
-  // Lexicographic order keeps schema fragments deterministic.
-  const files = fs
-    .readdirSync(SCHEMA_DIR)
-    .filter((name) => name.endsWith('.sql'))
-    .sort();
-
-  if (!files.length) {
-    throw new Error(`No schema files found in ${SCHEMA_DIR}`);
-  }
-
   const client = await pool.connect();
   let locked = false;
 
@@ -42,12 +93,12 @@ async function applySchema({ endPool = true } = {}) {
     await acquireDbSetupLock(client);
     locked = true;
 
-    for (const file of files) {
-      const sql = fs.readFileSync(path.join(SCHEMA_DIR, file), 'utf8');
-      console.log(`→ ${file}`);
-      await client.query(sql);
+    const result = await applyFreshSchemaIfNeeded(client);
+    if (result.skipped) {
+      console.log('Existing database detected; skipping fresh schema seed');
+    } else {
+      console.log('✓ Schema applied successfully');
     }
-    console.log('✓ Schema applied successfully');
   } finally {
     // Always unlock and release; optionally end the process pool for CLI mode.
     if (locked) {
@@ -71,4 +122,8 @@ if (require.main === module) {
   });
 }
 
-module.exports = { applySchema };
+module.exports = {
+  applySchema,
+  hasAppliedMigrations,
+  applyFreshSchemaIfNeeded,
+};

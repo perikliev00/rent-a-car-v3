@@ -186,6 +186,13 @@ const chatLimiter = createLimiter({
   max: readPositiveInt('RATE_LIMIT_CHAT_MAX', 60),
 });
 
+// Public availability search prices every car on the page. Cap anonymous bursts.
+const searchLimiter = createLimiter({
+  windowMs: DEFAULT_WINDOW_MS,
+  max: readPositiveInt('RATE_LIMIT_SEARCH_MAX', 120),
+  handler: createPolicyHandler('car-search'),
+});
+
 const contactLimiter = createLimiter({
   windowMs: DEFAULT_WINDOW_MS,
   max: readPositiveInt('RATE_LIMIT_CONTACT_MAX', 10),
@@ -209,6 +216,7 @@ module.exports = {
   checkoutLimiter,
   bookingLimiter,
   chatLimiter,
+  searchLimiter,
   contactLimiter,
   createLimiter,
   defaultHandler,

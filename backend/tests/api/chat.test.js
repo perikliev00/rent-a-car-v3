@@ -19,7 +19,28 @@ const mockCar = {
   seats: 5,
   category: 'Economy',
   categoryId: 1,
+  vin: 'VIN-SECRET',
+  registrationNumber: 'REG-SECRET',
+  mileage: 12000,
+  currentLocation: 'yard-secret',
+  insuranceExpiry: '2030-01-01',
+  technicalInspectionExpiry: '2030-02-01',
+  fuelLevel: 'full',
+  status: 'available',
+  isDeleted: false,
 };
+
+const INTERNAL_CAR_FIELDS = [
+  'vin',
+  'registrationNumber',
+  'mileage',
+  'currentLocation',
+  'insuranceExpiry',
+  'technicalInspectionExpiry',
+  'fuelLevel',
+  'status',
+  'isDeleted',
+];
 
 describe('/api/chat response contract', () => {
   beforeEach(() => {
@@ -75,10 +96,23 @@ describe('/api/chat response contract', () => {
       .expect(200);
 
     expect(Array.isArray(response.body)).toBe(true);
-    expect(response.body[0]).toEqual(expect.objectContaining({ id: 1 }));
+    expect(response.body[0]).toEqual(expect.objectContaining({ id: 1, name: 'Toyota Yaris' }));
+    for (const field of INTERNAL_CAR_FIELDS) {
+      expect(response.body[0]).not.toHaveProperty(field);
+    }
     expect(carRepository.listByFilter).toHaveBeenCalledWith(
       expect.objectContaining({ categoryId: '1', transmission: 'Automatic' })
     );
+  });
+
+  test('GET /api/v1/chat/cars-by-filter hides internal fleet fields', async () => {
+    const app = createApiTestApp();
+    const response = await request(app).get('/api/v1/chat/cars-by-filter').expect(200);
+    expect(response.body[0].name).toBe('Toyota Yaris');
+    for (const field of INTERNAL_CAR_FIELDS) {
+      expect(response.body[0]).not.toHaveProperty(field);
+    }
+    expect(JSON.stringify(response.body)).not.toContain('SECRET');
   });
 
   test('GET /api/chat/cars-by-filter returns validation error envelope', async () => {
@@ -105,6 +139,9 @@ describe('/api/chat response contract', () => {
 
     expect(response.body.success).toBeUndefined();
     expect(response.body).toEqual(expect.objectContaining({ id: 1, name: 'Toyota Yaris' }));
+    for (const field of INTERNAL_CAR_FIELDS) {
+      expect(response.body).not.toHaveProperty(field);
+    }
   });
 
   test('GET /api/chat/car-details/:carId returns not found error envelope', async () => {

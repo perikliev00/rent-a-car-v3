@@ -401,8 +401,17 @@ exports.postLogout = asyncHandler(async (req, res) => {
     return apiResponse.error(res, 'UNAUTHORIZED', 'You are not logged in.', 401);
   }
 
+  const sessionId = req.sessionID;
   req.session.isLoggedIn = false;
   req.session.user = null;
+  try {
+    const hub = require('../../modules/realtime/realtime.hub');
+    // Close only this session's streams. Another device or API client for the
+    // same user keeps its stream until that session ends or access is revoked.
+    if (sessionId) hub.revokeSession(sessionId);
+  } catch (err) {
+    logger.warn({ err, correlationId: req.correlationId }, 'Failed to close realtime streams on logout');
+  }
 
   return new Promise((resolve) => {
     req.session.destroy((err) => {

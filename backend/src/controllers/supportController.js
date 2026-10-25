@@ -3,6 +3,7 @@
  * Success responses are unwrapped; errors use `{ error: { code, message, correlationId } }`.
  */
 const carRepository = require('../repositories/carRepository');
+const { pickPublicCarFields } = require('../services/sql/car/carMapper');
 const { FEES } = require('../utils/fees');
 const { validationResult } = require('express-validator');
 const { respondJsonError } = require('../utils/controllerError');
@@ -113,7 +114,7 @@ exports.getCarsByFilter = async (req, res) => {
       limit: 10,
     });
 
-    res.json(cars);
+    res.json((cars || []).map((car) => pickPublicCarFields(car)).filter(Boolean));
   } catch (err) {
     logger.error({ err, correlationId: req.correlationId, context: 'getCarsByFilter' }, 'Failed to fetch filtered cars');
     return respondJsonError(res, req, {
@@ -182,7 +183,7 @@ exports.getCarDetails = async (req, res) => {
       });
     }
 
-    res.json(car);
+    res.json(pickPublicCarFields(car));
   } catch (err) {
     logger.error({ err, correlationId: req.correlationId, context: 'getCarDetails' }, 'Failed to fetch car details');
     return respondJsonError(res, req, {

@@ -38,7 +38,9 @@ services:
       - ./backend/.env
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgres://luxride:${POSTGRES_PASSWORD}@db:5432/luxride
+      DATABASE_URL: postgres://luxride_app:${APP_DB_PASSWORD}@db:5432/luxride
+      MIGRATION_DATABASE_URL: postgres://luxride:${POSTGRES_PASSWORD}@db:5432/luxride
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?APP_DB_PASSWORD is required}
       FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:?FRONTEND_BASE_URL is required}
       CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS is required}
       METRICS_TOKEN: ${METRICS_TOKEN:?METRICS_TOKEN is required}
@@ -79,7 +81,8 @@ services:
       - ./backend/.env
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgres://luxride:${POSTGRES_PASSWORD}@db:5432/luxride
+      DATABASE_URL: postgres://luxride_app:${APP_DB_PASSWORD}@db:5432/luxride
+      SKIP_DB_SETUP: "true"
       FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:?FRONTEND_BASE_URL is required}
       CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS is required}
       METRICS_TOKEN: ${METRICS_TOKEN:?METRICS_TOKEN is required}
@@ -91,6 +94,8 @@ services:
       - postgres_data:/mnt/pgdata:ro
     depends_on:
       db:
+        condition: service_healthy
+      backend:
         condition: service_healthy
     healthcheck:
       test:
@@ -181,13 +186,14 @@ services:
     restart: unless-stopped
 
   grafana:
-    image: grafana/grafana:11.4.0
+    image: grafana/grafana:13.2.4
     ports:
       - "127.0.0.1:3001:3000"
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD is required}
       GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SECURITY_CONTENT_SECURITY_POLICY: "true"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro

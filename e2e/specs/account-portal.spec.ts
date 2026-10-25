@@ -126,6 +126,29 @@ test.describe("account-documents", () => {
       await page.getByRole('button', { name: 'Delete' }).first().click();
       await expect(page.getByText('Document deleted').last()).toBeVisible({ timeout: 15_000 });
     });
+
+    test('customer document upload rejects a plain-text file', async ({ page, request }) => {
+      const email = uniqueEmail('docs-reject');
+      const customer = await signupCustomer(request, { email, password: PASSWORD });
+      await applySessionCookies(page, customer.session);
+
+      await page.goto('/account/documents');
+      await expect(page.getByRole('heading', { name: 'Documents', exact: true })).toBeVisible({
+        timeout: 15_000,
+      });
+
+      await page.getByLabel('Document type').selectOption('driver_license');
+      await page.locator('input[type="file"]').setInputFiles({
+        name: 'notes.txt',
+        mimeType: 'text/plain',
+        buffer: Buffer.from('this is not an identity document'),
+      });
+      await page.getByRole('button', { name: 'Upload' }).click();
+      await expect(page.getByText('Only JPG, PNG, WEBP, or PDF files are allowed.')).toBeVisible({
+        timeout: 15_000,
+      });
+      await expect(page.getByText('Document uploaded')).toHaveCount(0);
+    });
   });
 });
 

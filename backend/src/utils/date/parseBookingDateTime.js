@@ -5,6 +5,7 @@
 
 const { parseSofiaDate, getTodayInSofia } = require('./timezone');
 const { computeRentalDays } = require('./calculateRentalDays');
+const { MAX_RENTAL_DAYS, exceedsRentalDayLimit } = require('./rentalLimits');
 
 /**
  * Parse and validate booking dates/times; return rental days when valid.
@@ -70,6 +71,17 @@ function validateBookingDates({
     errors.push('Return date must be after pick-up date.');
   }
 
+  // Bound the window before any caller turns it into per-day pricing work.
+  let rentalDays = null;
+  if (end > start) {
+    const chargedDays = computeRentalDays(start, end);
+    if (exceedsRentalDayLimit(chargedDays)) {
+      errors.push(`Rental period cannot exceed ${MAX_RENTAL_DAYS} days.`);
+    } else {
+      rentalDays = chargedDays;
+    }
+  }
+
   if (errors.length > 0) {
     return {
       isValid: false,
@@ -80,9 +92,6 @@ function validateBookingDates({
     };
   }
 
-  // Valid window → charged day count (minimum 1).
-  const rentalDays = computeRentalDays(start, end);
-
   return {
     isValid: true,
     errors: [],
@@ -92,6 +101,24 @@ function validateBookingDates({
   };
 }
 
+/**
+ * True when both instants parse and the charged span is inside the domain cap.
+ * Callers that still want a partial price for other validation failures must
+ * use this before pricing.
+ *
+ * @param {Date} start
+ * @param {Date} end
+ * @param {Date} [now]
+ * @returns {boolean}
+ */
+function isWithinRentalLimits(start, end, _now = new Date()) {
+  if (!(start instanceof Date) || !(end instanceof Date) || end <= start) return false;
+  const chargedDays = computeRentalDays(start, end);
+  if (exceedsRentalDayLimit(chargedDays)) return false;
+  return true;
+}
+
 module.exports = {
   validateBookingDates,
+  isWithinRentalLimits,
 };

@@ -6,6 +6,7 @@
  */
 
 const { formatDateForDisplay } = require('../../utils/dateFormatter');
+const { escapeHtml, escapeMailHeader } = require('../../utils/htmlEscape');
 const { sendMail } = require('../../services/email/emailService');
 const logger = require('../../utils/logger');
 const logEvent = require('../../monitoring/logEvent');
@@ -39,22 +40,24 @@ function buildBookingSummary(payload) {
  */
 function renderNotification(notification) {
   const payload = notification.payload || {};
+  const summary = buildBookingSummary(payload);
+  const summaryHtml = escapeHtml(summary);
+  const orderLabel = escapeMailHeader(payload.orderId);
+  const carLabel = escapeMailHeader(payload.carName || `car #${payload.carId || ''}`);
 
   switch (notification.type) {
     case 'reservation_confirmation': {
-      const summary = buildBookingSummary(payload);
       return {
-        subject: `LuxRide booking confirmed — order #${payload.orderId}`,
+        subject: `LuxRide booking confirmed — order #${orderLabel}`,
         text: `Thank you for your booking.\n\n${summary}\n\nWe look forward to serving you.`,
-        html: `<p>Thank you for your booking.</p><pre>${summary}</pre><p>We look forward to serving you.</p>`,
+        html: `<p>Thank you for your booking.</p><pre>${summaryHtml}</pre><p>We look forward to serving you.</p>`,
       };
     }
     case 'admin_new_booking_alert': {
-      const summary = buildBookingSummary(payload);
       return {
-        subject: `New LuxRide booking — order #${payload.orderId}`,
+        subject: `New LuxRide booking — order #${orderLabel}`,
         text: `A new booking was confirmed.\n\n${summary}`,
-        html: `<p>A new booking was confirmed.</p><pre>${summary}</pre>`,
+        html: `<p>A new booking was confirmed.</p><pre>${summaryHtml}</pre>`,
       };
     }
     case 'payment_failed':
@@ -64,50 +67,50 @@ function renderNotification(notification) {
           payload.reason ? ` (${payload.reason})` : ''
         }. Please try again or contact support.`,
         html: `<p>We could not complete your payment${
-          payload.reason ? ` (<code>${payload.reason}</code>)` : ''
+          payload.reason ? ` (<code>${escapeHtml(payload.reason)}</code>)` : ''
         }. Please try again or contact support.</p>`,
       };
     case 'pickup_reminder':
       return {
         subject: 'LuxRide pickup reminder',
-        text: `Reminder: your pickup is soon.\n\n${buildBookingSummary(payload)}`,
-        html: `<p>Reminder: your pickup is soon.</p><pre>${buildBookingSummary(payload)}</pre>`,
+        text: `Reminder: your pickup is soon.\n\n${summary}`,
+        html: `<p>Reminder: your pickup is soon.</p><pre>${summaryHtml}</pre>`,
       };
     case 'return_reminder':
       return {
         subject: 'LuxRide return reminder',
-        text: `Reminder: your return is soon.\n\n${buildBookingSummary(payload)}`,
-        html: `<p>Reminder: your return is soon.</p><pre>${buildBookingSummary(payload)}</pre>`,
+        text: `Reminder: your return is soon.\n\n${summary}`,
+        html: `<p>Reminder: your return is soon.</p><pre>${summaryHtml}</pre>`,
       };
     case 'abandoned_checkout_reminder':
       return {
         subject: 'Complete your LuxRide booking',
-        text: `You still have a pending car hold. Complete checkout before it expires.\n\n${buildBookingSummary(payload)}`,
-        html: `<p>You still have a pending car hold. Complete checkout before it expires.</p><pre>${buildBookingSummary(payload)}</pre>`,
+        text: `You still have a pending car hold. Complete checkout before it expires.\n\n${summary}`,
+        html: `<p>You still have a pending car hold. Complete checkout before it expires.</p><pre>${summaryHtml}</pre>`,
       };
     case 'expiring_insurance_alert':
       return {
-        subject: `Insurance expiring — ${payload.carName || `car #${payload.carId}`}`,
+        subject: `Insurance expiring — ${carLabel}`,
         text: `Insurance/compliance item "${payload.itemTitle || payload.itemType}" expires on ${payload.expiresAt}.`,
-        html: `<p>Insurance/compliance item <strong>${payload.itemTitle || payload.itemType}</strong> expires on <strong>${payload.expiresAt}</strong>.</p>`,
+        html: `<p>Insurance/compliance item <strong>${escapeHtml(payload.itemTitle || payload.itemType)}</strong> expires on <strong>${escapeHtml(payload.expiresAt)}</strong>.</p>`,
       };
     case 'maintenance_reminder':
       return {
-        subject: `Maintenance reminder — ${payload.carName || `car #${payload.carId}`}`,
+        subject: `Maintenance reminder — ${carLabel}`,
         text: `Maintenance block scheduled ${payload.startDate} → ${payload.endDate}. ${payload.reason || ''}`,
-        html: `<p>Maintenance block scheduled <strong>${payload.startDate}</strong> → <strong>${payload.endDate}</strong>.</p>`,
+        html: `<p>Maintenance block scheduled <strong>${escapeHtml(payload.startDate)}</strong> → <strong>${escapeHtml(payload.endDate)}</strong>.</p>`,
       };
     case 'paid_but_not_confirmed_alert':
       return {
-        subject: `Paid but not confirmed — reservation #${payload.reservationId}`,
+        subject: `Paid but not confirmed — reservation #${escapeMailHeader(payload.reservationId)}`,
         text: `Reservation #${payload.reservationId} is paid but not confirmed. Customer: ${payload.email || 'n/a'}`,
-        html: `<p>Reservation <strong>#${payload.reservationId}</strong> is paid but not confirmed.</p>`,
+        html: `<p>Reservation <strong>#${escapeHtml(payload.reservationId)}</strong> is paid but not confirmed.</p>`,
       };
     default:
       return {
-        subject: `LuxRide notification — ${notification.type}`,
+        subject: `LuxRide notification — ${escapeMailHeader(notification.type)}`,
         text: JSON.stringify(payload, null, 2),
-        html: `<pre>${JSON.stringify(payload, null, 2)}</pre>`,
+        html: `<pre>${escapeHtml(JSON.stringify(payload, null, 2))}</pre>`,
       };
   }
 }

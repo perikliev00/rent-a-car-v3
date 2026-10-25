@@ -9,4 +9,5 @@ COPY . .
 
 EXPOSE 5173
 
+# 0.0.0.0 is required so Docker can publish the port. Compose binds that publish to 127.0.0.1.
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]

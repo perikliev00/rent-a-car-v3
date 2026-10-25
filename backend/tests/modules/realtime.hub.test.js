@@ -1,6 +1,12 @@
 const hub = require('../../src/modules/realtime/realtime.hub');
 const { buildLiveEvent } = require('../../src/modules/realtime/realtime.events');
 
+const authorizedAccess = {
+  userId: '1',
+  roles: ['manager'],
+  permissions: ['can_view_reservations_ops', 'can_view_calendar'],
+};
+
 function mockRes() {
   const chunks = [];
   return {
@@ -27,7 +33,7 @@ describe('realtime.hub', () => {
 
   test('publish delivers to subscribers', () => {
     const res = mockRes();
-    hub.subscribe(res);
+    hub.subscribe(res, { access: authorizedAccess, sessionId: 'sess-1' });
 
     const event = buildLiveEvent('payment_succeeded', { reservationId: '1' });
     hub.publish(event);
@@ -45,7 +51,7 @@ describe('realtime.hub', () => {
     hub.publish(second);
 
     const res = mockRes();
-    hub.subscribe(res, { lastEventId: first.id });
+    hub.subscribe(res, { lastEventId: first.id, access: authorizedAccess, sessionId: 'sess-1' });
 
     const body = res.chunks.join('');
     expect(body).not.toContain(`id: ${first.id}\n`);
@@ -55,7 +61,7 @@ describe('realtime.hub', () => {
 
   test('unsubscribe stops delivery', () => {
     const res = mockRes();
-    const id = hub.subscribe(res);
+    const id = hub.subscribe(res, { access: authorizedAccess, sessionId: 'sess-1' });
     hub.unsubscribe(id);
 
     hub.publish(buildLiveEvent('car_returned', { reservationId: '2' }));
@@ -64,7 +70,7 @@ describe('realtime.hub', () => {
 
   test('closeAll ends open responses', () => {
     const res = mockRes();
-    hub.subscribe(res);
+    hub.subscribe(res, { access: authorizedAccess, sessionId: 'sess-1' });
     expect(hub.getSubscriberCount()).toBe(1);
     hub.closeAll();
     expect(hub.getSubscriberCount()).toBe(0);

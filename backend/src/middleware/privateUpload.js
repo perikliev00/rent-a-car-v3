@@ -7,10 +7,12 @@ const multer = require('multer');
 const fileStorage = require('../services/storage');
 const {
   ensureUploadTempDir,
+  assertTempUploadQuota,
   getNormalizedExtension,
   removeUploadedFile,
   readFileHead,
 } = require('./fileUpload/uploadUtils');
+const { releaseTempUploadsOnEarlyExit } = require('./fileUpload/cleanupTempUploads');
 const { handleMulterError } = require('./fileUpload/handleMulterError');
 const { handleFileRejected } = require('./fileUpload/handleFileRejected');
 const { adminUploadLimiter, accountUploadLimiter } = require('./rateLimit');
@@ -66,6 +68,7 @@ function matchesImageMagic(buffer, ext) {
 const diskStorage = multer.diskStorage({
   destination: function (req, file, cb) {
     ensureUploadTempDir()
+      .then(() => assertTempUploadQuota())
       .then(() => cb(null, fileStorage.UPLOAD_TEMP_DIR))
       .catch((err) => cb(err));
   },
@@ -230,6 +233,7 @@ function rejectIfFileValidationFailed(req, res, next) {
 /** Middleware chain for customer account document uploads. */
 const customerDocumentUpload = [
   accountUploadLimiter || adminUploadLimiter,
+  releaseTempUploadsOnEarlyExit,
   documentUpload.single('file'),
   handleMulterError,
   handleFileRejected,
@@ -240,6 +244,7 @@ const customerDocumentUpload = [
 /** Middleware chain for admin private document uploads. */
 const adminPrivateDocumentUpload = [
   adminUploadLimiter,
+  releaseTempUploadsOnEarlyExit,
   documentUpload.single('file'),
   handleMulterError,
   handleFileRejected,
@@ -250,6 +255,7 @@ const adminPrivateDocumentUpload = [
 /** Middleware chain for checklist photos and signature image fields. */
 const checklistUpload = [
   adminUploadLimiter,
+  releaseTempUploadsOnEarlyExit,
   imageUpload.fields([
     { name: 'photos', maxCount: 5 },
     { name: 'customerSignature', maxCount: 1 },

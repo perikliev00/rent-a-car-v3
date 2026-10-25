@@ -6,6 +6,7 @@ const path = require('path');
 const storage = require('../../services/storage');
 
 const ALLOWED_IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp']);
+const TEMP_FILE_QUOTA = 200;
 
 const EXTENSION_TO_MIMETYPES = {
   '.jpg': ['image/jpeg'],
@@ -21,6 +22,27 @@ const EXTENSION_TO_MIMETYPES = {
  */
 async function ensureUploadTempDir() {
   return storage.ensureTempDir();
+}
+
+/**
+ * Refuse another temp file once the directory already holds the quota.
+ * @returns {Promise<void>}
+ */
+async function assertTempUploadQuota() {
+  let entries;
+  try {
+    entries = await fs.promises.readdir(storage.UPLOAD_TEMP_DIR, { withFileTypes: true });
+  } catch (err) {
+    if (err.code === 'ENOENT') return;
+    throw err;
+  }
+  const fileCount = entries.filter((entry) => entry.isFile()).length;
+  if (fileCount >= TEMP_FILE_QUOTA) {
+    const error = new Error('Upload temporary storage is full');
+    error.code = 'TEMP_STORAGE_FULL';
+    error.status = 429;
+    throw error;
+  }
 }
 
 /**
@@ -133,6 +155,8 @@ module.exports = {
   EXTENSION_TO_MIMETYPES,
   UPLOAD_TEMP_DIR: storage.UPLOAD_TEMP_DIR,
   ensureUploadTempDir,
+  assertTempUploadQuota,
+  TEMP_FILE_QUOTA,
   removeUploadedFile,
   reencodeAndPromoteUpload,
   readFileHead,

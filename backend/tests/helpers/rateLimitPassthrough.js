@@ -15,6 +15,7 @@ module.exports = {
   checkoutLimiter: passthrough,
   bookingLimiter: passthrough,
   chatLimiter: passthrough,
+  searchLimiter: passthrough,
   contactLimiter: passthrough,
   createLimiter: () => passthrough,
   defaultHandler: passthrough,

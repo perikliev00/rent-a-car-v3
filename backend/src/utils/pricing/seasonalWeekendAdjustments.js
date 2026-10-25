@@ -4,6 +4,7 @@
  */
 
 const { round2, applyAdj } = require('./pricingMath');
+const { MAX_RENTAL_DAYS, exceedsRentalDayLimit } = require('../date/rentalLimits');
 
 /**
  * Extract UTC calendar month/day from a Date (1-based month).
@@ -59,6 +60,12 @@ function dateInSeason(date, season) {
 function listChargeDates(start, rentalDays) {
   const dates = [];
   if (!start || rentalDays <= 0) return dates;
+  // Refuse before allocation. Callers must already have rejected this window.
+  if (exceedsRentalDayLimit(rentalDays)) {
+    const err = new Error(`Rental period cannot exceed ${MAX_RENTAL_DAYS} days.`);
+    err.code = 'RENTAL_PERIOD_TOO_LONG';
+    throw err;
+  }
   // Walk forward one UTC calendar day at a time for each charged day.
   for (let i = 0; i < rentalDays; i += 1) {
     dates.push(

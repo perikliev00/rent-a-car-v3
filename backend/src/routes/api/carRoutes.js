@@ -8,6 +8,7 @@ const { carListQueryValidationRules } = require('../../validators/carListQueryVa
 const { carIdParamValidation } = require('../../validators/carIdParamValidation');
 const validateRequest = require('../../middleware/validateRequest');
 const { requireApiKeyScope } = require('../../middleware/apiKeyAuth');
+const { searchLimiter } = require('../../middleware/rateLimit');
 
 const router = express.Router();
 
@@ -22,6 +23,7 @@ router.get(
 // Availability search for a date range and filters.
 router.get(
   '/search',
+  searchLimiter,
   requireApiKeyScope('cars:read'),
   searchQueryValidationRules,
   validateRequest,
