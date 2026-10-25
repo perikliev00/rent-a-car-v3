@@ -11,7 +11,7 @@ const { toHHMM } = require('../../utils/date/normalizeTime');
 const {
   getSessionId,
 } = require('../../utils/reservationHelpers');
-const { validateBookingDates } = require('../../utils/bookingValidation');
+const { validateBookingDates, isWithinRentalLimits } = require('../../utils/bookingValidation');
 const {
   createPendingReservation,
   findActiveReservationBySession,
@@ -118,8 +118,9 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
     });
 
     if (!isValid || !startDate || !endDate) {
-      // Still compute price when dates parse so the UI can show a partial breakdown.
-      if (startDate && endDate) {
+      // Partial price is only for small parsed windows. Oversized ranges must not
+      // enter the pricing engine on the way to a 422.
+      if (startDate && endDate && isWithinRentalLimits(startDate, endDate)) {
         pricing = await computeBookingPriceAsync(car, startDate, endDate, pickupLocation, returnLocation);
       }
       return apiResponse.error(

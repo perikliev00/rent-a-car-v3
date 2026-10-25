@@ -11,10 +11,12 @@ const {
   validateUploadedImages,
 } = require('./fileUpload/validateUploadedImage');
 const { adminPrivateDocumentUpload } = require('./privateUpload');
+const { releaseTempUploadsOnEarlyExit } = require('./fileUpload/cleanupTempUploads');
 
 /** Rate-limited single public image upload for a car listing. */
 const adminCarImageUpload = [
   adminUploadLimiter,
+  releaseTempUploadsOnEarlyExit,
   upload.single('image'),
   handleMulterError,
   handleFileRejected,
@@ -27,6 +29,7 @@ const adminCarDocumentUpload = adminPrivateDocumentUpload;
 /** Rate-limited multi-photo upload (up to 5) for damage reports. */
 const adminCarDamagePhotosUpload = [
   adminUploadLimiter,
+  releaseTempUploadsOnEarlyExit,
   upload.array('photos', 5),
   handleMulterError,
   handleFileRejected,

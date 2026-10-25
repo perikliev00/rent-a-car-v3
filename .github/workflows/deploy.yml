@@ -51,38 +51,35 @@ jobs:
       admin_image: ${{ steps.verify.outputs.admin_image }}
 
     steps:
+      - name: Checkout release tooling
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
       - name: Resolve immutable image tag
         id: resolve
         env:
           GH_TOKEN: ${{ github.token }}
+          INPUT_IMAGE_TAG: ${{ inputs.image_tag }}
+          EVENT_NAME: ${{ github.event_name }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
 
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${{ inputs.image_tag }}"
-          else
-            TAG="${{ github.event.workflow_run.head_sha }}"
+          if [ "$EVENT_NAME" != "workflow_dispatch" ]; then
+            export INPUT_IMAGE_TAG="$HEAD_SHA"
           fi
 
-          if [ -z "$TAG" ]; then
-            echo "Missing commit SHA"
-            exit 1
-          fi
-
-          if ! echo "$TAG" | grep -Eq '^[0-9a-f]{40}$'; then
-            echo "Image tag must be a full 40-character Git commit SHA"
-            exit 1
-          fi
+          TAG="$(node ops/resolve-image-tag.js)"
 
           echo "Resolved immutable release SHA:"
           echo "$TAG"
 
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             echo "Verifying successful CI for $TAG..."
 
             SUCCESS_COUNT="$(
               gh api \
-                "repos/${{ github.repository }}/actions/runs?head_sha=${TAG}&per_page=50" \
+                "repos/${REPOSITORY}/actions/runs?head_sha=${TAG}&per_page=50" \
                 --jq '[.workflow_runs[] |
                   select(
                     .name == "CI" and
@@ -103,14 +100,14 @@ jobs:
           echo "image_tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
           role-to-assume: ${{ vars.AWS_GITHUB_ACTIONS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Log in to Amazon ECR
         id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2
 
       - name: Verify immutable ECR images
         id: verify
@@ -197,7 +194,7 @@ jobs:
           } > verified-release.txt
 
       - name: Upload verified release manifest
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: verified-release-${{ steps.resolve.outputs.image_tag }}
           path: verified-release.txt
@@ -219,12 +216,12 @@ jobs:
 
     steps:
       - name: Check out exact release commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ needs.release-gate.outputs.image_tag }}
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
           role-to-assume: ${{ vars.AWS_GITHUB_ACTIONS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}

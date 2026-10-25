@@ -48,7 +48,12 @@ const { createShutdownGate } = require('./middleware/shutdownGate');
 const apiRoutes = require('./routes/api');
 
 const { ensureSessionTable } = require('./services/sql/sessionSqlService');
-const { initRealtime, shutdownRealtime } = require('./modules/realtime');
+const { initRealtime, shutdownRealtime, hub: realtimeHub } = require('./modules/realtime');
+const { lookupSessionAccess } = require('./modules/realtime/realtime.sessionLookup');
+const {
+  startUploadTempJanitor,
+  stopUploadTempJanitor,
+} = require('./services/storage/imageCleanupService');
 const { isBackgroundJobsEnabled } = require('./config/backgroundJobs');
 const {
   startBackgroundJobs,
@@ -139,7 +144,7 @@ app.get('/prometheus', requireMetricsToken, async (req, res, next) => {
 const store = new pgSession({
   pool,
   tableName: 'session',
-  createTableIfMissing: true,
+  createTableIfMissing: false,
   ttl: Math.floor(SESSION_IDLE_MS / 1000),
   pruneSessionInterval: 15 * 60,
 });
@@ -235,6 +240,7 @@ async function gracefulShutdown(trigger, error = null) {
   logger.error({ trigger, err: error }, 'Starting graceful shutdown');
 
   stopBackgroundJobs();
+  stopUploadTempJanitor();
   // Stop gauge poller so we do not keep querying a closing pool.
   if (gaugePollerTimer) {
     clearInterval(gaugePollerTimer);
@@ -288,11 +294,14 @@ async function gracefulShutdown(trigger, error = null) {
 
     // Wire SSE/realtime hub used by admin clients.
     initRealtime();
+    realtimeHub.setSessionLookup(lookupSessionAccess);
 
     // Multi-replica setups disable jobs here and run `worker.js` instead.
     if (isBackgroundJobsEnabled()) {
       await startBackgroundJobs({ pool });
     } else {
+      // The API container owns uploads/tmp. The worker janitor cannot see it.
+      startUploadTempJanitor();
       logger.info(
         { RUN_BACKGROUND_JOBS: process.env.RUN_BACKGROUND_JOBS },
         'Background jobs disabled for this process'

@@ -432,7 +432,7 @@ async function listCarsByFilter({
     params
   );
 
-  return result.rows.map((row) => mapSqlCar(row));
+  return result.rows.map((row) => mapPublicCar(row));
 }
 
 module.exports = {

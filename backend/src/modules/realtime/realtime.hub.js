@@ -1,14 +1,24 @@
 /**
  * In-memory SSE hub for admin live events.
  *
- * v1: single-process only. Multi-instance deploys need sticky sessions
- * or a shared pub/sub (e.g. Redis) so publishes reach all API nodes.
+ * Each subscriber carries the session identity captured at connect time.
+ * Live delivery and Last-Event-ID replay use the same authorization policy.
+ * Logout and role changes close same-process streams immediately. Other API
+ * processes drop the stream on the next heartbeat after the session row is
+ * gone or the stored permission fingerprint changes.
  */
+
+const {
+  authorizeLiveEvent,
+  redactLiveEvent,
+  authFingerprint,
+} = require('./realtime.accessPolicy');
 
 const HEARTBEAT_MS = 20_000;
 const RING_BUFFER_SIZE = 50;
+const MAX_SSE_LIFETIME_MS = 15 * 60 * 1000;
 
-/** @type {Map<string, { res: import('express').Response, lastEventId: string | null }>} */
+/** @type {Map<string, object>} */
 const subscribers = new Map();
 
 /** @type {Array<{ id: string, type: string, payload: object }>} */
@@ -16,28 +26,40 @@ const ringBuffer = [];
 
 let subscriberSeq = 0;
 let heartbeatTimer = null;
+let sessionLookup = null;
 
 /**
- * Start keepalive pings so proxies do not close idle SSE connections.
+ * @param {Function|null} lookup
+ */
+function setSessionLookup(lookup) {
+  sessionLookup = typeof lookup === 'function' ? lookup : null;
+}
+
+/**
+ * Start keepalive pings and session revalidation.
  * Idempotent: only one interval is created while any subscriber is connected.
  */
 function ensureHeartbeat() {
   if (heartbeatTimer) return;
   heartbeatTimer = setInterval(() => {
-    // Ping every subscriber; drop dead sockets that throw on write.
-    for (const [id, sub] of subscribers.entries()) {
+    void (async () => {
       try {
-        sub.res.write(`: ping\n\n`);
-        // Named ping event for clients that listen for event: ping
-        sub.res.write(`event: ping\ndata: {"ok":true}\n\n`);
+        await revalidateSubscribers();
       } catch {
-        subscribers.delete(id);
+        // Per-subscriber failures are handled inside revalidateSubscribers.
       }
-    }
-    // Stop the timer when the last subscriber disconnects.
-    if (subscribers.size === 0) {
-      stopHeartbeat();
-    }
+      for (const [id, sub] of subscribers.entries()) {
+        try {
+          sub.res.write(`: ping\n\n`);
+          sub.res.write(`event: ping\ndata: {"ok":true}\n\n`);
+        } catch {
+          subscribers.delete(id);
+        }
+      }
+      if (subscribers.size === 0) {
+        stopHeartbeat();
+      }
+    })();
   }, HEARTBEAT_MS);
   heartbeatTimer.unref?.();
 }
@@ -51,8 +73,6 @@ function stopHeartbeat() {
 }
 
 /**
- * Append an event to the ring buffer, trimming oldest entries past RING_BUFFER_SIZE.
- * Used for Last-Event-ID replay on reconnect.
  * @param {{ id: string, type: string, payload: object }} entry
  */
 function pushToRing(entry) {
@@ -63,7 +83,6 @@ function pushToRing(entry) {
 }
 
 /**
- * Write one SSE message (id, event name, JSON data) to a response stream.
  * @param {import('express').Response} res
  * @param {{ id: string, type: string, payload: object }} event
  */
@@ -74,24 +93,34 @@ function writeSse(res, { id, type, payload }) {
 }
 
 /**
- * Events after lastEventId; if id unknown, replay the whole ring (best-effort catch-up).
+ * @param {import('express').Response} res
+ * @param {{ id: string, type: string, payload: object }} entry
+ * @param {object|null} access
+ * @returns {boolean} True when the event was written
+ */
+function deliver(res, entry, access) {
+  const decision = authorizeLiveEvent(access, entry.payload);
+  if (!decision.allow) return false;
+  const payload = decision.redact ? redactLiveEvent(entry.payload) : entry.payload;
+  writeSse(res, { id: entry.id, type: entry.type, payload });
+  return true;
+}
+
+/**
  * @param {string|null} lastEventId
  * @returns {Array<{ id: string, type: string, payload: object }>}
  */
 function eventsAfter(lastEventId) {
   if (!lastEventId) return [];
   const idx = ringBuffer.findIndex((e) => e.id === lastEventId);
-  // Unknown id → client may have missed the whole window; replay everything.
   if (idx < 0) return [...ringBuffer];
   return ringBuffer.slice(idx + 1);
 }
 
 /**
- * Fan-out a live event to all subscribers and retain it in the ring buffer.
- * @param {object} event - full live event payload (must include id + type)
+ * @param {object} event
  */
 function publish(event) {
-  // Ignore malformed events so a bad publisher cannot poison the hub.
   if (!event || !event.id || !event.type) {
     return event;
   }
@@ -99,10 +128,9 @@ function publish(event) {
   const entry = { id: event.id, type: event.type, payload: event };
   pushToRing(entry);
 
-  // Write to every open SSE connection; prune sockets that fail.
   for (const [id, sub] of subscribers.entries()) {
     try {
-      writeSse(sub.res, entry);
+      deliver(sub.res, entry, sub.access);
     } catch {
       subscribers.delete(id);
     }
@@ -112,26 +140,33 @@ function publish(event) {
 }
 
 /**
- * Register an SSE response as a subscriber and optionally replay missed events.
  * @param {import('express').Response} res
- * @param {{ lastEventId?: string | null }} [opts]
- * @returns {string} subscriber id
+ * @param {{ lastEventId?: string|null, access?: object|null, sessionId?: string|null, connectedAt?: number, maxLifetimeMs?: number }} [opts]
+ * @returns {string}
  */
 function subscribe(res, opts = {}) {
   subscriberSeq += 1;
   const id = `sub-${subscriberSeq}`;
-  const lastEventId = opts.lastEventId || null;
+  const access = opts.access || null;
+  const sessionId = opts.sessionId || null;
 
-  subscribers.set(id, { res, lastEventId });
+  subscribers.set(id, {
+    res,
+    lastEventId: opts.lastEventId || null,
+    access,
+    sessionId,
+    userId: access && access.userId != null ? String(access.userId) : null,
+    connectedAt: opts.connectedAt || Date.now(),
+    maxLifetimeMs: opts.maxLifetimeMs || MAX_SSE_LIFETIME_MS,
+    authFingerprint: authFingerprint(access),
+  });
   ensureHeartbeat();
 
-  // Best-effort catch-up from the ring buffer before live traffic resumes.
-  const replay = eventsAfter(lastEventId);
+  const replay = eventsAfter(opts.lastEventId || null);
   for (const entry of replay) {
     try {
-      writeSse(res, entry);
+      deliver(res, entry, access);
     } catch {
-      // Replay write failed — drop this subscriber immediately.
       subscribers.delete(id);
       return id;
     }
@@ -141,7 +176,25 @@ function subscribe(res, opts = {}) {
 }
 
 /**
- * Remove a subscriber; stop heartbeat when the last connection closes.
+ * @param {string} subscriberId
+ * @param {string} reason
+ */
+function closeSubscriber(subscriberId, reason) {
+  const sub = subscribers.get(subscriberId);
+  if (!sub) return;
+  subscribers.delete(subscriberId);
+  try {
+    sub.res.write(`event: session_revoked\ndata: ${JSON.stringify({ reason })}\n\n`);
+    sub.res.end();
+  } catch {
+    // The socket may already be gone.
+  }
+  if (subscribers.size === 0) {
+    stopHeartbeat();
+  }
+}
+
+/**
  * @param {string} subscriberId
  */
 function unsubscribe(subscriberId) {
@@ -152,8 +205,57 @@ function unsubscribe(subscriberId) {
 }
 
 /**
- * End all SSE responses and clear subscribers (used on process shutdown / tests).
+ * @param {string|number} userId
  */
+function revokeUser(userId) {
+  const target = String(userId);
+  for (const [id, sub] of [...subscribers.entries()]) {
+    if (sub.userId === target) closeSubscriber(id, 'revoked');
+  }
+}
+
+/**
+ * @param {string} sessionId
+ */
+function revokeSession(sessionId) {
+  if (!sessionId) return;
+  for (const [id, sub] of [...subscribers.entries()]) {
+    if (sub.sessionId === sessionId) closeSubscriber(id, 'logout');
+  }
+}
+
+/**
+ * Re-check lifetime, session existence, and authorization fingerprint.
+ * @param {Function|null} [lookup]
+ * @returns {Promise<void>}
+ */
+async function revalidateSubscribers(lookup = sessionLookup) {
+  const now = Date.now();
+  for (const [id, sub] of [...subscribers.entries()]) {
+    if (now - sub.connectedAt >= sub.maxLifetimeMs) {
+      closeSubscriber(id, 'max_lifetime');
+      continue;
+    }
+    if (typeof lookup !== 'function' || !sub.sessionId) continue;
+    try {
+      const state = await lookup(sub.sessionId);
+      if (!state || state.valid !== true) {
+        closeSubscriber(id, 'session_invalid');
+        continue;
+      }
+      const nextAccess = state.access || sub.access;
+      const nextFingerprint = authFingerprint(nextAccess);
+      if (nextFingerprint !== sub.authFingerprint) {
+        closeSubscriber(id, 'authorization_changed');
+        continue;
+      }
+      sub.access = nextAccess;
+    } catch {
+      closeSubscriber(id, 'revalidation_failed');
+    }
+  }
+}
+
 function closeAll() {
   for (const [id, sub] of subscribers.entries()) {
     try {
@@ -166,24 +268,19 @@ function closeAll() {
   stopHeartbeat();
 }
 
-/** @returns {number} Current open SSE subscriber count. */
 function getSubscriberCount() {
   return subscribers.size;
 }
 
-/** @returns {Array<{ id: string, type: string, payload: object }>} Shallow copy of the ring buffer. */
 function getRingBuffer() {
   return [...ringBuffer];
 }
 
-/**
- * Test helper: tear down connections and reset ring / sequence state.
- * @private
- */
 function _resetForTests() {
   closeAll();
   ringBuffer.length = 0;
   subscriberSeq = 0;
+  sessionLookup = null;
 }
 
 module.exports = {
@@ -191,10 +288,16 @@ module.exports = {
   subscribe,
   unsubscribe,
   closeAll,
+  closeSubscriber,
+  revokeUser,
+  revokeSession,
+  revalidateSubscribers,
+  setSessionLookup,
   getSubscriberCount,
   getRingBuffer,
   eventsAfter,
   HEARTBEAT_MS,
   RING_BUFFER_SIZE,
+  MAX_SSE_LIFETIME_MS,
   _resetForTests,
 };

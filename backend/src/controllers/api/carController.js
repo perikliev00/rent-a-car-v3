@@ -126,13 +126,28 @@ exports.searchCars = asyncHandler(async (req, res, next) => {
       category,
     } = req.query;
 
-    const { startDate, endDate, rentalDays } = validateBookingDates({
+    const {
+      isValid,
+      errors: bookingErrors,
+      startDate,
+      endDate,
+      rentalDays,
+    } = validateBookingDates({
       pickupDate: pickupDateOnly,
       returnDate: returnDateOnly,
       pickupTime: pickupTime || '10:00',
       returnTime: returnTime || '10:00',
       now,
     });
+
+    if (!isValid || !startDate || !endDate || rentalDays == null) {
+      return apiResponse.error(
+        res,
+        'VALIDATION_ERROR',
+        bookingErrors[0] || 'Invalid booking dates.',
+        422
+      );
+    }
 
     const pickupDate = startDate;
     const returnDate = endDate;

@@ -152,12 +152,13 @@ function mapSqlCar(row, dates = []) {
   };
 }
 
-/** Public catalog DTO — omits fleet ops internals. */
-function mapPublicCar(row, dates = []) {
-  const car = mapSqlCar(row, dates);
-  // Guard: early-return or throw when required input is missing/invalid.
+/**
+ * Allowlist for anonymous catalog and chat responses.
+ * @param {object|null|undefined} car
+ * @returns {object|null}
+ */
+function pickPublicCarFields(car) {
   if (!car) return null;
-
   return {
     id: car.id,
     name: car.name,
@@ -175,6 +176,11 @@ function mapPublicCar(row, dates = []) {
     categoryId: car.categoryId,
     dates: car.dates,
   };
+}
+
+/** Public catalog DTO — omits fleet ops internals. */
+function mapPublicCar(row, dates = []) {
+  return pickPublicCarFields(mapSqlCar(row, dates));
 }
 
 /**
@@ -206,5 +212,6 @@ module.exports = {
   parsePage,
   mapSqlCar,
   mapPublicCar,
+  pickPublicCarFields,
   fetchCarRowById,
 };

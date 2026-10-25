@@ -6,6 +6,20 @@ const hub = require('./realtime.hub');
 const asyncHandler = require('../../utils/asyncHandler');
 
 /**
+ * Snapshot the staff identity that must authorize every later SSE frame.
+ * @param {import('express').Request} req
+ * @returns {{ userId: string|null, roles: string[], permissions: string[] }}
+ */
+function accessFromRequest(req) {
+  const user = req.session?.user || {};
+  return {
+    userId: user.id != null ? String(user.id) : null,
+    roles: Array.isArray(user.roles) ? user.roles : [],
+    permissions: Array.isArray(user.permissions) ? user.permissions : [],
+  };
+}
+
+/**
  * GET /api/admin/realtime/stream — staff-only SSE feed.
  * Honors Last-Event-ID / lastEventId for reconnect replay from the hub ring buffer.
  * @param {import('express').Request} req
@@ -30,7 +44,11 @@ exports.stream = asyncHandler(async (req, res) => {
   // Comment frame so the client knows the socket is open before replay/live events.
   res.write(`: connected\n\n`);
 
-  const subscriberId = hub.subscribe(res, { lastEventId });
+  const subscriberId = hub.subscribe(res, {
+    lastEventId,
+    access: accessFromRequest(req),
+    sessionId: req.sessionID,
+  });
 
   // Tear down hub registration when the client disconnects or aborts.
   const cleanup = () => {

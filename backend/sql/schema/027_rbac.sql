@@ -82,10 +82,8 @@ JOIN permissions p ON p.key IN (
 )
 WHERE r.slug = 'receptionist' ON CONFLICT DO NOTHING;
 
-INSERT INTO role_permissions (role_id, permission_id)
-SELECT r.id, p.id FROM roles r
-JOIN permissions p ON p.key IN ('can_view_reservations_ops')
-WHERE r.slug = 'driver' ON CONFLICT DO NOTHING;
+-- Drivers do not receive can_view_reservations_ops. Migration 024 removes it
+-- on upgraded databases; this seed must not grant it again.
 
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r

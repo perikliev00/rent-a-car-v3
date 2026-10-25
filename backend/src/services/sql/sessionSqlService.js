@@ -9,6 +9,18 @@ const { clientQuery } = require('../../db/transaction');
  * @returns {Promise<*>}
  */
 async function ensureSessionTable(client = null) {
+  const existing = await clientQuery(
+    client,
+    `
+    SELECT 1
+    FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'session'
+    LIMIT 1
+    `
+  );
+  // The runtime role must not need CREATE. Schema/migrations own this table.
+  if (existing.rowCount > 0) return;
+
   await clientQuery(
     client,
     `
@@ -46,6 +58,21 @@ async function listActiveSessionIds(client = null) {
   return result.rows.map((row) => String(row.sid));
 }
 
+/**
+ * Close in-process SSE subscribers for a user whose session rows were removed.
+ * Other API processes observe the deletion on their next stream revalidation.
+ * @param {string|number} userId
+ */
+function notifySessionRevocation(userId) {
+  if (userId == null || userId === '') return;
+  try {
+    const hub = require('../../modules/realtime/realtime.hub');
+    hub.revokeUser(userId);
+  } catch {
+    // Realtime is optional while the process is still booting.
+  }
+}
+
 /** Destroy connect-pg-simple sessions for a user (id stored as string or number in sess.user). */
 async function destroySessionsForUser(userId, client = null) {
   const id = String(userId);
@@ -60,6 +87,7 @@ async function destroySessionsForUser(userId, client = null) {
     `,
     [id]
   );
+  notifySessionRevocation(id);
   return result.rowCount || 0;
 }
 
@@ -69,6 +97,11 @@ async function destroySessionsForRole(roleId, client = null) {
   // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(id) || id <= 0) return 0;
 
+  const assigned = await clientQuery(
+    client,
+    `SELECT user_id FROM user_roles WHERE role_id = $1`,
+    [id]
+  );
   const result = await clientQuery(
     client,
     `
@@ -79,6 +112,9 @@ async function destroySessionsForRole(roleId, client = null) {
     `,
     [id]
   );
+  for (const row of assigned.rows) {
+    notifySessionRevocation(row.user_id);
+  }
   return result.rowCount || 0;
 }
 

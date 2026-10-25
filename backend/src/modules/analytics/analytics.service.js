@@ -277,22 +277,49 @@ async function getCarPerformance({ carId, from, to, access }) {
 }
 
 /**
- * Minimal CSV serializer with quote escaping.
+ * Keep spreadsheet apps from treating fleet text as a formula.
+ * A leading apostrophe is the literal-text marker for Excel and Google Sheets.
+ * @param {string} value
+ * @returns {string}
+ */
+function neutralizeSpreadsheetText(value) {
+  if (/^[\s\u0000-\u001F]*[=+\-@]/.test(value)) {
+    return `'${value}`;
+  }
+  return value;
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function quoteCsv(value) {
+  if (/[",\r\n]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
+/**
+ * CSV serializer. Numeric columns stay numbers, including legitimate negatives.
+ * Text columns are neutralized when they would be read as formulas.
  * @param {object[]} rows
- * @param {{ key: string, label: string }[]} columns
+ * @param {{ key: string, label: string, kind?: 'text'|'number' }[]} columns
  */
 function toCsv(rows, columns) {
   const header = columns.map((c) => c.label).join(',');
   const lines = rows.map((row) =>
     columns
-      .map((c) => {
-        const val = row[c.key];
-        if (val == null) return '';
-        const str = String(val);
-        // RFC-style escaping when value contains comma or quote.
-        return str.includes(',') || str.includes('"')
-          ? `"${str.replace(/"/g, '""')}"`
-          : str;
+      .map((column) => {
+        const val = row[column.key];
+        if (val == null || val === '') return '';
+        if (column.kind === 'number') {
+          if (typeof val === 'number' && Number.isFinite(val)) return String(val);
+          const numeric = String(val);
+          if (/^-?\d+(\.\d+)?$/.test(numeric)) return numeric;
+          return quoteCsv(neutralizeSpreadsheetText(numeric));
+        }
+        return quoteCsv(neutralizeSpreadsheetText(String(val)));
       })
       .join(',')
   );
@@ -316,16 +343,16 @@ async function exportCsv({ from, to, access }) {
   const { rows } = await getCarsPerformance({ from, to, access });
   // Drop money columns when revenue permission is missing.
   return toCsv(rows, [
-    { key: 'carId', label: 'car_id' },
-    { key: 'carName', label: 'car_name' },
-    { key: 'registrationNumber', label: 'registration_number' },
-    { key: 'revenue', label: 'revenue' },
-    { key: 'bookingsCount', label: 'bookings_count' },
-    { key: 'utilizationRate', label: 'utilization_rate' },
-    { key: 'maintenanceDays', label: 'maintenance_days' },
-    { key: 'repairCost', label: 'repair_cost' },
-    { key: 'serviceCost', label: 'service_cost' },
-    { key: 'profitability', label: 'profitability' },
+    { key: 'carId', label: 'car_id', kind: 'text' },
+    { key: 'carName', label: 'car_name', kind: 'text' },
+    { key: 'registrationNumber', label: 'registration_number', kind: 'text' },
+    { key: 'revenue', label: 'revenue', kind: 'number' },
+    { key: 'bookingsCount', label: 'bookings_count', kind: 'number' },
+    { key: 'utilizationRate', label: 'utilization_rate', kind: 'number' },
+    { key: 'maintenanceDays', label: 'maintenance_days', kind: 'number' },
+    { key: 'repairCost', label: 'repair_cost', kind: 'number' },
+    { key: 'serviceCost', label: 'service_cost', kind: 'number' },
+    { key: 'profitability', label: 'profitability', kind: 'number' },
   ].filter((c) => canMoney || !['revenue', 'repairCost', 'serviceCost', 'profitability'].includes(c.key)));
 }
 
@@ -337,6 +364,7 @@ module.exports = {
   getCarsPerformance,
   getCarPerformance,
   exportCsv,
+  toCsv,
   periodDayCount,
   assertValidRange,
 };

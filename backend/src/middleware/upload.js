@@ -6,6 +6,7 @@ const multer = require('multer');
 const fileStorage = require('../services/storage');
 const {
   ensureUploadTempDir,
+  assertTempUploadQuota,
   getNormalizedExtension,
   isAllowedImageExtension,
   isAllowedImageMimetype,
@@ -15,6 +16,7 @@ const diskStorage = multer.diskStorage({
   destination: function (req, file, cb) {
     // Ensure temp dir exists before multer writes the stream.
     ensureUploadTempDir()
+      .then(() => assertTempUploadQuota())
       .then(() => cb(null, fileStorage.UPLOAD_TEMP_DIR))
       .catch((err) => cb(err));
   },
