@@ -17,7 +17,6 @@ const {
  */
 async function updateCarStatus(id, status, client = null) {
   const carId = normalizeCarId(id);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!carId) {
     throw new Error('Invalid car id');
   }
@@ -39,7 +38,6 @@ async function updateCarStatus(id, status, client = null) {
     [carId, status, availability]
   );
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!result.rowCount) {
     return null;
   }
@@ -55,7 +53,6 @@ async function updateCarStatus(id, status, client = null) {
  */
 async function findCarStatusForUpdate(id, client = null) {
   const carId = normalizeCarId(id);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!carId) {
     return null;
   }
@@ -72,7 +69,6 @@ async function findCarStatusForUpdate(id, client = null) {
   );
 
   const row = result.rows[0];
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) return null;
   return {
     id: String(row.id),
@@ -90,7 +86,6 @@ async function findCarStatusForUpdate(id, client = null) {
  */
 async function countActiveFleetReservations(carId, excludeReservationId = null, client = null) {
   const id = normalizeCarId(carId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!id) return 0;
 
   const params = [id];

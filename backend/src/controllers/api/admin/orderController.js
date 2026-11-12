@@ -99,7 +99,6 @@ exports.listDeletedOrders = asyncHandler(async (req, res, next) => {
  * @returns {Promise<import('express').Response|void>}
  */
 exports.emptyDeletedOrders = asyncHandler(async (req, res, next) => {
-  // Collect express-validator results for this request.
   const errors = validationResult(req);
   // Validation failed — respond before running domain logic.
   if (!errors.isEmpty()) {
@@ -196,7 +195,6 @@ exports.getCarAvailability = asyncHandler(async (req, res, next) => {
  * @returns {Promise<import('express').Response|void>}
  */
 exports.createOrder = asyncHandler(async (req, res, next) => {
-  // Collect express-validator results for this request.
   const errors = validationResult(req);
   // Validation failed — respond before running domain logic.
   if (!errors.isEmpty()) {
@@ -243,7 +241,6 @@ exports.createOrder = asyncHandler(async (req, res, next) => {
  * @returns {Promise<import('express').Response|void>}
  */
 exports.getOrderById = asyncHandler(async (req, res, next) => {
-  // Collect express-validator results for this request.
   const errors = validationResult(req);
   // Validation failed — respond before running domain logic.
   if (!errors.isEmpty()) {
@@ -273,7 +270,6 @@ exports.getOrderById = asyncHandler(async (req, res, next) => {
  * @returns {Promise<import('express').Response|void>}
  */
 exports.getOrderEditForm = asyncHandler(async (req, res, next) => {
-  // Collect express-validator results for this request.
   const errors = validationResult(req);
   // Validation failed — respond before running domain logic.
   if (!errors.isEmpty()) {
@@ -303,7 +299,6 @@ exports.getOrderEditForm = asyncHandler(async (req, res, next) => {
  * @returns {Promise<import('express').Response|void>}
  */
 exports.updateOrder = asyncHandler(async (req, res, next) => {
-  // Collect express-validator results for this request.
   const errors = validationResult(req);
   // Validation failed — respond before running domain logic.
   if (!errors.isEmpty()) {
@@ -359,7 +354,6 @@ exports.updateOrder = asyncHandler(async (req, res, next) => {
  * @returns {Promise<import('express').Response|void>}
  */
 exports.deleteOrder = asyncHandler(async (req, res, next) => {
-  // Collect express-validator results for this request.
   const errors = validationResult(req);
   // Validation failed — respond before running domain logic.
   if (!errors.isEmpty()) {
@@ -392,7 +386,6 @@ exports.deleteOrder = asyncHandler(async (req, res, next) => {
  * @returns {Promise<import('express').Response|void>}
  */
 exports.restoreOrder = asyncHandler(async (req, res, next) => {
-  // Collect express-validator results for this request.
   const errors = validationResult(req);
   // Validation failed — respond before running domain logic.
   if (!errors.isEmpty()) {

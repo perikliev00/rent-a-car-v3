@@ -13,7 +13,6 @@ const { mapSqlReservation, RESERVATION_SELECT } = require('./reservationMapper')
  */
 async function listByUserId(userId, { limit = 50 } = {}, client = null) {
   const id = Number(userId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(id) || id <= 0) {
     return [];
   }
@@ -46,7 +45,6 @@ async function listByUserId(userId, { limit = 50 } = {}, client = null) {
 async function findByIdForUser(reservationId, userId, client = null) {
   const rid = Number(reservationId);
   const uid = Number(userId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(rid) || rid <= 0 || !Number.isInteger(uid) || uid <= 0) {
     return null;
   }
@@ -79,7 +77,6 @@ async function findByIdForUser(reservationId, userId, client = null) {
 async function updateTravelDetails(reservationId, userId, travel, client = null) {
   const rid = Number(reservationId);
   const uid = Number(userId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(rid) || rid <= 0 || !Number.isInteger(uid) || uid <= 0) {
     return null;
   }
@@ -107,7 +104,6 @@ async function updateTravelDetails(reservationId, userId, travel, client = null)
     ]
   );
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!result.rows[0]) {
     return null;
   }
@@ -125,7 +121,6 @@ async function updateTravelDetails(reservationId, userId, travel, client = null)
 async function claimByEmail(userId, email, client = null) {
   const uid = Number(userId);
   const normalizedEmail = String(email || '').trim().toLowerCase();
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(uid) || uid <= 0 || !normalizedEmail) {
     return { reservations: 0, orders: 0 };
   }

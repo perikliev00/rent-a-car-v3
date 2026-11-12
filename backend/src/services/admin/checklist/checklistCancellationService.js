@@ -54,7 +54,6 @@ async function reviewCancellationRequest(req, requestId, { approve, adminNote })
     throw err;
   }
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!approve) {
     const reviewed = await cancellationSql.review({
       id: requestId,

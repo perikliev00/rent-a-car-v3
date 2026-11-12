@@ -31,7 +31,6 @@ async function reconcileFleetAlerts(now = new Date()) {
  * Best-effort reconcile after mutations; never throws into the caller.
  */
 async function reconcileFleetAlertsQuietly() {
-  // Protected block: isolate failure modes.
   try {
     await reconcileFleetAlerts(new Date());
   } catch (err) {
@@ -75,9 +74,7 @@ async function syncInsuranceInspectionCompliance(carId, payload, userId = null) 
  * @returns {Promise<*>}
  */
 async function storeComplianceUpload(file) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!file) return null;
-  // Protected block: isolate failure modes.
   try {
     const stored = await privateStorage.storePrivateFile({
       tempPath: file.path,
@@ -98,7 +95,6 @@ async function storeComplianceUpload(file) {
  * @returns {Promise<*>}
  */
 async function openLegacyPublicReadStream(legacyUrl) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!legacyUrl || !publicStorage.isManagedPublicUrl(legacyUrl)) {
     return null;
   }
@@ -108,11 +104,9 @@ async function openLegacyPublicReadStream(legacyUrl) {
   if (publicStorage.driver === 'local' && publicStorage.PUBLIC_CAR_IMAGES_DIR) {
     const filename = path.basename(legacyUrl);
     const filePath = path.resolve(publicStorage.PUBLIC_CAR_IMAGES_DIR, filename);
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!filePath.startsWith(path.resolve(publicStorage.PUBLIC_CAR_IMAGES_DIR))) {
       return null;
     }
-    // Protected block: isolate failure modes.
     try {
       await fs.promises.access(filePath, fs.constants.R_OK);
     } catch {
@@ -132,7 +126,6 @@ async function openLegacyPublicReadStream(legacyUrl) {
  */
 function buildCompliancePayload(body, documentStorageKey = null, existing = null) {
   const itemType = body.itemType || existing?.itemType;
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!COMPLIANCE_TYPES.includes(itemType)) {
     throw new Error('Invalid compliance type');
   }
@@ -152,7 +145,6 @@ function buildCompliancePayload(body, documentStorageKey = null, existing = null
 /** @param {number|string} carId */
 async function listCompliance(carId) {
   const car = await carRepository.findByIdForAdmin(carId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!car || car.isDeleted) throw new Error('Car not found');
   const items = await complianceSql.listByCarId(carId);
   return items.map(complianceSql.toPublicComplianceItem);
@@ -164,13 +156,11 @@ async function listCompliance(carId) {
  */
 async function createCompliance(carId, body, file = null, userId = null) {
   const car = await carRepository.findByIdForAdmin(carId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!car || car.isDeleted) throw new Error('Car not found');
 
   const documentStorageKey = await storeComplianceUpload(file);
   const payload = buildCompliancePayload(body, documentStorageKey);
   let item;
-  // Protected block: isolate failure modes.
   try {
     item = await complianceSql.create(carId, {
       ...payload,
@@ -199,7 +189,6 @@ async function updateCompliance(carId, itemId, body, file = null) {
   const documentStorageKey = await storeComplianceUpload(file);
   const payload = buildCompliancePayload(body, documentStorageKey, existing);
   let item;
-  // Protected block: isolate failure modes.
   try {
     item = await complianceSql.update(carId, itemId, {
       itemType: payload.itemType,
@@ -274,18 +263,15 @@ async function deleteCompliance(carId, itemId) {
  */
 async function openComplianceDocumentDownload(carId, itemId) {
   const car = await carRepository.findByIdForAdmin(carId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!car || car.isDeleted) throw new Error('Car not found');
 
   const item = await complianceSql.findById(carId, itemId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!item) {
     const err = new Error('Compliance item not found');
     err.code = 'NOT_FOUND';
     err.status = 404;
     throw err;
   }
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!item.hasDocument) {
     const err = new Error('File is no longer available');
     err.code = 'NOT_FOUND';
@@ -295,7 +281,6 @@ async function openComplianceDocumentDownload(carId, itemId) {
 
   if (item.documentStorageKey) {
     const opened = await privateStorage.openPrivateReadStream(item.documentStorageKey);
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!opened) {
       const err = new Error('File is no longer available');
       err.code = 'NOT_FOUND';
@@ -311,7 +296,6 @@ async function openComplianceDocumentDownload(carId, itemId) {
   }
 
   const opened = await openLegacyPublicReadStream(item.documentUrl);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!opened) {
     const err = new Error('File is no longer available');
     err.code = 'NOT_FOUND';

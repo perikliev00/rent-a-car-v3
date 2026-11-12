@@ -37,7 +37,6 @@ function registerStatusChangeListener(listener) {
  */
 async function notifyListeners(event) {
   for (const listener of statusChangeListeners) {
-    // Protected block: isolate failure modes.
     try {
       await listener(event);
     } catch (err) {
@@ -65,7 +64,6 @@ async function auditStatusChange(event) {
     },
   };
 
-  // Protected block: isolate failure modes.
   try {
     if (actor?.type === 'admin' && actor.req) {
       await logAdminAction(actor.req, payload);
@@ -94,7 +92,6 @@ async function changeStatusCore({
   client,
 }) {
   const reservation = await reservationSql.findByIdForUpdate(reservationId, client);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!reservation) {
     const err = new Error('Reservation not found');
     err.code = 'NOT_FOUND';

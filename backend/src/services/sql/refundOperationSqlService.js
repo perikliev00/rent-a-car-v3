@@ -9,7 +9,6 @@ const { clientQuery } = require('../../db/transaction');
  * @returns {*}
  */
 function mapRow(row) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) return null;
   return {
     id: row.id,
@@ -96,7 +95,6 @@ async function insertRefundOperation(
  * @returns {Promise<*>}
  */
 async function findById(id, client = null) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (id == null) return null;
   const result = await clientQuery(
     client,
@@ -166,7 +164,6 @@ async function findByStripeRefundId(stripeRefundId, client = null) {
  * @returns {Promise<*>}
  */
 async function findByPaymentIntentId(paymentIntentId, client = null) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!paymentIntentId) return null;
   const result = await clientQuery(
     client,

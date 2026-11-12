@@ -7,7 +7,6 @@ const { toHHMM: normalizeToHHMM } = require('../../../utils/date/normalizeTime')
 
 /** Coerce a date-like value to YYYY-MM-DD (or empty string). */
 function toISODate(value) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!value) return '';
   if (/^\d{4}-\d{2}-\d{2}/.test(value)) return String(value).slice(0, 10);
   const d = new Date(value);
@@ -113,7 +112,6 @@ function applyPricingToOrder(order, pricing) {
  * @param {Date} prevEnd
  */
 function extractStoredRange(blocks, prevStart, prevEnd) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Array.isArray(blocks) || !blocks.length) {
     return { storedStart: prevStart, storedEnd: prevEnd };
   }

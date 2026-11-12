@@ -29,7 +29,6 @@ async function confirmManualReviewReservation(req, reservation, reason) {
     const carId = reservation.carId?.id || reservation.carId;
 
     await acquireCarAdvisoryLocks(client, [carId]);
-    // Protected block: isolate failure modes.
     try {
       await assertNoActiveReservationHold(
         carId,
@@ -153,7 +152,6 @@ async function changeReservationStatus(req, { reservationId, status, reason }) {
  */
 async function getReservationDetail(reservationId) {
   const reservation = await reservationRepository.findById(reservationId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!reservation) {
     const err = new Error('Reservation not found');
     err.code = 'NOT_FOUND';

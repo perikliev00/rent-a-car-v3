@@ -12,7 +12,6 @@ const ACTIVE_STATUS_SQL = ACTIVE_RESERVATION_STATUSES.map((s) => `'${s}'`).join(
  */
 function normalizeCarId(carId) {
   const id = Number(carId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(id) || id <= 0) {
     return null;
   }
@@ -35,7 +34,6 @@ function toNumberOrZero(value) {
  * @returns {*}
  */
 function mapSqlReservation(row) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) {
     return null;
   }

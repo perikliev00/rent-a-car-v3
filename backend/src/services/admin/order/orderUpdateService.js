@@ -33,7 +33,6 @@ const { acquireCarAdvisoryLocks } = require('../../../db/transaction');
  */
 async function updateOrder(orderId, payload) {
   const contactResult = validateOrderContact(payload);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!contactResult.ok) {
     return buildOrderEditErrorResult(
       orderId,
@@ -43,7 +42,6 @@ async function updateOrder(orderId, payload) {
   }
 
   let range;
-  // Protected block: isolate failure modes.
   try {
     range = parseOrderDateRange(
       payload.pickupDate,
@@ -58,7 +56,6 @@ async function updateOrder(orderId, payload) {
     throw err;
   }
 
-  // Protected block: isolate failure modes.
   try {
     const audit = await runWithOptionalTransaction((client) =>
       updateOrderCore({
@@ -89,7 +86,6 @@ async function updateOrder(orderId, payload) {
 
 /** Serialize a date-like value for audit payloads. */
 function toIso(value) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!value) return null;
   if (value instanceof Date) return value.toISOString();
   return String(value);
@@ -136,7 +132,6 @@ async function updateOrderCore({ orderId, payload, contact, range, client }) {
   );
 
   const car = await carRepository.findByIdForAdmin(newCarId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!car) {
     const err = new Error('Car not found');
     err.code = 'CAR_NOT_FOUND';
@@ -166,7 +161,6 @@ async function updateOrderCore({ orderId, payload, contact, range, client }) {
     priceChanged: Boolean(recalculatePrice),
   };
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!sameCar || !sameStart || !sameEnd) {
     await assertNoActiveReservationHold(newCarId, range.start, range.end, client);
     await assertNoOpenPhysicalRental(newCarId, client, {

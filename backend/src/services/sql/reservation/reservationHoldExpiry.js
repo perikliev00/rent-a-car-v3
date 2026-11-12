@@ -8,7 +8,6 @@ const { normalizeCarId } = require('./reservationMapper');
 /** Marks expired holds for one car so they leave the partial exclusion constraint. */
 async function expireStaleHoldsForCar(carId, now = new Date(), client = null) {
   const normalizedCarId = normalizeCarId(carId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId) {
     return 0;
   }
@@ -54,7 +53,6 @@ async function expireStaleHoldsForCar(carId, now = new Date(), client = null) {
  * @param {object|null} [client]
  */
 async function expireStaleHoldsForSession(sessionId, now = new Date(), client = null) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!sessionId) {
     return 0;
   }

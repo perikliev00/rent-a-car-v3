@@ -13,7 +13,6 @@ const { generatePdf } = require('../../pdf/pdfDocumentService');
  */
 async function downloadReservationPdf(reservationId, kind) {
   const reservation = await reservationSql.findById(reservationId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!reservation) {
     const err = new Error('Reservation not found');
     err.code = 'NOT_FOUND';

@@ -9,7 +9,6 @@ const { clientQuery } = require('../../db/transaction');
  * @returns {*}
  */
 function mapPermission(row) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) return null;
   return {
     id: String(row.id),
@@ -56,7 +55,6 @@ async function listPermissions(client = null) {
  */
 async function findPermissionByKey(key, client = null) {
   const normalized = String(key || '').trim();
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalized) return null;
   const result = await clientQuery(
     client,
@@ -137,7 +135,6 @@ async function listPermissionKeysForRoleId(roleId, client = null) {
  */
 async function replaceRolePermissions(roleId, permissionIds, client = null) {
   const rid = Number(roleId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(rid) || rid <= 0) {
     throw new Error('Invalid role id');
   }
@@ -189,7 +186,6 @@ async function listRolePermissionMatrix(client = null) {
   const byRole = new Map();
   for (const row of result.rows) {
     const roleId = String(row.role_id);
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!byRole.has(roleId)) {
       byRole.set(roleId, {
         roleId,

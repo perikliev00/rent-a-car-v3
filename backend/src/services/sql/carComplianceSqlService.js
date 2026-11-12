@@ -10,7 +10,6 @@ const { COMPLIANCE_TYPE_LABELS } = require('../../constants/carEnums');
  * @returns {*}
  */
 function toDateOnly(value) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!value) return null;
   if (value instanceof Date) return value.toISOString().slice(0, 10);
   const str = String(value);
@@ -40,7 +39,6 @@ function deriveComplianceStatus({ expiresAt, statusHint = null, todayStr = null 
  * @returns {*}
  */
 function mapComplianceItem(row) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) return null;
   const itemType = row.item_type;
   const documentStorageKey = row.document_storage_key || null;
@@ -71,7 +69,6 @@ function mapComplianceItem(row) {
  * @returns {*}
  */
 function toPublicComplianceItem(item) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!item) return null;
   return {
     id: item.id,

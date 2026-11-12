@@ -17,7 +17,6 @@ async function compensateReservationAfterStripeFailure(
   reservationDoc,
   createdReservationThisStep = true
 ) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!reservationDoc) {
     return;
   }
@@ -27,7 +26,6 @@ async function compensateReservationAfterStripeFailure(
     return;
   }
 
-  // Protected block: isolate failure modes.
   try {
     await changeStatus({
       reservationId: reservationDoc.id,

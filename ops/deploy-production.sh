@@ -66,6 +66,7 @@ require_alertmanager_smtp_config() {
     ALERT_SMTP_USERNAME \
     ALERT_SMTP_PASSWORD \
     ALERT_EMAIL_TO
+  # Begin the loop body.
   do
     value="$(awk -F= -v key="$key" '
       $1 == key {
@@ -89,6 +90,64 @@ require_alertmanager_smtp_config() {
 }
 
 require_alertmanager_smtp_config "$ALERTMANAGER_ENV_FILE_PATH"
+
+# Compose interpolation keys must be present in compose.env (--env-file).
+# These are distinct from service env_file values (e.g. backend.env).
+# Never print variable values.
+require_compose_interpolation_keys() {
+  local env_file="$1"
+  local missing=""
+  local key
+  local value
+
+  for key in \
+    POSTGRES_PASSWORD \
+    APP_DB_PASSWORD \
+    METRICS_TOKEN \
+    GRAFANA_ADMIN_PASSWORD \
+    API_IMAGE \
+    CUSTOMER_IMAGE \
+    ADMIN_IMAGE
+  # Begin the loop body.
+  do
+    value="$(awk -F= -v key="$key" '
+      $1 == key {
+        sub(/^[^=]*=/, "")
+        print
+        exit
+      }
+    ' "$env_file")"
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    if [[ -z "$value" ]]; then
+      missing+=" $key"
+    fi
+  done
+
+  if [[ -n "$missing" ]]; then
+    echo "Compose environment file is missing required variable(s):${missing}" >&2
+    echo "File: $env_file" >&2
+    echo "APP_DB_PASSWORD is used for Compose interpolation into DATABASE_URL (luxride_app)." >&2
+    echo "It must live in compose.env, not only in backend.env." >&2
+    exit 2
+  fi
+
+  value="$(awk -F= -v key="APP_DB_PASSWORD" '
+    $1 == key {
+      sub(/^[^=]*=/, "")
+      print
+      exit
+    }
+  ' "$env_file")"
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  if [[ "${#value}" -lt 16 ]]; then
+    echo "APP_DB_PASSWORD in $env_file must be at least 16 characters" >&2
+    exit 2
+  fi
+}
+
+require_compose_interpolation_keys "$ENV_FILE"
 
 read_release_value() {
   local key="$1"
@@ -209,6 +268,7 @@ cleanup() {
 restore_infrastructure() {
   if [[ -f "$INFRA_BACKUP_DIR/docker-compose.aws.yml" ]]; then
     cp -a "$INFRA_BACKUP_DIR/docker-compose.aws.yml" "$COMPOSE_FILE"
+  # Test an additional condition in the if-chain.
   elif [[ -f "$INFRA_BACKUP_DIR/compose.absent" ]]; then
     rm -f "$COMPOSE_FILE"
   fi
@@ -216,6 +276,7 @@ restore_infrastructure() {
   if [[ -d "$INFRA_BACKUP_DIR/monitoring" ]]; then
     rm -rf "$ROOT/monitoring"
     cp -a "$INFRA_BACKUP_DIR/monitoring" "$ROOT/monitoring"
+  # Test an additional condition in the if-chain.
   elif [[ -f "$INFRA_BACKUP_DIR/monitoring.absent" ]]; then
     rm -rf "$ROOT/monitoring"
   fi

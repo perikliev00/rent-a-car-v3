@@ -203,7 +203,6 @@ async function validateStripeSessionForFinalization({
 }) {
   const sessionLink = validateActiveStripeSessionLink(reservation, stripeSessionId);
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!sessionLink.ok) {
     logger.warn(
       {
@@ -240,7 +239,6 @@ async function validateStripeSessionForFinalization({
   const stripeSession = await resolveStripeCheckoutSessionDetails(stripeSessionId, options);
   const paymentDetails = validateStripePaymentDetails(stripeSession, reservation);
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!paymentDetails.ok) {
     logger.warn(
       {

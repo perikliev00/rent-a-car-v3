@@ -125,7 +125,6 @@ function buildPdfBuffer(buildFn) {
     doc.on('data', (chunk) => chunks.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
-    // Protected block: isolate failure modes.
     try {
       buildFn(doc);
       drawFooter(doc);
@@ -242,7 +241,6 @@ async function generateDamageReport(reservation) {
  */
 async function generatePickupChecklistPdf(reservation) {
   const { pickupChecklist } = await loadContext(reservation);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!pickupChecklist) {
     const err = new Error('Pickup checklist not found');
     err.code = 'NOT_FOUND';
@@ -270,7 +268,6 @@ async function generatePickupChecklistPdf(reservation) {
  */
 async function generateReturnChecklistPdf(reservation) {
   const { returnChecklist } = await loadContext(reservation);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!returnChecklist) {
     const err = new Error('Return checklist not found');
     err.code = 'NOT_FOUND';
@@ -308,7 +305,6 @@ const GENERATORS = {
  */
 async function generatePdf(kind, reservation) {
   const generator = GENERATORS[kind];
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!generator) {
     const err = new Error('Unknown PDF document type');
     err.code = 'VALIDATION_ERROR';

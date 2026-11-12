@@ -9,18 +9,15 @@ const { clientQuery } = require('../../db/transaction');
  * @returns {*}
  */
 function mapDamageReport(row) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) return null;
   let photos = row.photos;
   if (typeof photos === 'string') {
-    // Protected block: isolate failure modes.
     try {
       photos = JSON.parse(photos);
     } catch {
       photos = [];
     }
   }
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Array.isArray(photos)) photos = [];
 
   return {
@@ -174,7 +171,6 @@ async function remove(carId, reportId, client = null) {
     `,
     [Number(reportId), Number(carId)]
   );
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!result.rowCount) return null;
   return mapDamageReport({ ...result.rows[0], car_id: carId, description: '', status: 'resolved' });
 }

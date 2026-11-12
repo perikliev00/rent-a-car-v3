@@ -48,11 +48,9 @@ async function persistPendingFromStripe(op, stripeRefund) {
  * @returns {Promise<*>}
  */
 async function auditSucceededRefund(req, { reservation, applied, stripeRefund, amountCents }) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!req) {
     return;
   }
-  // Protected block: isolate failure modes.
   try {
     await logAdminAction(req, {
       action: 'admin.refunded_reservation',
@@ -130,7 +128,6 @@ async function finishWithStripeRefund(
  * Indeterminate errors leave the op usable for retry (do not mark failed).
  */
 async function createRefundForOperation(op, { paymentIntentId, amountCents }) {
-  // Protected block: isolate failure modes.
   try {
     return await createRefund({
       paymentIntentId,
@@ -181,7 +178,6 @@ async function startNextAttemptAfterConfirmedFailure(failedOp, stripeCtx) {
  */
 async function retrieveExistingRefund(op, stripeCtx) {
   let existingRefund;
-  // Protected block: isolate failure modes.
   try {
     existingRefund = await retrieveRefund(op.stripeRefundId);
   } catch (err) {

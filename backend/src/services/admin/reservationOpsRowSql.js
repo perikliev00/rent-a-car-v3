@@ -9,7 +9,6 @@ const { clientQuery } = require('../../db/transaction');
  * @param {object|null} row
  */
 function mapOpsRow(row) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) return null;
   return {
     id: String(row.id),

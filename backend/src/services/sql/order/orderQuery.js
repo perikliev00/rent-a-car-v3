@@ -19,7 +19,6 @@ const {
  */
 async function findOrderById(orderId, client = null) {
   const normalizedId = normalizeId(orderId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedId) {
     return null;
   }
@@ -46,7 +45,6 @@ async function findOrderById(orderId, client = null) {
  */
 async function findOrderByIdPopulated(orderId, client = null) {
   const order = await findOrderById(orderId, client);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!order) {
     return null;
   }
@@ -63,7 +61,6 @@ async function findOrderByIdPopulated(orderId, client = null) {
  */
 async function findOrderByReservationId(reservationId, client = null) {
   const normalizedReservationId = normalizeId(reservationId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedReservationId) {
     return null;
   }

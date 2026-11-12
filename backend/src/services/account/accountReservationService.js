@@ -139,7 +139,6 @@ async function listReservations(userId) {
  */
 async function getReservationDetail(userId, reservationId) {
   const reservation = await reservationSql.findByIdForUser(reservationId, userId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!reservation) {
     const err = new Error('Reservation not found');
     err.code = 'NOT_FOUND';
@@ -148,7 +147,6 @@ async function getReservationDetail(userId, reservationId) {
   }
 
   let order = null;
-  // Protected block: isolate failure modes.
   try {
     order = await orderSql.findOrderByReservationId(reservationId);
   } catch {
@@ -189,7 +187,6 @@ async function getReservationDetail(userId, reservationId) {
  */
 async function updateTravel(userId, reservationId, travel) {
   const updated = await reservationSql.updateTravelDetails(reservationId, userId, travel);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!updated) {
     const err = new Error('Reservation not found');
     err.code = 'NOT_FOUND';
@@ -209,7 +206,6 @@ async function updateTravel(userId, reservationId, travel) {
  */
 async function requestCancellation(req, userId, reservationId, reason) {
   const reservation = await reservationSql.findByIdForUser(reservationId, userId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!reservation) {
     const err = new Error('Reservation not found');
     err.code = 'NOT_FOUND';
@@ -269,7 +265,6 @@ async function requestCancellation(req, userId, reservationId, reason) {
     };
   }
 
-  // Protected block: isolate failure modes.
   try {
     const cancellationRequest = await cancellationSql.create({
       reservationId,
@@ -301,7 +296,6 @@ async function requestCancellation(req, userId, reservationId, reason) {
 async function getReservationForPdf(userId, reservationId, { admin = false } = {}) {
   if (admin) {
     const reservation = await reservationSql.findById(reservationId);
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!reservation) {
       const err = new Error('Reservation not found');
       err.code = 'NOT_FOUND';
@@ -311,7 +305,6 @@ async function getReservationForPdf(userId, reservationId, { admin = false } = {
     return reservation;
   }
   const reservation = await reservationSql.findByIdForUser(reservationId, userId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!reservation) {
     const err = new Error('Reservation not found');
     err.code = 'NOT_FOUND';

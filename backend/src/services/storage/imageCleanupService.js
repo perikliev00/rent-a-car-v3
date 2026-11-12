@@ -23,7 +23,6 @@ async function listReferencedCarImageUrls() {
 
 /** Delete managed public images not referenced by any car record. */
 async function cleanupOrphanCarImages() {
-  // Protected block: isolate failure modes.
   try {
     const referenced = (await listReferencedCarImageUrls()).filter((url) =>
       storage.isManagedPublicUrl(url)
@@ -41,7 +40,6 @@ async function cleanupOrphanCarImages() {
 
 /** Remove temp uploads older than the given age. */
 async function cleanupStaleUploadTempFiles(maxAgeMs = STALE_TEMP_MAX_AGE_MS) {
-  // Protected block: isolate failure modes.
   try {
     const { removed } = await storage.cleanupStaleTempFiles(maxAgeMs);
     if (removed.length > 0) {

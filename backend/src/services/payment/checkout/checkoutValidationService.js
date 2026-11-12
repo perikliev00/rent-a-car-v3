@@ -24,7 +24,6 @@ function validationResultFromReq(req) {
 function validateCheckoutRequest(req, car, formData) {
   const errors = validationResultFromReq(req);
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!errors.isEmpty()) {
     const message = errors.array()[0].msg;
     return {
@@ -45,7 +44,6 @@ function validateCheckoutRequest(req, car, formData) {
     returnTime: formData.returnTime || '23:59',
   });
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!isValid || !startDate || !endDate) {
     const message =
       bookingErrors[0] || 'Invalid booking dates. Please choose a different range.';

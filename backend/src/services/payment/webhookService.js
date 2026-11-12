@@ -27,7 +27,6 @@ async function handleStripeWebhookFlow(req) {
     `${logPrefix} webhook received`
   );
 
-  // Protected block: isolate failure modes.
   try {
     // Reject forged payloads; Stripe signature verification is the trust boundary.
     event = stripe.webhooks.constructEvent(
@@ -70,7 +69,6 @@ async function handleStripeWebhookFlow(req) {
   // Stripe / payment-related branch.
   if (event.type === 'checkout.session.completed') {
     const session = event.data && event.data.object;
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!session || !session.id) {
       trackWebhookFailure('missing_session_id', {
         requestId: req.requestId,
@@ -148,7 +146,6 @@ async function handleStripeWebhookFlow(req) {
       };
     }
 
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!result?.found) {
       trackWebhookFailure('reservation_not_found', {
         requestId: req.requestId,

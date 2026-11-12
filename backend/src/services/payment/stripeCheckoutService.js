@@ -137,7 +137,6 @@ async function retrieveStripeCheckoutSession(sessionId) {
  * @returns {Promise<object>}
  */
 async function retrieveStripePaymentIntent(paymentIntentId) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!paymentIntentId) {
     throw new Error('paymentIntentId is required');
   }
@@ -176,12 +175,10 @@ function isStripeExpireAlreadyTerminalError(err) {
  * @returns {Promise<{ ok: boolean, skipped?: boolean, paid?: boolean, alreadyExpired?: boolean, expired?: boolean, session?: object, error?: Error }>}
  */
 async function safeExpireSupersededCheckoutSession(sessionId, context = {}) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!sessionId) {
     return { ok: true, skipped: true };
   }
 
-  // Protected block: isolate failure modes.
   try {
     const session = await retrieveStripeCheckoutSession(sessionId);
 

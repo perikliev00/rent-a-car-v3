@@ -48,7 +48,6 @@ function trackApplyFailure(req, event, err) {
  */
 async function claimRefundInbox(event, obj) {
   const payload = buildRefundInboxPayload(event, obj);
-  // Protected block: isolate failure modes.
   try {
     const row = await paymentEventSql.insertPaymentEvent({
       eventId: event.id,
@@ -60,7 +59,6 @@ async function claimRefundInbox(event, obj) {
     });
     return { row, duplicate: false };
   } catch (err) {
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!isUniqueViolation(err)) {
       throw err;
     }
@@ -92,13 +90,11 @@ async function markInboxStatus(row, status) {
 async function handleRefundWebhookEvent(event, req) {
   const obj = event.data?.object;
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!event?.id) {
     return { statusCode: 500, body: { received: false } };
   }
 
   let claimed;
-  // Protected block: isolate failure modes.
   try {
     claimed = await claimRefundInbox(event, obj);
   } catch (err) {
@@ -115,9 +111,7 @@ async function handleRefundWebhookEvent(event, req) {
     return { statusCode: 200, body: { received: true } };
   }
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!obj) {
-    // Protected block: isolate failure modes.
     try {
       await markInboxStatus(claimed.row, 'ignored');
     } catch (err) {
@@ -131,12 +125,10 @@ async function handleRefundWebhookEvent(event, req) {
     return { statusCode: 200, body: { received: true } };
   }
 
-  // Protected block: isolate failure modes.
   try {
     const result = await applyRefundFromStripeObject(obj, { eventType: event.type });
     const nextStatus =
       result?.handled === false && IGNORE_REASONS.has(result.reason) ? 'ignored' : 'processed';
-    // Protected block: isolate failure modes.
     try {
       await markInboxStatus(claimed.row, nextStatus);
     } catch (err) {

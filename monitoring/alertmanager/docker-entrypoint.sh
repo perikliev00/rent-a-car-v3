@@ -47,6 +47,7 @@ require_smtp_vars() {
     ALERT_SMTP_USERNAME \
     ALERT_SMTP_PASSWORD \
     ALERT_EMAIL_TO
+  # Begin the loop body.
   do
     eval "value=\${$name:-}"
     if [ -z "$value" ]; then

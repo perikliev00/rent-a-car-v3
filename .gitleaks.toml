@@ -1,15 +1,21 @@
 # Allow only known intentional Stripe-shaped placeholders used in CI/unit tests.
 # Real sk_live_ / sk_test_ credentials must still fail the scan.
+#
+# Use singular [allowlist] so both older (≤8.24) and newer Gitleaks binaries
+# apply the list when extending the default config.
 title = "LuxRide"
 
 [extend]
 useDefault = true
 
-[[allowlists]]
+[allowlist]
 description = "Intentional Stripe-shaped CI/test placeholders (not real credentials)"
 regexTarget = "secret"
 regexes = [
   '''(?i)^sk_(?:live|test)_[a-z0-9_]*placeholder[a-z0-9_]*$''',
   '''sk_test_123456789012345678901234567890''',
   '''sk_live_test123456789012345678901234567890''',
+]
+stopwords = [
+  '''placeholder''',
 ]

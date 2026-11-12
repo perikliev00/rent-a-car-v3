@@ -140,7 +140,6 @@ function buildCarPayload(payload, file, existingCar = null) {
   });
 
   const seats = parseInt(payload.seats, 10);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(seats) || seats <= 0) {
     throw new Error('Seats must be a positive number.');
   }
@@ -152,7 +151,6 @@ function buildCarPayload(payload, file, existingCar = null) {
         ? existingCar.price
         : undefined;
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (price === undefined) {
     throw new Error('At least one price tier is required.');
   }
@@ -163,14 +161,12 @@ function buildCarPayload(payload, file, existingCar = null) {
       ? existingCar.image
       : buildImagePath(file);
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!image) {
     throw new Error('Car image is required.');
   }
 
   const status = resolveFleetStatus(payload, existingCar);
   const fuelLevel = emptyToNull(payload.fuelLevel);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (fuelLevel && !FUEL_LEVELS.includes(fuelLevel)) {
     throw new Error('Invalid fuel level.');
   }

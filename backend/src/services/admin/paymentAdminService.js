@@ -30,7 +30,6 @@ const REFUND_STATES = new Set(['none', 'pending', 'failed']);
 /** Clamp queue page size to 1–50 to avoid oversized admin queries. */
 function clampQueueLimit(limit) {
   const n = Number(limit);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isFinite(n)) return DEFAULT_QUEUE_LIMIT;
   return Math.min(50, Math.max(1, n));
 }
@@ -43,7 +42,6 @@ function clampQueueLimit(limit) {
  */
 function appendIdSearch(conditions, params, q) {
   const search = String(q || '').trim();
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!search) return;
   params.push(search);
   conditions.push(`(r.id::text = $${params.length} OR o.id::text = $${params.length})`);

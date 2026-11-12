@@ -65,7 +65,6 @@ exports.getPaymentMonitoring = asyncHandler(async (req, res, next) => {
  * @returns {Promise<import('express').Response|void>}
  */
 exports.reconcilePayments = asyncHandler(async (req, res, next) => {
-  // Collect express-validator results for this request.
   const errors = validationResult(req);
   // Validation failed — respond before running domain logic.
   if (!errors.isEmpty()) {

@@ -81,6 +81,7 @@ describeIf('AUTH-006: authSessionSecurity', () => {
     const signupAgent = await createSessionAgent(app);
     expect(
       (await withCsrf(signupAgent, signupAgent.post('/api/auth/signup')).send({ email, password }))
+        // Continue the chained call started on the previous line.
         .status
     ).toBe(201);
 

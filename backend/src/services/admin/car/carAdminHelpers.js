@@ -5,7 +5,6 @@ const storage = require('../../storage');
 
 /** Parse a price-tier form field; empty → undefined (omit), invalid → undefined. */
 function parsePriceTier(value) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (value === undefined || value === null || value === '') return undefined;
   const parsed = parseFloat(value);
   return Number.isNaN(parsed) ? undefined : parsed;
@@ -13,7 +12,6 @@ function parsePriceTier(value) {
 
 /** Positive integer category id, or null when cleared/invalid. */
 function parseCategoryId(value) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (value === undefined || value === null || value === '') return null;
   const parsed = parseInt(String(value), 10);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
@@ -36,18 +34,14 @@ function resolveCategoryId(payload, existingCar) {
 
 /** Prefer shortest tier as display base price when multiple tiers are set. */
 function deriveBasePrice({ tierShort, tierMedium, tierLong }) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (tierShort !== undefined) return tierShort;
-  // Guard: early-return or throw when required input is missing/invalid.
   if (tierMedium !== undefined) return tierMedium;
-  // Guard: early-return or throw when required input is missing/invalid.
   if (tierLong !== undefined) return tierLong;
   return undefined;
 }
 
 /** Public URL for an uploaded car image, or fallback when no file. */
 function buildImagePath(file, fallback = '') {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!file) return fallback;
   return file.publicUrl || storage.buildPublicUrl(file.filename);
 }
@@ -56,7 +50,6 @@ function buildImagePath(file, fallback = '') {
  * Delete a managed storage object only when the URL is ours (never touch external CDN URLs).
  */
 async function deleteManagedImageIfUnused(publicUrl) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!publicUrl || !storage.isManagedPublicUrl(publicUrl)) {
     return;
   }
@@ -65,7 +58,6 @@ async function deleteManagedImageIfUnused(publicUrl) {
 
 /** Empty string / undefined → null for nullable DB columns. */
 function emptyToNull(value) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (value === undefined || value === null || value === '') return null;
   return value;
 }
@@ -76,7 +68,6 @@ function emptyToNull(value) {
  * @returns {*}
  */
 function parseOptionalInt(value) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (value === undefined || value === null || value === '') return null;
   const n = parseInt(String(value), 10);
   return Number.isInteger(n) ? n : null;
@@ -88,7 +79,6 @@ function parseOptionalInt(value) {
  * @returns {*}
  */
 function parseOptionalFloat(value) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (value === undefined || value === null || value === '') return null;
   const n = parseFloat(value);
   return Number.isFinite(n) ? n : null;

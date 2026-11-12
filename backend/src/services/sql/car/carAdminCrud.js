@@ -81,7 +81,6 @@ async function createAdminCar(payload, client = null) {
  */
 async function updateAdminCar(id, payload, client = null) {
   const carId = normalizeCarId(id);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!carId) {
     throw new Error('Invalid car id');
   }
@@ -143,7 +142,6 @@ async function updateAdminCar(id, payload, client = null) {
     ]
   );
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!result.rowCount) {
     return null;
   }
@@ -160,7 +158,6 @@ async function updateAdminCar(id, payload, client = null) {
  */
 async function deleteCarById(id, client = null) {
   const carId = normalizeCarId(id);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!carId) {
     throw new Error('Invalid car id');
   }

@@ -177,7 +177,6 @@ async function applySucceededRefund(
   const result = client ? await run(client) : await runWithTransaction(run);
 
   if (result.needsReview) {
-    // Protected block: isolate failure modes.
     try {
       await logSystemAction({
         action: 'system.refund_domain_transition_failed',

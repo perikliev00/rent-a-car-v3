@@ -48,7 +48,6 @@ function amountsEqual(a, b) {
  * @returns {*}
  */
 function currenciesEqual(objectCurrency, opCurrency) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (objectCurrency == null || objectCurrency === '') {
     return false;
   }
@@ -162,7 +161,6 @@ async function applyRefundFromStripeObject(stripeObject, { eventType = null } = 
     (paymentIntentId && (await refundOpSql.findByPaymentIntentId(paymentIntentId))) ||
     null;
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!op) {
     logger.info(
       { eventType, refundId, paymentIntentId },

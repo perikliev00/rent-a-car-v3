@@ -17,7 +17,6 @@ async function fetchCarsByIds(carIds, client = null) {
   )];
 
   const map = new Map();
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedIds.length) {
     return map;
   }
@@ -63,7 +62,6 @@ async function fetchCarsByIds(carIds, client = null) {
  * @returns {Promise<*>}
  */
 async function populateOrdersWithCars(orders, client = null) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Array.isArray(orders) || !orders.length) {
     return orders || [];
   }

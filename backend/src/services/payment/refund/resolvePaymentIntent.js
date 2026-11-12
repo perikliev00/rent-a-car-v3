@@ -70,7 +70,6 @@ function snapshotAmountCents(reservation) {
  */
 async function resolvePaymentIntentIdFromCheckoutSession(reservation) {
   const sessionId = reservation?.stripeSessionId;
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!sessionId) {
     throw refundError(
       'REFUND_NO_PAYMENT_INTENT',
@@ -79,7 +78,6 @@ async function resolvePaymentIntentIdFromCheckoutSession(reservation) {
   }
 
   let session;
-  // Protected block: isolate failure modes.
   try {
     session = await retrieveStripeCheckoutSession(sessionId);
   } catch (err) {
@@ -94,7 +92,6 @@ async function resolvePaymentIntentIdFromCheckoutSession(reservation) {
       ? session.payment_intent
       : session.payment_intent?.id || null;
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!pi) {
     throw refundError(
       'REFUND_NO_PAYMENT_INTENT',
@@ -147,14 +144,12 @@ async function resolvePaymentIntentForReservation(reservation) {
   let paymentIntentId = existing ? String(existing) : null;
   let sessionFallback = null;
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!paymentIntentId) {
     sessionFallback = await resolvePaymentIntentIdFromCheckoutSession(reservation);
     paymentIntentId = sessionFallback.paymentIntentId;
   }
 
   if (paymentIntentId) {
-    // Protected block: isolate failure modes.
     try {
       const fromPi = await resolveFromPaymentIntent(paymentIntentId);
       if (fromPi.amountCents === 0) {
@@ -194,7 +189,6 @@ async function resolvePaymentIntentForReservation(reservation) {
     };
   }
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!paymentIntentId) {
     throw refundError(
       'REFUND_NO_PAYMENT_INTENT',

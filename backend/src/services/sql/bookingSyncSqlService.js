@@ -13,7 +13,6 @@ const { toUtc } = require('../../utils/toUtc');
  */
 function normalizeCarId(carId) {
   const id = Number(carId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(id) || id <= 0) {
     return null;
   }
@@ -60,7 +59,6 @@ function openPhysicalRentalOverlapSql(blockAlias = 'b') {
  */
 async function extendOpenPhysicalRentalBlocks(carId = null, now = new Date(), client = null) {
   const normalizedCarId = carId ? normalizeCarId(carId) : null;
-  // Guard: early-return or throw when required input is missing/invalid.
   if (carId && normalizedCarId === null) {
     return;
   }
@@ -110,7 +108,6 @@ async function extendOpenPhysicalRentalBlocks(carId = null, now = new Date(), cl
  */
 async function clampClosedPhysicalRentalBlocks(carId = null, now = new Date(), client = null) {
   const normalizedCarId = carId ? normalizeCarId(carId) : null;
-  // Guard: early-return or throw when required input is missing/invalid.
   if (carId && normalizedCarId === null) {
     return;
   }
@@ -182,12 +179,10 @@ async function purgeExpired(carId = null, client = null) {
   const now = new Date();
   const normalizedCarId = carId ? normalizeCarId(carId) : null;
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (carId && normalizedCarId === null) {
     return;
   }
 
-  // Protected block: isolate failure modes.
   try {
     await extendOpenPhysicalRentalBlocks(normalizedCarId, now, client);
   } catch (err) {
@@ -246,7 +241,6 @@ async function purgeExpired(carId = null, client = null) {
  */
 async function assertNoOverlap(carId, start, end, client = null) {
   const normalizedCarId = normalizeCarId(carId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId) {
     throw new Error('Invalid car id');
   }
@@ -284,7 +278,6 @@ async function insertDateBlock(carId, start, end, client = null, options = {}) {
   const notes = options.notes || null;
   const createdByUserId = options.createdByUserId != null ? Number(options.createdByUserId) : null;
 
-  // Protected block: isolate failure modes.
   try {
     await clientQuery(
       client,
@@ -322,14 +315,12 @@ async function insertDateBlock(carId, start, end, client = null, options = {}) {
  */
 async function addRange(carId, start, end, client = null, options = {}) {
   const normalizedCarId = normalizeCarId(carId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId) {
     throw new Error('Invalid car id');
   }
 
   const s = toUtc(start);
   const e = toUtc(end);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!(s < e)) {
     throw new Error('Invalid date range');
   }
@@ -355,7 +346,6 @@ async function addRange(carId, start, end, client = null, options = {}) {
  */
 async function updateRange(carId, prevStart, prevEnd, newStart, newEnd, client = null) {
   const normalizedCarId = normalizeCarId(carId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId) {
     throw new Error('Invalid car id');
   }
@@ -364,7 +354,6 @@ async function updateRange(carId, prevStart, prevEnd, newStart, newEnd, client =
   const pe = toUtc(prevEnd);
   const ns = toUtc(newStart);
   const ne = toUtc(newEnd);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!(ns < ne)) {
     throw new Error('Invalid date range');
   }
@@ -395,7 +384,6 @@ async function updateRange(carId, prevStart, prevEnd, newStart, newEnd, client =
 async function moveRange(prevCarId, newCarId, prevStart, prevEnd, newStart, newEnd, client = null) {
   const prevId = normalizeCarId(prevCarId);
   const newId = normalizeCarId(newCarId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!prevId || !newId) {
     throw new Error('Invalid car id');
   }
@@ -404,7 +392,6 @@ async function moveRange(prevCarId, newCarId, prevStart, prevEnd, newStart, newE
   const pe = toUtc(prevEnd);
   const ns = toUtc(newStart);
   const ne = toUtc(newEnd);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!(ns < ne)) {
     throw new Error('Invalid date range');
   }
@@ -431,13 +418,11 @@ async function moveRange(prevCarId, newCarId, prevStart, prevEnd, newStart, newE
  * @param {object|null} [client]
  */
 async function removeRange(carId, startDate, endDate, client = null) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!carId || !startDate || !endDate) {
     return;
   }
 
   const normalizedCarId = normalizeCarId(carId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId) {
     return;
   }
@@ -461,7 +446,6 @@ async function removeRange(carId, startDate, endDate, client = null) {
  */
 async function purgeOrphaned(carId, client = null) {
   const normalizedCarId = normalizeCarId(carId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId) {
     return;
   }
@@ -476,7 +460,6 @@ async function purgeOrphaned(carId, client = null) {
     [normalizedCarId]
   );
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!blocksResult.rows.length) {
     return;
   }
@@ -509,7 +492,6 @@ async function purgeOrphaned(carId, client = null) {
     .filter((block) => !hasOverlapWithAnyOrder(block))
     .map((block) => block.id);
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!orphanIds.length) {
     return;
   }
@@ -557,7 +539,6 @@ async function fetchDateBlocksByCarIds(carIds, client = null) {
   )];
 
   const map = new Map();
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedIds.length) {
     return map;
   }
@@ -575,7 +556,6 @@ async function fetchDateBlocksByCarIds(carIds, client = null) {
 
   for (const row of result.rows) {
     const carId = Number(row.car_id);
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!map.has(carId)) {
       map.set(carId, []);
     }

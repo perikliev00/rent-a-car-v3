@@ -1,7 +1,13 @@
 {
   "name": "luxride",
   "private": true,
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
+    "prepare": "node scripts/install-git-hooks.js",
+    "hooks:install": "node scripts/install-git-hooks.js",
+    "ci:local": "node scripts/ci-local.js",
     "test": "npm run test:unit && npm run test:frontend && npm run test:admin-frontend",
     "test:unit": "npm --prefix backend test",
     "test:frontend": "npm --prefix \"front end\" test",

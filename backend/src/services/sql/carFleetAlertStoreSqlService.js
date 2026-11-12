@@ -9,11 +9,9 @@ const { clientQuery } = require('../../db/transaction');
  * @returns {*}
  */
 function mapAlertRow(row) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) return null;
   let meta = row.meta;
   if (typeof meta === 'string') {
-    // Protected block: isolate failure modes.
     try {
       meta = JSON.parse(meta);
     } catch {
@@ -108,7 +106,6 @@ async function upsertActive(alert, client = null) {
 
 /** Mark specific active alert ids as resolved. */
 async function resolveByIds(ids, resolvedAt = null, client = null) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!ids?.length) return 0;
   const result = await clientQuery(
     client,

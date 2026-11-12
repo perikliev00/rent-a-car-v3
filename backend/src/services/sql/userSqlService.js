@@ -31,7 +31,6 @@ function normalizeEmail(email) {
  */
 function normalizeId(value) {
   const id = Number(value);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(id) || id <= 0) {
     return null;
   }
@@ -44,7 +43,6 @@ function normalizeId(value) {
  * @returns {*}
  */
 function mapSqlUser(row) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) {
     return null;
   }
@@ -70,7 +68,6 @@ function mapSqlUser(row) {
  */
 async function findUserByEmail(email, client = null) {
   const normalizedEmail = normalizeEmail(email);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedEmail) {
     return null;
   }
@@ -97,7 +94,6 @@ async function findUserByEmail(email, client = null) {
  */
 async function findUserById(userId, client = null) {
   const normalizedId = normalizeId(userId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedId) {
     return null;
   }
@@ -124,7 +120,6 @@ async function findUserById(userId, client = null) {
  */
 async function findUserByVerificationTokenHash(tokenHash, client = null) {
   const hash = String(tokenHash || '').trim();
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!hash) {
     return null;
   }
@@ -196,7 +191,6 @@ async function createUser(
  */
 async function setVerificationToken(userId, tokenHash, expiresAt, client = null) {
   const normalizedId = normalizeId(userId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedId || !tokenHash || !expiresAt) {
     return null;
   }
@@ -226,7 +220,6 @@ async function setVerificationToken(userId, tokenHash, expiresAt, client = null)
  */
 async function markEmailVerified(userId, client = null) {
   const normalizedId = normalizeId(userId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedId) {
     return null;
   }
@@ -257,7 +250,6 @@ async function markEmailVerified(userId, client = null) {
  */
 async function clearVerificationToken(userId, client = null) {
   const normalizedId = normalizeId(userId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedId) {
     return null;
   }

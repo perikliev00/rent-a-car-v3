@@ -23,7 +23,6 @@ const ITEM_TYPE_TO_PREFIX = {
 
 /** Normalize Date/string to YYYY-MM-DD for day-level expiry math. */
 function toDateOnly(value) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!value) return null;
   if (value instanceof Date) return value.toISOString().slice(0, 10);
   const str = String(value);
@@ -53,7 +52,6 @@ function complianceLabel(itemType, title) {
 function desiredAlertFromCompliance(row, todayStr) {
   const itemType = row.item_type;
   const prefix = ITEM_TYPE_TO_PREFIX[itemType];
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!prefix) return null;
 
   const carId = String(row.car_id);
@@ -196,7 +194,6 @@ async function reconcileFleetAlerts({ now = new Date(), client = null } = {}) {
   let complianceRows = [];
   let damageRows = [];
 
-  // Protected block: isolate failure modes.
   try {
     complianceRows = await loadTrackedComplianceRows(client);
   } catch (err) {
@@ -204,7 +201,6 @@ async function reconcileFleetAlerts({ now = new Date(), client = null } = {}) {
     if (err?.code !== '42P01') throw err;
   }
 
-  // Protected block: isolate failure modes.
   try {
     damageRows = await loadUnresolvedDamages(client);
   } catch (err) {
@@ -222,7 +218,6 @@ async function reconcileFleetAlerts({ now = new Date(), client = null } = {}) {
 
   for (const alert of desired) {
     keepKeys.add(storeSql.alertKey(alert));
-    // Protected block: isolate failure modes.
     try {
       await storeSql.upsertActive(alert, client);
       upserted += 1;
@@ -235,7 +230,6 @@ async function reconcileFleetAlerts({ now = new Date(), client = null } = {}) {
   }
 
   let resolved = 0;
-  // Protected block: isolate failure modes.
   try {
     // Anything still active but not in keepKeys is no longer warranted.
     resolved = await storeSql.resolveMissing(
@@ -252,10 +246,8 @@ async function reconcileFleetAlerts({ now = new Date(), client = null } = {}) {
 
 /** Cron/job entry: reconcile and log only when something changed. */
 async function runFleetAlertChecks() {
-  // Protected block: isolate failure modes.
   try {
     const result = await reconcileFleetAlerts({ now: new Date() });
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!result.skipped && (result.upserted || result.resolved)) {
       logger.info(
         {

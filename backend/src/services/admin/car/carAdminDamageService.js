@@ -16,7 +16,6 @@ const { reconcileFleetAlertsQuietly } = require('./carAdminComplianceService');
 /** @param {number|string} carId */
 async function listDamageReports(carId) {
   const car = await carRepository.findByIdForAdmin(carId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!car || car.isDeleted) throw new Error('Car not found');
   return damageReportSql.listByCarId(carId);
 }
@@ -31,7 +30,6 @@ async function listDamageReports(carId) {
  */
 async function createDamageReport(carId, body, files = [], userId = null) {
   const car = await carRepository.findByIdForAdmin(carId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!car || car.isDeleted) throw new Error('Car not found');
 
   const photos = (files || []).map((f) => buildImagePath(f));
@@ -55,7 +53,6 @@ async function createDamageReport(carId, body, files = [], userId = null) {
 /** @param {number|string} carId @param {number|string} reportId */
 async function resolveDamageReport(carId, reportId) {
   const report = await damageReportSql.resolve(carId, reportId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!report) throw new Error('Damage report not found');
   await reconcileFleetAlertsQuietly();
   return report;

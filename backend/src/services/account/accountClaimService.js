@@ -14,7 +14,6 @@ const reservationSql = require('../sql/reservationSqlService');
  */
 async function claimReservationsForUser(userId, email) {
   const user = await userSql.findUserById(userId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!user?.emailVerifiedAt) {
     return { reservations: 0, orders: 0, skipped: true };
   }

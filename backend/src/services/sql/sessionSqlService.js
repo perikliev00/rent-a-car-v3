@@ -76,7 +76,6 @@ function notifySessionRevocation(userId) {
 /** Destroy connect-pg-simple sessions for a user (id stored as string or number in sess.user). */
 async function destroySessionsForUser(userId, client = null) {
   const id = String(userId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!id || id === 'undefined' || id === 'null') return 0;
 
   const result = await clientQuery(
@@ -94,7 +93,6 @@ async function destroySessionsForUser(userId, client = null) {
 /** Destroy sessions for every user currently assigned the given role. */
 async function destroySessionsForRole(roleId, client = null) {
   const id = Number(roleId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(id) || id <= 0) return 0;
 
   const assigned = await clientQuery(

@@ -102,7 +102,6 @@ async function handleFinalizationOverlap(
     throw err;
   }
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!err || err.code !== 'OVERLAP') {
     throw err;
   }
@@ -147,7 +146,6 @@ async function finalizePaidExpiredHold({
   const { logPrefix, paidAmount } = options;
   const holdExpiresAt = reservation.holdExpiresAt ? new Date(reservation.holdExpiresAt) : null;
 
-  // Protected block: isolate failure modes.
   try {
     const hasTxClient = Boolean(client && typeof client.query === 'function');
 

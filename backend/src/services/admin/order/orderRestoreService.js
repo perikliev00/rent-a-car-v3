@@ -23,7 +23,6 @@ const { acquireCarAdvisoryLocks } = require('../../../db/transaction');
  * @param {number|string} orderId
  */
 async function restoreOrder(orderId) {
-  // Protected block: isolate failure modes.
   try {
     await runWithOptionalTransaction(async (client) => {
       const order = await orderSql.findOrderById(orderId, client);

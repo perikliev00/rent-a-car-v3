@@ -16,12 +16,10 @@ async function syncCarStatusFromReservation(
   client = null
 ) {
   const carId = reservation?.carId?.id || reservation?.carId;
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!carId) return null;
 
   // Row lock so two status transitions cannot overwrite each other mid-sync.
   const car = await carSql.findCarStatusForUpdate(carId, client);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!car || car.isDeleted) return null;
 
   const current = car.status;

@@ -16,6 +16,7 @@ describe('privateLocalStorageService', () => {
     const opened = await local.openPrivateReadStream(stored.storageKey);
     expect(opened.path).toBe(stored.path);
     const chunks = [];
+    // Iterate asynchronously over the async iterable.
     for await (const chunk of opened.stream) {
       chunks.push(chunk);
     }

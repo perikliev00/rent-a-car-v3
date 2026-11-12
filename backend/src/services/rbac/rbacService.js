@@ -67,7 +67,6 @@ async function getUserAccess(userId, client = null) {
  * @returns {*}
  */
 function userHasPermission(access, permissionKey) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!access) return false;
   if ((access.roles || []).includes(OWNER_SLUG)) return true;
   return (access.permissions || []).includes(permissionKey);
@@ -80,7 +79,6 @@ function userHasPermission(access, permissionKey) {
  * @returns {*}
  */
 function userHasAnyPermission(access, keys) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!access) return false;
   if ((access.roles || []).includes(OWNER_SLUG)) return true;
   const set = new Set(access.permissions || []);
@@ -92,7 +90,6 @@ function userHasAnyPermission(access, keys) {
  * `users.role` is a denormalized cache and must never grant access on its own.
  */
 function isStaffAccess(access) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!access) return false;
   if ((access.roles || []).length > 0) return true;
   if ((access.permissions || []).length > 0) return true;
@@ -147,7 +144,6 @@ async function syncUserLegacyRole(userId, assigned, client) {
  */
 async function assertCanRemoveOwner(userId, client) {
   const currentlyOwner = await userRoleSql.userHasRoleSlug(userId, OWNER_SLUG, client);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!currentlyOwner) return;
 
   const ownerCount = await userRoleSql.countUsersWithRoleSlug(OWNER_SLUG, client);
@@ -172,7 +168,6 @@ async function setUserRoles(userId, roleIds, assignedByUserId = null) {
   // Open a DB transaction so writes commit atomically.
   const result = await runWithTransaction(async (client) => {
     const user = await userSql.findUserById(userId, client);
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!user) {
       throw createHttpError('NOT_FOUND', 'User not found.', 404);
     }
@@ -185,7 +180,6 @@ async function setUserRoles(userId, roleIds, assignedByUserId = null) {
 
     const ownerRole = await roleSql.findRoleBySlug(OWNER_SLUG, client);
     const nextHasOwner = ownerRole && uniqueIds.includes(Number(ownerRole.id));
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!nextHasOwner) {
       await assertCanRemoveOwner(userId, client);
     }
@@ -217,11 +211,9 @@ async function assignUserRole(userId, roleId, assignedByUserId = null) {
   // Open a DB transaction so writes commit atomically.
   const result = await runWithTransaction(async (client) => {
     const user = await userSql.findUserById(userId, client);
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!user) throw createHttpError('NOT_FOUND', 'User not found.', 404);
 
     const role = await roleSql.findRoleById(roleId, client);
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!role) throw createHttpError('NOT_FOUND', 'Role not found.', 404);
 
     const assigned = await userRoleSql.assignRoleToUser(
@@ -251,11 +243,9 @@ async function revokeUserRole(userId, roleId) {
   // Open a DB transaction so writes commit atomically.
   const result = await runWithTransaction(async (client) => {
     const user = await userSql.findUserById(userId, client);
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!user) throw createHttpError('NOT_FOUND', 'User not found.', 404);
 
     const role = await roleSql.findRoleById(roleId, client);
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!role) throw createHttpError('NOT_FOUND', 'Role not found.', 404);
 
     if (role.slug === OWNER_SLUG) {
@@ -287,7 +277,6 @@ async function updateRolePermissions(roleId, permissionKeys) {
   // Open a DB transaction so writes commit atomically.
   const result = await runWithTransaction(async (client) => {
     const role = await roleSql.findRoleById(roleId, client);
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!role) throw createHttpError('NOT_FOUND', 'Role not found.', 404);
 
     if (role.slug === OWNER_SLUG) {

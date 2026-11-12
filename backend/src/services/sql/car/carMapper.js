@@ -39,7 +39,6 @@ const CAR_SELECT = `
  */
 function normalizeCarId(value) {
   const id = Number(value);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(id) || id <= 0) {
     return null;
   }
@@ -65,7 +64,6 @@ function parsePage(raw, { min = 1, max = 999999 } = {}) {
  * @returns {*}
  */
 function toNumberOrUndefined(value) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (value === null || value === undefined) return undefined;
 
   const number = Number(value);
@@ -78,7 +76,6 @@ function toNumberOrUndefined(value) {
  * @returns {*}
  */
 function toDateOnly(value) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!value) return undefined;
   if (value instanceof Date) {
     return value.toISOString().slice(0, 10);
@@ -113,7 +110,6 @@ function mapFleetFields(row) {
  * @returns {*}
  */
 function mapSqlCar(row, dates = []) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) return null;
 
   return {

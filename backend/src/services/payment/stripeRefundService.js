@@ -53,7 +53,6 @@ async function createRefund({ paymentIntentId, amountCents = null, idempotencyKe
  * @throws {Error} When refundId is missing
  */
 async function retrieveRefund(refundId) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!refundId) {
     throw new Error('refundId is required');
   }

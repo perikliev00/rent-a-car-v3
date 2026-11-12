@@ -58,7 +58,6 @@ async function resolveCheckoutReservation({ req, car, formData, startDate, endDa
 
   let createdReservationThisStep = false;
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!reservationDoc) {
     const {
       reservation: createdReservation,
@@ -119,7 +118,6 @@ async function resolveCheckoutReservation({ req, car, formData, startDate, endDa
       reservationDoc.returnDate instanceof Date &&
       reservationDoc.returnDate.getTime() === endDate.getTime();
 
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!sameCar || !sameStart || !sameEnd) {
       return {
         ok: false,

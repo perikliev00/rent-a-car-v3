@@ -43,7 +43,6 @@ async function processStripeWebhookEvent({
       client
     );
 
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!inserted) {
       result = {
         found: true,

@@ -1,17 +1,31 @@
 #!/usr/bin/env bash
-# Enable protected main + required CI check via GitHub Rulesets API.
-# Prerequisites: gh auth login with admin rights on the repo.
-# Run AFTER 3 consecutive fully green CI runs on main.
+# Enable protected main + required CI check via the GitHub Rulesets API.
+#
+# Prerequisites:
+#   - gh auth login with admin rights on the repository
+#   - Prefer waiting until the aggregate "CI" check has been green on main
+#
+# Usage:
+#   bash scripts/enable-main-protection.sh [owner/repo]
+#
+# Verifies the ruleset afterwards. Does not claim success without API confirmation.
 set -euo pipefail
+
+ROOT="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
+RULESET_FILE="$ROOT/scripts/main-ci-required.ruleset.json"
 
 REPO="${1:-}"
 if [ -z "$REPO" ]; then
   REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
 fi
 
-echo "Applying ruleset on $REPO (protect main, require PR, require status check CI)..."
+if [ ! -f "$RULESET_FILE" ]; then
+  echo "Missing ruleset definition: $RULESET_FILE" >&2
+  exit 1
+fi
 
-# Delete existing ruleset with the same name if present (idempotent-ish update).
+echo "Applying ruleset on $REPO (protect main, require PR, require status check \"CI\")…"
+
 EXISTING_ID="$(gh api "repos/$REPO/rulesets" --jq '.[] | select(.name=="main-ci-required") | .id' | head -n1 || true)"
 if [ -n "${EXISTING_ID:-}" ]; then
   echo "Updating existing ruleset id=$EXISTING_ID"
@@ -22,45 +36,21 @@ else
   PATH_SUFFIX=""
 fi
 
-gh api --method "$METHOD" "repos/$REPO/rulesets$PATH_SUFFIX" --input - <<'EOF'
-{
-  "name": "main-ci-required",
-  "target": "branch",
-  "enforcement": "active",
-  "conditions": {
-    "ref_name": {
-      "include": ["refs/heads/main"],
-      "exclude": []
-    }
-  },
-  "rules": [
-    {
-      "type": "pull_request",
-      "parameters": {
-        "required_approving_review_count": 0,
-        "dismiss_stale_reviews_on_push": true,
-        "require_code_owner_review": false,
-        "require_last_push_approval": false,
-        "required_review_thread_resolution": true
-      }
-    },
-    {
-      "type": "required_status_checks",
-      "parameters": {
-        "strict_required_status_checks_policy": true,
-        "do_not_enforce_on_create": false,
-        "required_status_checks": [
-          { "context": "CI" }
-        ]
-      }
-    },
-    {
-      "type": "non_fast_forward"
-    }
-  ],
-  "bypass_actors": []
-}
-EOF
+gh api --method "$METHOD" "repos/$REPO/rulesets$PATH_SUFFIX" --input "$RULESET_FILE"
 
-echo "✓ Ruleset active: direct pushes to main blocked; PR merges require green status check \"CI\"."
-echo "Tip: also add Environment protection rules for staging/production in GitHub Settings → Environments."
+echo "Verifying ruleset…"
+ACTIVE_ID="$(gh api "repos/$REPO/rulesets" --jq '.[] | select(.name=="main-ci-required" and .enforcement=="active") | .id' | head -n1 || true)"
+if [ -z "${ACTIVE_ID:-}" ]; then
+  echo "Ruleset was not found as active after apply." >&2
+  exit 1
+fi
+
+DETAIL="$(gh api "repos/$REPO/rulesets/$ACTIVE_ID")"
+echo "$DETAIL" | grep -q '"CI"' || {
+  echo "Active ruleset does not list required status check \"CI\"." >&2
+  exit 1
+}
+
+echo "Verified: ruleset main-ci-required (id=$ACTIVE_ID) is active."
+echo "Direct pushes to main are blocked; PR merges require a green \"CI\" check."
+echo "Tip: also configure Environment protection for staging/production under GitHub Settings → Environments."

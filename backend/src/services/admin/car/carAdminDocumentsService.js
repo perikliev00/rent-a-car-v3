@@ -29,7 +29,6 @@ function notFoundError(message = 'Document not found') {
  * @param {string} legacyUrl
  */
 async function openLegacyPublicReadStream(legacyUrl) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!legacyUrl || !publicStorage.isManagedPublicUrl(legacyUrl)) {
     return null;
   }
@@ -41,11 +40,9 @@ async function openLegacyPublicReadStream(legacyUrl) {
   if (publicStorage.driver === 'local' && publicStorage.PUBLIC_CAR_IMAGES_DIR) {
     const filename = path.basename(legacyUrl);
     const filePath = path.resolve(publicStorage.PUBLIC_CAR_IMAGES_DIR, filename);
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!filePath.startsWith(path.resolve(publicStorage.PUBLIC_CAR_IMAGES_DIR))) {
       return null;
     }
-    // Protected block: isolate failure modes.
     try {
       await fs.promises.access(filePath, fs.constants.R_OK);
     } catch {
@@ -63,7 +60,6 @@ async function openLegacyPublicReadStream(legacyUrl) {
 /** @param {number|string} carId */
 async function listDocuments(carId) {
   const car = await carRepository.findByIdForAdmin(carId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!car || car.isDeleted) throw new Error('Car not found');
   const docs = await documentSql.listByCarId(carId);
   return docs.map(documentSql.toPublicDocument);
@@ -78,13 +74,10 @@ async function listDocuments(carId) {
  */
 async function uploadDocument(carId, file, name, userId = null) {
   const car = await carRepository.findByIdForAdmin(carId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!car || car.isDeleted) throw new Error('Car not found');
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!file) throw new Error('Document file is required.');
 
   let stored;
-  // Protected block: isolate failure modes.
   try {
     stored = await privateStorage.storePrivateFile({
       tempPath: file.path,
@@ -97,7 +90,6 @@ async function uploadDocument(carId, file, name, userId = null) {
     throw err;
   }
 
-  // Protected block: isolate failure modes.
   try {
     const document = await documentSql.create(carId, {
       name: name || file.originalname || 'document',
@@ -121,7 +113,6 @@ async function uploadDocument(carId, file, name, userId = null) {
  */
 async function deleteDocument(carId, docId) {
   const doc = await documentSql.remove(carId, docId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!doc) throw new Error('Document not found');
   if (doc.storageKey) {
     await privateStorage.deletePrivateFile(doc.storageKey);
@@ -139,16 +130,13 @@ async function deleteDocument(carId, docId) {
  */
 async function openDocumentDownload(carId, docId) {
   const car = await carRepository.findByIdForAdmin(carId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!car || car.isDeleted) throw new Error('Car not found');
 
   const doc = await documentSql.findById(carId, docId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!doc) notFoundError();
 
   if (doc.storageKey) {
     const opened = await privateStorage.openPrivateReadStream(doc.storageKey);
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!opened) notFoundError('File is no longer available');
     return {
       document: doc,
@@ -160,7 +148,6 @@ async function openDocumentDownload(carId, docId) {
 
   if (doc.legacyUrl) {
     const opened = await openLegacyPublicReadStream(doc.legacyUrl);
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!opened) notFoundError('File is no longer available');
     return {
       document: doc,

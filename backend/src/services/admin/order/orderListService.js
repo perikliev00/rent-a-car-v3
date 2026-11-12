@@ -28,27 +28,23 @@ function buildDateRangeFilters(filters) {
 
   if (filters.startDate) {
     const parsed = parseSofiaDate(filters.startDate, '00:00');
-    // Guard: early-return or throw when required input is missing/invalid.
     if (parsed && !Number.isNaN(parsed.getTime())) {
       rangeStart = parsed;
     }
   }
   if (filters.endDate) {
     const parsed = parseSofiaDate(filters.endDate, '23:59');
-    // Guard: early-return or throw when required input is missing/invalid.
     if (parsed && !Number.isNaN(parsed.getTime())) {
       rangeEnd = parsed;
     }
   }
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!rangeStart && !rangeEnd) {
     return null;
   }
 
   const start = rangeStart || rangeEnd;
   const end = rangeEnd || rangeStart;
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!start || !end || start > end) {
     return null;
   }

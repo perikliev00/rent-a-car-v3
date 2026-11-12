@@ -41,7 +41,6 @@ async function reconcileOneSession(reservation, { dryRun = false } = {}) {
   // Idempotency guard: return early when work was already applied.
   if (existingOrder) {
     summary.action = 'already_confirmed';
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!dryRun) {
       await paymentFailureSql.markFailuresResolvedByStripeSession(stripeSessionId);
     }
@@ -49,7 +48,6 @@ async function reconcileOneSession(reservation, { dryRun = false } = {}) {
   }
 
   let session;
-  // Protected block: isolate failure modes.
   try {
     session = await retrieveStripeCheckoutSession(stripeSessionId);
   } catch (err) {

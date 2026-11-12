@@ -35,7 +35,6 @@ function validationErrorResponse(res, errors) {
  * @returns {Promise<import('express').Response|void>}
  */
 exports.changeStatus = asyncHandler(async (req, res, next) => {
-  // Collect express-validator results for this request.
   const errors = validationResult(req);
   // Validation failed — respond before running domain logic.
   if (!errors.isEmpty()) {

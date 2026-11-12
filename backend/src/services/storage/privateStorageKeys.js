@@ -24,12 +24,10 @@ function generatePrivateKey(originalName, category = 'doc') {
  * @returns {boolean}
  */
 function isValidPrivateStorageKey(storageKey) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!storageKey || typeof storageKey !== 'string' || !storageKey.startsWith(KEY_PREFIX)) {
     return false;
   }
   const relative = storageKey.slice(KEY_PREFIX.length);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!relative || relative.includes('..') || path.posix.isAbsolute(relative) || path.win32.isAbsolute(relative)) {
     return false;
   }

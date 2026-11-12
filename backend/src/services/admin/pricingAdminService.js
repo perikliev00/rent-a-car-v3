@@ -89,17 +89,14 @@ async function previewPricing(body) {
     bookedAt,
   } = body || {};
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!carId) {
     return { ok: false, status: 400, error: 'carId is required' };
   }
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!ALLOWED_LOCATIONS.includes(pickupLocation) || !ALLOWED_LOCATIONS.includes(returnLocation)) {
     return { ok: false, status: 400, error: 'Invalid pickup or return location' };
   }
 
   const car = await carRepository.findById(carId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!car) {
     return { ok: false, status: 404, error: 'Car not found' };
   }
@@ -111,7 +108,6 @@ async function previewPricing(body) {
     returnTime,
   });
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!isValid || !startDate || !endDate) {
     return { ok: false, status: 422, error: errors?.[0] || 'Invalid booking dates' };
   }

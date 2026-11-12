@@ -45,7 +45,6 @@ async function getReadyStatus(pool) {
     migrations: { ok: false, pending: [] },
   };
 
-  // Protected block: isolate failure modes.
   try {
     await pool.query('SELECT 1');
     checks.database = {
@@ -63,7 +62,6 @@ async function getReadyStatus(pool) {
     };
   }
 
-  // Protected block: isolate failure modes.
   try {
     const migrationStatus = await getMigrationStatus(pool);
     checks.migrations = {

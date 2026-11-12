@@ -46,7 +46,6 @@ const createCompliance = asyncHandler(async (req, res, next) => {
       return apiResponse.error(res, 'VALIDATION_ERROR', req.fileValidationError, 422);
     }
 
-    // Collect express-validator results for this request.
     const errors = validationResult(req);
     // Validation failed — respond before running domain logic.
     if (!errors.isEmpty()) {
@@ -94,7 +93,6 @@ const updateCompliance = asyncHandler(async (req, res, next) => {
       return apiResponse.error(res, 'VALIDATION_ERROR', req.fileValidationError, 422);
     }
 
-    // Collect express-validator results for this request.
     const errors = validationResult(req);
     // Validation failed — respond before running domain logic.
     if (!errors.isEmpty()) {

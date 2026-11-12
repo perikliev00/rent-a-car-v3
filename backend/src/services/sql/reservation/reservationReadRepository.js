@@ -21,7 +21,6 @@ const OPEN_PHYSICAL_RENTAL_STATUSES = Object.freeze(['picked_up', 'active_rental
  */
 async function findOpenPhysicalRental(carId, client = null, options = {}) {
   const normalizedCarId = normalizeCarId(carId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId) {
     return null;
   }
@@ -69,7 +68,6 @@ async function carHasOpenPhysicalRental(carId, client = null) {
  * @returns {Promise<*>}
  */
 async function findActiveBySessionId(sessionId, client = null) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!sessionId) {
     return null;
   }
@@ -166,7 +164,6 @@ async function findOverlappingHold(
  */
 async function findBookedDateOverlap(carId, startDate, endDate, client = null) {
   const normalizedCarId = normalizeCarId(carId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId) {
     return null;
   }
@@ -184,7 +181,6 @@ async function findBookedDateOverlap(carId, startDate, endDate, client = null) {
     [normalizedCarId, startDate, endDate]
   );
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!result.rowCount) {
     return null;
   }
@@ -200,7 +196,6 @@ async function findBookedDateOverlap(carId, startDate, endDate, client = null) {
  */
 async function findById(id, client = null) {
   const reservationId = Number(id);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(reservationId) || reservationId <= 0) {
     return null;
   }
@@ -230,7 +225,6 @@ async function findById(id, client = null) {
  */
 async function findByIdForUpdate(id, client = null) {
   const reservationId = Number(id);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(reservationId) || reservationId <= 0) {
     return null;
   }

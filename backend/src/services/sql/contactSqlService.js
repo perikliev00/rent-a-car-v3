@@ -24,7 +24,6 @@ const ALLOWED_STATUSES = ['new', 'ready', 'done'];
  */
 function normalizeId(value) {
   const id = Number(value);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(id) || id <= 0) {
     return null;
   }
@@ -37,7 +36,6 @@ function normalizeId(value) {
  * @returns {*}
  */
 function mapSqlContact(row) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) {
     return null;
   }
@@ -112,7 +110,6 @@ async function listContacts(client = null) {
  */
 async function updateContactStatus(contactId, status, client = null) {
   const normalizedId = normalizeId(contactId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedId) {
     return null;
   }
@@ -144,7 +141,6 @@ async function updateContactStatus(contactId, status, client = null) {
  */
 async function deleteContactById(contactId, client = null) {
   const normalizedId = normalizeId(contactId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedId) {
     return false;
   }

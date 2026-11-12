@@ -43,7 +43,6 @@ const listCars = asyncHandler(async (req, res, next) => {
  * @returns {Promise<import('express').Response|void>}
  */
 const getCarById = asyncHandler(async (req, res, next) => {
-  // Collect express-validator results for this request.
   const errors = validationResult(req);
   // Validation failed — respond before running domain logic.
   if (!errors.isEmpty()) {
@@ -81,7 +80,6 @@ const createCar = asyncHandler(async (req, res, _next) => {
       return apiResponse.error(res, 'VALIDATION_ERROR', req.fileValidationError, 422);
     }
 
-    // Collect express-validator results for this request.
     const errors = validationResult(req);
     // Validation failed — respond before running domain logic.
     if (!errors.isEmpty()) {
@@ -130,7 +128,6 @@ const updateCar = asyncHandler(async (req, res, _next) => {
       return apiResponse.error(res, 'VALIDATION_ERROR', req.fileValidationError, 422);
     }
 
-    // Collect express-validator results for this request.
     const errors = validationResult(req);
     // Validation failed — respond before running domain logic.
     if (!errors.isEmpty()) {
@@ -182,7 +179,6 @@ const updateCar = asyncHandler(async (req, res, _next) => {
  * @returns {Promise<import('express').Response|void>}
  */
 const deleteCar = asyncHandler(async (req, res, next) => {
-  // Collect express-validator results for this request.
   const errors = validationResult(req);
   // Validation failed — respond before running domain logic.
   if (!errors.isEmpty()) {
@@ -219,7 +215,6 @@ const deleteCar = asyncHandler(async (req, res, next) => {
  * @returns {Promise<import('express').Response|void>}
  */
 const changeFleetStatus = asyncHandler(async (req, res, next) => {
-  // Collect express-validator results for this request.
   const errors = validationResult(req);
   // Validation failed — respond before running domain logic.
   if (!errors.isEmpty()) {

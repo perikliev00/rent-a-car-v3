@@ -9,7 +9,6 @@ const { clientQuery, isUniqueViolation } = require('../../db/transaction');
  * @returns {*}
  */
 function mapDocument(row) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) return null;
   return {
     id: Number(row.id),
@@ -87,7 +86,6 @@ async function findById(docId, client = null) {
  * @returns {Promise<*>}
  */
 async function upsert(payload, client = null) {
-  // Protected block: isolate failure modes.
   try {
     if (payload.docType === 'driver_license' || payload.docType === 'passport_id') {
       const existing = await clientQuery(

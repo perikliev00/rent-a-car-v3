@@ -82,7 +82,6 @@ async function updateCar(id, payload, file) {
   const carPayload = buildCarPayload(payload, file, existingCar);
   const newTiers = extractPriceTiers(carPayload);
   const updated = await carRepository.update(id, carPayload);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!updated) {
     throw new Error('Car not found');
   }
@@ -132,7 +131,6 @@ async function deleteCar(id) {
   }
 
   const deleted = await carRepository.deleteById(id);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!deleted) {
     throw new Error('Car not found');
   }

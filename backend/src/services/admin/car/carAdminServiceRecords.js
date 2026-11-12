@@ -12,7 +12,6 @@ const {
 /** @param {number|string} carId */
 async function listServiceRecords(carId) {
   const car = await carRepository.findByIdForAdmin(carId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!car || car.isDeleted) throw new Error('Car not found');
   return serviceRecordSql.listByCarId(carId);
 }
@@ -24,7 +23,6 @@ async function listServiceRecords(carId) {
  */
 async function createServiceRecord(carId, body, userId = null) {
   const car = await carRepository.findByIdForAdmin(carId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!car || car.isDeleted) throw new Error('Car not found');
   return serviceRecordSql.create(carId, {
     serviceType: body.serviceType,
@@ -69,7 +67,6 @@ async function updateServiceRecord(carId, recordId, body) {
  */
 async function deleteServiceRecord(carId, recordId) {
   const ok = await serviceRecordSql.remove(carId, recordId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!ok) throw new Error('Service record not found');
 }
 

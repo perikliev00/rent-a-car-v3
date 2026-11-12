@@ -12,6 +12,7 @@ vi.mock('../components/ui/toastStore', () => ({
 
 type Listener = (event: MessageEvent<string>) => void;
 
+// Declare the MockEventSource class.
 class MockEventSource {
   static instances: MockEventSource[] = [];
   url: string;

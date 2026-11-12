@@ -9,7 +9,6 @@ const { clientQuery } = require('../../db/transaction');
  * @returns {*}
  */
 function mapRole(row) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) return null;
   return {
     id: String(row.id),
@@ -58,7 +57,6 @@ async function listRoles(client = null) {
  */
 async function findRoleById(roleId, client = null) {
   const id = Number(roleId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(id) || id <= 0) return null;
   const result = await clientQuery(
     client,
@@ -81,7 +79,6 @@ async function findRoleById(roleId, client = null) {
  */
 async function findRoleBySlug(slug, client = null) {
   const normalized = String(slug || '').trim().toLowerCase();
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalized) return null;
   const result = await clientQuery(
     client,

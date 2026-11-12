@@ -17,7 +17,6 @@ const { changeStatus } = require('../../reservation/reservationStatusService');
 async function deleteOrder(orderId) {
   await runWithOptionalTransaction(async (client) => {
     const order = await orderSql.findOrderById(orderId, client);
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!order || order.isDeleted) return;
 
     // Linked reservation path: cancel reservation; its hooks soft-delete the order.

@@ -120,7 +120,6 @@ const CONFIRMED_NO_REFUND_CODES = new Set(['refund_failed']);
  * @returns {boolean}
  */
 function isIndeterminateStripeError(err) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!err) {
     return true;
   }

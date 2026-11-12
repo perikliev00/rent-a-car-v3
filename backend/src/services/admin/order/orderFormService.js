@@ -95,7 +95,6 @@ async function buildOrderNewErrorResult(payload, errorMessage) {
  */
 async function buildOrderEditErrorResult(orderId, payload, errorMessage) {
   const order = await orderSql.findOrderByIdPopulated(orderId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!order) {
     const err = new Error('Order not found');
     err.status = 404;
@@ -141,7 +140,6 @@ async function getCreateOrderForm() {
  */
 async function getOrderEditData(id) {
   const order = await orderSql.findOrderByIdPopulated(id);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!order) {
     return null;
   }

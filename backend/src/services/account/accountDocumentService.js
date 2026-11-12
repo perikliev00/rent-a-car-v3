@@ -16,7 +16,6 @@ const ALLOWED_DOC_TYPES = new Set(['driver_license', 'passport_id', 'other']);
  * @returns {object|null}
  */
 function toPublicDocument(doc) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!doc) return null;
   return {
     id: doc.id,
@@ -47,14 +46,12 @@ async function listDocuments(userId) {
  * @returns {Promise<object>}
  */
 async function uploadDocument(userId, { file, docType, reservationId }) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!file) {
     const err = new Error('A file is required.');
     err.code = 'VALIDATION_ERROR';
     err.status = 422;
     throw err;
   }
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!ALLOWED_DOC_TYPES.has(docType)) {
     await removeUploadedFile(file);
     const err = new Error('Invalid document type.');
@@ -67,7 +64,6 @@ async function uploadDocument(userId, { file, docType, reservationId }) {
   if (reservationId != null && String(reservationId).trim() !== '') {
     // Only allow linking documents to reservations the user owns.
     const owned = await reservationSql.findByIdForUser(reservationId, userId);
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!owned) {
       await removeUploadedFile(file);
       const err = new Error('Reservation not found.');
@@ -79,7 +75,6 @@ async function uploadDocument(userId, { file, docType, reservationId }) {
   }
 
   let stored;
-  // Protected block: isolate failure modes.
   try {
     stored = await privateStorage.storePrivateFile({
       tempPath: file.path,
@@ -97,7 +92,6 @@ async function uploadDocument(userId, { file, docType, reservationId }) {
 
   let document;
   let replaced;
-  // Protected block: isolate failure modes.
   try {
     ({ document, replaced } = await documentSql.upsert({
       userId,
@@ -128,7 +122,6 @@ async function uploadDocument(userId, { file, docType, reservationId }) {
  */
 async function deleteDocument(userId, docId) {
   const doc = await documentSql.remove(docId, userId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!doc) {
     const err = new Error('Document not found');
     err.code = 'NOT_FOUND';
@@ -151,14 +144,12 @@ async function openDocumentDownload(userId, docId, { admin = false } = {}) {
   const doc = admin
     ? await documentSql.findById(docId)
     : await documentSql.findByIdForUser(docId, userId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!doc) {
     const err = new Error('Document not found');
     err.code = 'NOT_FOUND';
     err.status = 404;
     throw err;
   }
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!admin && String(doc.userId) !== String(userId)) {
     const err = new Error('Document not found');
     err.code = 'NOT_FOUND';
@@ -167,7 +158,6 @@ async function openDocumentDownload(userId, docId, { admin = false } = {}) {
   }
 
   const opened = await privateStorage.openPrivateReadStream(doc.storageKey);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!opened) {
     const err = new Error('File is no longer available');
     err.code = 'NOT_FOUND';

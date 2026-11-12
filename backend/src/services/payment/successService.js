@@ -57,7 +57,6 @@ async function handleCheckoutSuccessFlow(req) {
   // Webhook may still be in flight — attempt finalization from the success page path.
   if (!confirmed) {
     const metadata = session.metadata || {};
-    // Protected block: isolate failure modes.
     try {
       const result = await finalizeReservationByStripeSessionId(stripeSessionId, {
         reservationId: metadata.reservationId || session.client_reference_id || null,

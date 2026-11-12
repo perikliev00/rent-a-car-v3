@@ -10,7 +10,6 @@ const { clientQuery } = require('../../db/transaction');
  */
 function normalizeAdminUserId(value) {
   const id = Number(value);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(id) || id <= 0) {
     return null;
   }
@@ -35,7 +34,6 @@ function normalizeActorType(value) {
  * @returns {*}
  */
 function mapAuditLogRow(row) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) return null;
 
   const action = row.action;

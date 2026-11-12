@@ -14,13 +14,11 @@ const PRIVATE_DIR = path.join(__dirname, '..', '..', '..', 'uploads', 'private')
  * @returns {string|null}
  */
 function resolvePrivatePath(storageKey) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!isValidPrivateStorageKey(storageKey)) {
     return null;
   }
   const relative = storageKey.slice(KEY_PREFIX.length);
   const resolved = path.resolve(PRIVATE_DIR, relative);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!resolved.startsWith(path.resolve(PRIVATE_DIR))) {
     return null;
   }
@@ -40,14 +38,12 @@ async function ensurePrivateDir() {
  * @returns {Promise<{ storageKey: string, path: string, mimeType: string, sizeBytes: number }>}
  */
 async function storePrivateFile({ tempPath, originalName, category = 'doc', mimeType }) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!tempPath) {
     throw new Error('Missing temp upload path.');
   }
 
   const storageKey = generatePrivateKey(originalName, category);
   const destPath = resolvePrivatePath(storageKey);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!destPath) {
     throw new Error('Invalid private storage key.');
   }
@@ -79,7 +75,6 @@ async function storePrivateFile({ tempPath, originalName, category = 'doc', mime
 async function storePrivateBuffer({ buffer, originalName, category = 'doc', mimeType }) {
   const storageKey = generatePrivateKey(originalName, category);
   const destPath = resolvePrivatePath(storageKey);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!destPath) {
     throw new Error('Invalid private storage key.');
   }
@@ -102,11 +97,9 @@ async function storePrivateBuffer({ buffer, originalName, category = 'doc', mime
  */
 async function openPrivateReadStream(storageKey) {
   const filePath = resolvePrivatePath(storageKey);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!filePath) {
     return null;
   }
-  // Protected block: isolate failure modes.
   try {
     await fs.promises.access(filePath, fs.constants.R_OK);
   } catch {
@@ -125,9 +118,7 @@ async function openPrivateReadStream(storageKey) {
  */
 async function deletePrivateFile(storageKey) {
   const filePath = resolvePrivatePath(storageKey);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!filePath) return false;
-  // Protected block: isolate failure modes.
   try {
     await fs.promises.unlink(filePath);
     return true;
@@ -144,9 +135,7 @@ async function deletePrivateFile(storageKey) {
  */
 async function privateFileExists(storageKey) {
   const filePath = resolvePrivatePath(storageKey);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!filePath) return false;
-  // Protected block: isolate failure modes.
   try {
     await fs.promises.access(filePath, fs.constants.R_OK);
     return true;

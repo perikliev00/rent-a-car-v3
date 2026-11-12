@@ -12,7 +12,6 @@ const metrics = require('../../monitoring/metrics');
  */
 function isEmailEnabledFlag() {
   const flag = process.env.EMAIL_ENABLED;
-  // Guard: early-return or throw when required input is missing/invalid.
   if (flag === undefined) {
     return null;
   }
@@ -43,7 +42,6 @@ function isEmailConfigured() {
  * @returns {Promise<*>}
  */
 async function createTransport() {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!isEmailConfigured()) {
     return null;
   }
@@ -69,13 +67,11 @@ async function createTransport() {
  * @returns {Promise<{ sent: boolean, reason?: string }>}
  */
 async function sendMail({ to, subject, text, html }) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!to) {
     return { sent: false, reason: 'missing_recipient' };
   }
 
   const transport = await createTransport();
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!transport) {
     logger.info({ to, subject }, 'Email skipped (SMTP not configured)');
     return { sent: false, reason: 'smtp_not_configured' };

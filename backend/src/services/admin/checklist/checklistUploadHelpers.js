@@ -12,7 +12,6 @@ const FUEL_LEVELS = new Set(['empty', 'quarter', 'half', 'three_quarters', 'full
  * @param {string} category
  */
 async function storeUpload(file, category) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!file) return null;
   const stored = await privateStorage.storePrivateFile({
     tempPath: file.path,

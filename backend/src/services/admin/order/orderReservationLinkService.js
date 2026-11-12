@@ -13,7 +13,6 @@ const { recordInitialStatus } = require('../../reservation/reservationStatusServ
  * @param {{actor?: object, client?: object|null}} [opts]
  */
 async function ensureLinkedConfirmedReservation(order, { actor = { type: 'admin' }, client = null } = {}) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!order) {
     return null;
   }

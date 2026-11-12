@@ -9,7 +9,6 @@ const { clientQuery } = require('../../db/transaction');
  * @returns {*}
  */
 function normalizeReservationId(value) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (value == null || value === '') {
     return null;
   }

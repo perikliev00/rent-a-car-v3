@@ -20,7 +20,6 @@ function isValidLocation(location) {
 
 /** Human-readable label for a location id (static labels or title-cased slug). */
 function formatLocationName(location) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!location) return '';
   if (LOCATION_LABELS[location]) return LOCATION_LABELS[location];
   return location
@@ -54,7 +53,6 @@ function feeFor(location) {
  * @returns {Promise<Record<string, number>>}
  */
 async function getDeliveryFeeMap() {
-  // Protected block: isolate failure modes.
   try {
     // DB fees override static defaults when pricing config loads.
     const config = await loadPricingConfig();

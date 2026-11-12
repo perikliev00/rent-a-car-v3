@@ -33,7 +33,6 @@ function toIso(value) {
  * @returns {Promise<*>}
  */
 async function findSessionHoldRows(sessionId, client) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!sessionId) {
     return [];
   }

@@ -47,7 +47,6 @@ async function createPendingReservation(
   client = null
 ) {
   const normalizedCarId = normalizeCarId(carId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId) {
     throw new Error('Invalid car id');
   }
@@ -159,11 +158,9 @@ async function createPendingReservationWithAvailabilityCheck({
   excludeSessionId = null,
 }) {
   const normalizedCarId = normalizeCarId(carId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId) {
     throw new Error('Invalid car id');
   }
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!sessionId || typeof sessionId !== 'string') {
     throw new Error('Invalid session id');
   }
@@ -217,7 +214,6 @@ async function createPendingReservationWithAvailabilityCheck({
     }
 
     await client.query('SAVEPOINT hold_insert');
-    // Protected block: isolate failure modes.
     try {
       const reservation = await createPendingReservation(
         {

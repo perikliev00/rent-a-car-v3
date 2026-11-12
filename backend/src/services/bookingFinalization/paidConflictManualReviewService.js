@@ -54,7 +54,6 @@ async function markPaidReservationConflict({
       : 'manual_review';
 
   let updatedReservation = reservation;
-  // Protected block: isolate failure modes.
   try {
     const result = await changeStatus({
       reservationId: reservation.id,

@@ -131,7 +131,6 @@ exports.postLogin = asyncHandler(async (req, res, next) => {
       return apiResponse.error(res, 'ALREADY_LOGGED_IN', 'You are already logged in.', 409);
     }
 
-    // Collect express-validator results for this request.
     const errors = validationResult(req);
     const { email, password } = req.body;
 
@@ -208,7 +207,6 @@ exports.postSignup = asyncHandler(async (req, res, next) => {
       return apiResponse.error(res, 'ALREADY_LOGGED_IN', 'You are already logged in.', 409);
     }
 
-    // Collect express-validator results for this request.
     const errors = validationResult(req);
     const { email, password } = req.body;
 
@@ -277,7 +275,6 @@ exports.postSignup = asyncHandler(async (req, res, next) => {
  */
 exports.postVerifyEmail = asyncHandler(async (req, res, next) => {
   try {
-    // Collect express-validator results for this request.
     const errors = validationResult(req);
     // Validation failed — respond before running domain logic.
     if (!errors.isEmpty()) {

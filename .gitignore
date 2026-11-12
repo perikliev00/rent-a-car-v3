@@ -53,8 +53,15 @@ backend/src/public/images/uploads/
 Thumbs.db
 desktop.ini
 
+# Local CI gate lock (concurrent ci:local)
+.ci-local.lock
+.tmp-gitleaks*
+
 # Local validation scratch
 .tmp-am-validate-*/
+
+# One-shot scripts that may embed host secrets (never commit)
+ops/*.once.sh
 
 # Editor
 .idea/

@@ -105,12 +105,10 @@ async function confirmPreviousSessionExpired(sessionId, context) {
     return { ok: false, paid: true };
   }
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!expireResult.ok) {
     return { ok: false };
   }
 
-  // Protected block: isolate failure modes.
   try {
     // Double-check: race where payment completed between expire attempt and now.
     const confirmed = await retrieveStripeCheckoutSession(sessionId);
@@ -155,7 +153,6 @@ async function resolveExistingCheckoutSession({
   };
 
   let existingSession;
-  // Protected block: isolate failure modes.
   try {
     existingSession = await retrieveStripeCheckoutSession(previousStripeSessionId);
   } catch (err) {
@@ -190,7 +187,6 @@ async function resolveExistingCheckoutSession({
     if (expired.paid) {
       return { action: 'paid', sessionId: previousStripeSessionId };
     }
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!expired.ok) {
       return { action: 'refuse' };
     }
@@ -213,7 +209,6 @@ async function createAndLinkStripeSession({
   createdReservationThisStep,
 }) {
   let attempt;
-  // Protected block: isolate failure modes.
   try {
     attempt = await reservationSql.reserveCheckoutAttempt(reservationDoc.id);
   } catch (err) {
@@ -230,7 +225,6 @@ async function createAndLinkStripeSession({
   const idempotencyKey = buildCheckoutIdempotencyKey(reservationDoc.id, attempt);
 
   let stripeSession;
-  // Protected block: isolate failure modes.
   try {
     stripeSession = await createStripeCheckoutSession({
       car,
@@ -264,7 +258,6 @@ async function createAndLinkStripeSession({
     return checkoutErrorResponse(car, formData, pricing);
   }
 
-  // Protected block: isolate failure modes.
   try {
     reservationDoc = await linkStripeSessionToReservation({
       req,
@@ -388,7 +381,6 @@ async function createOrReuseLockedCheckoutSession({
 
   // Idempotency guard: return early when work was already applied.
   if (existing.action === 'reuse') {
-    // Protected block: isolate failure modes.
     try {
       reservationDoc = await linkStripeSessionToReservation({
         req,
@@ -441,13 +433,11 @@ async function createCheckoutSessionFlow(req) {
   const formData = { ...req.body, releaseRedirect: req.originalUrl };
 
   const car = await carRepository.findById(formData.carId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!car) {
     throw new NotFoundError('Car not found.');
   }
 
   const validation = validateCheckoutRequest(req, car, formData);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!validation.ok) {
     return validation.response;
   }
@@ -455,7 +445,6 @@ async function createCheckoutSessionFlow(req) {
   const { startDate, endDate } = validation;
 
   const pricingResult = await resolveCheckoutPricing(car, formData, startDate, endDate);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!pricingResult.ok) {
     return pricingResult.response;
   }
@@ -470,7 +459,6 @@ async function createCheckoutSessionFlow(req) {
     endDate,
     pricing,
   });
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!reservationResult.ok) {
     return reservationResult.response;
   }
@@ -490,7 +478,6 @@ async function createCheckoutSessionFlow(req) {
     return checkoutErrorResponse(car, formData, pricing);
   }
 
-  // Protected block: isolate failure modes.
   try {
     // Serialize concurrent checkout starts for the same reservation.
     return await withReservationCheckoutLock(reservationDoc.id, async () => {

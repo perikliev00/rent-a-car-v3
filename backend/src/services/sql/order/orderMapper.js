@@ -43,7 +43,6 @@ const ALLOWED_STATUSES = ['active', 'pending', 'expired', 'cancelled'];
  */
 function normalizeId(value) {
   const id = Number(value);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(id) || id <= 0) {
     return null;
   }
@@ -66,7 +65,6 @@ function toNumberOrZero(value) {
  * @returns {*}
  */
 function mapSqlOrder(row) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) {
     return null;
   }
@@ -112,7 +110,6 @@ function mapSqlOrder(row) {
  * @returns {*}
  */
 function attachCarToOrder(order, car) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!order) {
     return null;
   }

@@ -12,7 +12,6 @@ const SEVERITY_ORDER = { critical: 0, warning: 1, info: 2 };
  * @returns {*}
  */
 function toDateOnly(value) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!value) return null;
   if (value instanceof Date) return value.toISOString().slice(0, 10);
   const str = String(value);
@@ -179,7 +178,6 @@ async function listFleetAlerts(client = null) {
     alerts.push(...buildAlertsForCar(row, todayStr));
   }
 
-  // Protected block: isolate failure modes.
   try {
     const persisted = await storeSql.listActive(client);
     for (const alert of persisted) {

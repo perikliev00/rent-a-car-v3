@@ -135,7 +135,6 @@ async function reholdPendingReservationWithAvailabilityCheck({
   if (!normalizedNewCarId) {
     throw new Error('Invalid car id');
   }
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!sessionId || typeof sessionId !== 'string') {
     throw new Error('Invalid session id');
   }
@@ -158,7 +157,6 @@ async function reholdPendingReservationWithAvailabilityCheck({
     ]);
     await expireStaleHoldsForSession(sessionId, now, client);
 
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!peeked) {
       return { ok: false, reason: 'not_found' };
     }
@@ -168,7 +166,6 @@ async function reholdPendingReservationWithAvailabilityCheck({
     }
 
     const locked = await findByIdForUpdate(peeked.id, client);
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!locked || locked.sessionId !== sessionId) {
       return { ok: false, reason: 'not_found' };
     }
@@ -230,7 +227,6 @@ async function reholdPendingReservationWithAvailabilityCheck({
     };
 
     await client.query('SAVEPOINT hold_rehold');
-    // Protected block: isolate failure modes.
     try {
       const reservation = await updateHoldForRehold(
         {

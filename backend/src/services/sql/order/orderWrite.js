@@ -14,7 +14,6 @@ async function createOrderFromReservation(reservation, carId, client = null) {
   const normalizedCarId = normalizeId(carId);
   const normalizedReservationId = normalizeId(reservation.id);
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId || !normalizedReservationId) {
     throw new Error('Invalid car or reservation id for order creation');
   }
@@ -93,7 +92,6 @@ async function createOrderFromReservation(reservation, carId, client = null) {
  */
 async function createAdminOrder(orderPayload, client = null) {
   const normalizedCarId = normalizeId(orderPayload.carId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId) {
     throw new Error('Invalid car id for order creation');
   }
@@ -168,7 +166,6 @@ async function createAdminOrder(orderPayload, client = null) {
  */
 async function updateOrderFromDoc(order, client = null) {
   const orderId = normalizeId(order.id);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!orderId) {
     throw new Error('Invalid order id');
   }

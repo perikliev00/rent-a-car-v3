@@ -32,7 +32,6 @@ async function releaseActiveReservationForSession(req, options = {}) {
   const skipAudit = Boolean(options.skipAudit);
   const reservation = await findActiveReservationBySession(req);
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!reservation) {
     return { cancelled: false, reservation: null };
   }
@@ -50,7 +49,6 @@ async function releaseActiveReservationForSession(req, options = {}) {
     reason,
   });
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!skipAudit) {
     const action =
       reason === 'checkout_cancel'
@@ -69,7 +67,6 @@ async function releaseActiveReservationForSession(req, options = {}) {
 
 /** Refresh hold TTL in memory (caller persists via changeStatus patch). */
 function extendReservationHold(reservation) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!reservation) {
     return reservation;
   }
@@ -88,7 +85,6 @@ async function checkCarAvailabilityForRange({
   endDate,
   now = new Date(),
 }) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!carId || !(startDate instanceof Date) || !(endDate instanceof Date)) {
     throw new Error('checkCarAvailabilityForRange: invalid arguments');
   }
@@ -174,7 +170,6 @@ async function createPendingReservation(payload, req = null) {
  * @returns {Promise<*>}
  */
 async function attachCarNameToReservation(reservation) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!reservation) {
     return reservation;
   }
@@ -184,13 +179,11 @@ async function attachCarNameToReservation(reservation) {
       ? reservation.carId.id
       : reservation.carId;
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!rawCarId) {
     return reservation;
   }
 
   const car = await carRepository.findById(rawCarId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!car) {
     return reservation;
   }
@@ -208,7 +201,6 @@ async function attachCarNameToReservation(reservation) {
  */
 async function reconcileProcessingStripeReservations(now = new Date()) {
   const candidates = await reservationRepository.findProcessingWithExpiredHold(now);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!candidates.length) {
     return { checked: 0, expired: 0, finalized: 0, kept: 0 };
   }
@@ -224,7 +216,6 @@ async function reconcileProcessingStripeReservations(now = new Date()) {
       continue;
     }
 
-    // Protected block: isolate failure modes.
     try {
       const session = await retrieveStripeCheckoutSession(stripeSessionId);
 
@@ -286,7 +277,6 @@ async function reconcileProcessingStripeReservations(now = new Date()) {
  * Job: expire holds whose browse sessions died, then reconcile Stripe processing holds.
  */
 async function cleanUpAbandonedReservations() {
-  // Protected block: isolate failure modes.
   try {
     const nowUTC = new Date();
     const activeSids = await sessionSql.listActiveSessionIds();
@@ -342,12 +332,10 @@ async function cleanUpAbandonedReservations() {
  * @returns {*}
  */
 function publishReholdSideEffects(result) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!result?.ok || !result.reservation) {
     return;
   }
 
-  // Protected block: isolate failure modes.
   try {
     const {
       publishLiveEvent,

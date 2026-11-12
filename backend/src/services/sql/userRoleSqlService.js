@@ -9,7 +9,6 @@ const { clientQuery } = require('../../db/transaction');
  * @returns {*}
  */
 function mapUserRole(row) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) return null;
   return {
     userId: String(row.user_id),
@@ -29,7 +28,6 @@ function mapUserRole(row) {
  */
 async function listRolesForUser(userId, client = null) {
   const uid = Number(userId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(uid) || uid <= 0) return [];
 
   const result = await clientQuery(
@@ -82,7 +80,6 @@ async function listRoleIdsForUser(userId, client = null) {
  */
 async function countUsersWithRoleSlug(slug, client = null) {
   const normalized = String(slug || '').trim().toLowerCase();
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalized) return 0;
   const result = await clientQuery(
     client,
@@ -107,7 +104,6 @@ async function countUsersWithRoleSlug(slug, client = null) {
 async function userHasRoleSlug(userId, slug, client = null) {
   const uid = Number(userId);
   const normalized = String(slug || '').trim().toLowerCase();
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(uid) || uid <= 0 || !normalized) return false;
 
   const result = await clientQuery(
@@ -136,7 +132,6 @@ async function assignRoleToUser(userId, roleId, assignedByUserId = null, client 
   const uid = Number(userId);
   const rid = Number(roleId);
   const by = assignedByUserId != null ? Number(assignedByUserId) : null;
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(uid) || uid <= 0 || !Number.isInteger(rid) || rid <= 0) {
     throw new Error('Invalid user or role id');
   }
@@ -164,7 +159,6 @@ async function assignRoleToUser(userId, roleId, assignedByUserId = null, client 
 async function revokeRoleFromUser(userId, roleId, client = null) {
   const uid = Number(userId);
   const rid = Number(roleId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(uid) || uid <= 0 || !Number.isInteger(rid) || rid <= 0) {
     throw new Error('Invalid user or role id');
   }
@@ -191,7 +185,6 @@ async function revokeRoleFromUser(userId, roleId, client = null) {
  */
 async function replaceUserRoles(userId, roleIds, assignedByUserId = null, client = null) {
   const uid = Number(userId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(uid) || uid <= 0) {
     throw new Error('Invalid user id');
   }

@@ -37,7 +37,6 @@ function opName(methodName) {
  * @returns {object} Proxy-like wrapped module
  */
 function wrapStorageMetrics(driverModule) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!driverModule || typeof driverModule !== 'object') {
     return driverModule;
   }
@@ -46,7 +45,6 @@ function wrapStorageMetrics(driverModule) {
   const wrapped = Object.create(Object.getPrototypeOf(driverModule));
 
   for (const [key, value] of Object.entries(driverModule)) {
-    // Guard: early-return or throw when required input is missing/invalid.
     if (typeof value !== 'function' || !ASYNC_OPS.has(key)) {
       wrapped[key] = value;
       continue;

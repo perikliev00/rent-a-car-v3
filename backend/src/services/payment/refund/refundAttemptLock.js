@@ -49,7 +49,6 @@ async function lockAndCreateAttempt({
   return runWithTransaction(async (tx) => {
     // FOR UPDATE prevents two admins from creating parallel pending refunds.
     const locked = await reservationSql.findByIdForUpdate(reservationId, tx);
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!locked) {
       throw refundError('NOT_FOUND', 'Reservation not found.', 404);
     }

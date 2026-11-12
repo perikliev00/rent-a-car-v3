@@ -32,7 +32,6 @@ async function resolveCheckoutPricing(car, formData, startDate, endDate) {
   });
 
   let pricing;
-  // Protected block: isolate failure modes.
   try {
     pricing = await computeBookingPriceAsync(
       car,

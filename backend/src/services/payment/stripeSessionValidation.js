@@ -29,7 +29,6 @@ function canLinkNewStripeSession(reservation) {
 function validateActiveStripeSessionLink(reservation, incomingSessionId) {
   const activeSessionId = reservation?.stripeSessionId || null;
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!activeSessionId) {
     return { ok: true, orphanRecovery: true };
   }
@@ -142,7 +141,6 @@ function paidSnapshotFromFinalizationContext(options = {}, stripeSession = null)
  * @returns {object}
  */
 function paidAmountPatch(paidAmountCents, paidCurrency) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!(Number(paidAmountCents) > 0)) {
     return {};
   }
@@ -159,7 +157,6 @@ function paidAmountPatch(paidAmountCents, paidCurrency) {
  * @returns {object|null}
  */
 function buildStripeSessionSnapshot(session) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!session) {
     return null;
   }

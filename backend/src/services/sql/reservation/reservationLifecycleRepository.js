@@ -12,7 +12,6 @@ const { mapSqlReservation, normalizeCarId } = require('./reservationMapper');
  */
 async function update(reservation, client = null) {
   const reservationId = Number(reservation.id);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(reservationId) || reservationId <= 0) {
     throw new Error('Invalid reservation id');
   }
@@ -96,7 +95,6 @@ async function update(reservation, client = null) {
  */
 async function applyStatusChange({ reservationId, newStatus, patch = null }, client = null) {
   const id = Number(reservationId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(id) || id <= 0) {
     throw new Error('Invalid reservation id');
   }
@@ -202,7 +200,6 @@ async function reserveCheckoutAttempt(
   { forceIncrement = false, client = null } = {}
 ) {
   const id = Number(reservationId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(id) || id <= 0) {
     throw new Error('Invalid reservation id');
   }
@@ -225,7 +222,6 @@ async function reserveCheckoutAttempt(
     [id, Boolean(forceIncrement)]
   );
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!result.rowCount) {
     const err = new Error('Reservation not found');
     err.code = 'NOT_FOUND';
@@ -241,7 +237,6 @@ async function reserveCheckoutAttempt(
  */
 async function createConfirmedReservation(payload, client = null) {
   const normalizedCarId = normalizeCarId(payload.carId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId) {
     throw new Error('Invalid car id');
   }

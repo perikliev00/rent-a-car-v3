@@ -224,6 +224,7 @@ ALERT_SMTP_REQUIRE_TLS=true
 EOF
   {
     echo "POSTGRES_PASSWORD=dummy-postgres-password"
+    echo "APP_DB_PASSWORD=dummy-app-db-password-32chars"
     echo "API_IMAGE=123456789012.dkr.ecr.eu-central-1.amazonaws.com/rentacar-api@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     echo "CUSTOMER_IMAGE=123456789012.dkr.ecr.eu-central-1.amazonaws.com/rentacar-customer@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     echo "ADMIN_IMAGE=123456789012.dkr.ecr.eu-central-1.amazonaws.com/rentacar-admin@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"

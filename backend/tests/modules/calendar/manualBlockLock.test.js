@@ -37,6 +37,7 @@ jest.mock('../../../src/modules/calendar/calendar.shared', () => ({
 jest.mock('../../../src/modules/calendar/calendar.eventMapper', () => ({
   mapBlockEvent: jest.fn((row) => ({ type: 'blocked', id: `blocked:${row.id}` })),
   parseEventId: jest.requireActual('../../../src/modules/calendar/calendar.eventMapper')
+    // Continue the chained call started on the previous line.
     .parseEventId,
 }));
 

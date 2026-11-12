@@ -62,13 +62,11 @@ function armCreateSessionGate() {
  * @param {{ timeoutMs?: number }} [options]
  */
 async function waitForCreateSession({ timeoutMs = 8000 } = {}) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!createGate) {
     throw new Error('Create session gate is not armed');
   }
 
   let timeoutId;
-  // Protected block: isolate failure modes.
   try {
     await Promise.race([
       createGate.started.promise,
@@ -112,7 +110,6 @@ async function createSession({ reservationId, carId, sessionId, pricing, car, id
     return { ...sessionsByIdempotency.get(idempotencyKey) };
   }
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (createGate && !createGateConsumed) {
     createGateConsumed = true;
     createGate.started.resolve();
@@ -190,7 +187,6 @@ async function createSession({ reservationId, carId, sessionId, pricing, car, id
  */
 function retrieveSession(sessionId) {
   const session = sessions.get(sessionId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!session) {
     const err = new Error(`No such checkout.session: ${sessionId}`);
     err.type = 'StripeInvalidRequestError';
@@ -209,7 +205,6 @@ function retrieveSession(sessionId) {
  */
 function setSessionState(sessionId, patch = {}) {
   const session = sessions.get(sessionId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!session) {
     const err = new Error(`No such checkout.session: ${sessionId}`);
     err.type = 'StripeInvalidRequestError';
@@ -305,7 +300,6 @@ function createOrphanPaidSession({ amountTotal = 10000, currency = 'eur' } = {})
  */
 function ensurePaymentIntentFromSession(session) {
   const piId = String(session.payment_intent);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!paymentIntents.has(piId)) {
     paymentIntents.set(piId, {
       id: piId,
@@ -438,11 +432,9 @@ function createRefund({ paymentIntentId, amountCents = null, idempotencyKey }) {
 
   const pi = getOrCreatePaymentIntent(paymentIntentId, amountCents);
   let amount = amountCents;
-  // Guard: early-return or throw when required input is missing/invalid.
   if (amount == null) {
     amount = remainingOf(pi);
   }
-  // Guard: early-return or throw when required input is missing/invalid.
   if (amount == null) {
     amount = 10000;
   }
@@ -491,7 +483,6 @@ function createRefund({ paymentIntentId, amountCents = null, idempotencyKey }) {
  */
 function retrieveRefund(refundId) {
   const refund = refunds.get(refundId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!refund) {
     const err = new Error(`No such refund: ${refundId}`);
     err.type = 'StripeInvalidRequestError';
@@ -508,7 +499,6 @@ function retrieveRefund(refundId) {
  */
 function setRefundState(refundId, patch = {}) {
   const refund = refunds.get(refundId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!refund) {
     const err = new Error(`No such refund: ${refundId}`);
     err.type = 'StripeInvalidRequestError';

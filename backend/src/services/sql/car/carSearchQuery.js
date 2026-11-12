@@ -129,31 +129,25 @@ function buildCarWhere(criteria = {}, rentalDays = 1, options = {}) {
     where.push(`LOWER(c.fuel_type) = LOWER(${addParam(params, criteria.fuelType)})`);
   }
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (criteria.seatsMin !== undefined) {
     where.push(`c.seats >= ${addParam(params, criteria.seatsMin)}`);
   }
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (criteria.seatsMax !== undefined) {
     where.push(`c.seats <= ${addParam(params, criteria.seatsMax)}`);
   }
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (criteria.categoryId !== undefined) {
     where.push(`c.category_id = ${addParam(params, criteria.categoryId)}`);
   }
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (criteria.priceMin !== undefined || criteria.priceMax !== undefined) {
     const priceExpr = getPriceExpression(rentalDays);
 
-    // Guard: early-return or throw when required input is missing/invalid.
     if (criteria.priceMin !== undefined) {
       where.push(`${priceExpr} >= ${addParam(params, criteria.priceMin)}`);
     }
 
-    // Guard: early-return or throw when required input is missing/invalid.
     if (criteria.priceMax !== undefined) {
       where.push(`${priceExpr} <= ${addParam(params, criteria.priceMax)}`);
     }
@@ -252,7 +246,6 @@ async function paginateSqlCars(criteria = {}, options = {}) {
 async function fetchSqlCarById(id, { includeDeleted = false, publicView = false } = {}) {
   const carId = Number(id);
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(carId) || carId <= 0) {
     return null;
   }
@@ -272,7 +265,6 @@ async function fetchSqlCarById(id, { includeDeleted = false, publicView = false 
   );
 
   const row = result.rows[0];
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) {
     return null;
   }
@@ -403,13 +395,11 @@ async function listCarsByFilter({
     where.push(`LOWER(c.transmission) = LOWER($${params.length})`);
   }
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (seatsMin !== undefined && seatsMin !== null && seatsMin !== '') {
     params.push(Number(seatsMin));
     where.push(`c.seats >= $${params.length}`);
   }
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (seatsMax !== undefined && seatsMax !== null && seatsMax !== '') {
     params.push(Number(seatsMax));
     where.push(`c.seats <= $${params.length}`);

@@ -9,7 +9,6 @@ const { clientQuery } = require('../../db/transaction');
  * @returns {*}
  */
 function mapDocument(row) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) return null;
   const storageKey = row.storage_key || null;
   const legacyUrl = row.url || null;
@@ -34,7 +33,6 @@ function mapDocument(row) {
  * @returns {*}
  */
 function toPublicDocument(doc) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!doc) return null;
   return {
     id: doc.id,

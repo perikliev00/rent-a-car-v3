@@ -166,7 +166,12 @@ When `NODE_ENV=production`, startup validation rejects unsafe or incomplete conf
 
 ## Testing
 
-Run the common suites from the repository root:
+Full local CI gate (mirrors GitHub required checks; used by the pre-push hook):
+
+    npm run hooks:install
+    npm run ci:local
+
+Individual suites from the repository root:
 
     npm test
     npm run test:db
@@ -174,13 +179,15 @@ Run the common suites from the repository root:
     npm run test:e2e
     npm run test:all
 
-`npm test` runs backend unit/API tests and both frontend unit suites without PostgreSQL. Database consistency, integration, and E2E suites use a dedicated test database.
+`npm test` runs backend unit/API tests and both frontend unit suites without PostgreSQL. Database consistency, integration, and E2E suites use a dedicated test database. `ci:local` provisions an ephemeral Docker Postgres so concurrent runs do not share state.
 
-See [`TESTING.md`](TESTING.md) for ownership boundaries, local test setup, concurrency coverage, CI behavior, and Playwright reporting.
+See [`TESTING.md`](TESTING.md) and [`docs/ci-local.md`](docs/ci-local.md) for ownership boundaries, hook setup, concurrency coverage, CI behavior, and Playwright reporting.
 
 ## CI/CD
 
 ### CI
+
+Local developers should run `npm run ci:local` (enforced by `.githooks/pre-push` after `npm run hooks:install`). Protect `main` with the ruleset in [`docs/branch-protection.md`](docs/branch-protection.md).
 
 `.github/workflows/ci.yml` runs on pushes and pull requests. The pipeline includes:
 

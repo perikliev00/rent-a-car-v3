@@ -29,7 +29,6 @@ function normalizeScopes(scopes) {
   const list = Array.isArray(scopes) ? scopes : [];
   const unique = [...new Set(list.map((s) => String(s).trim()).filter(Boolean))];
   for (const scope of unique) {
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!ALLOWED_SCOPES.includes(scope)) {
       throw new ValidationError(`Invalid API key scope: ${scope}`);
     }
@@ -47,7 +46,6 @@ function normalizeScopes(scopes) {
  * @returns {object|null}
  */
 function mapRow(row) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) return null;
   return {
     id: String(row.id),
@@ -82,7 +80,6 @@ async function listApiKeys() {
  */
 async function createApiKey({ name, scopes, rateTier, createdByUserId }) {
   const trimmedName = String(name || '').trim();
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!trimmedName) {
     throw new ValidationError('API key name is required.');
   }
@@ -118,7 +115,6 @@ async function revokeApiKey(id) {
                last_used_at, revoked_at, created_at`,
     [id]
   );
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!result.rows[0]) {
     throw new NotFoundError('API key not found.');
   }
@@ -131,7 +127,6 @@ async function revokeApiKey(id) {
  * @returns {Promise<object|null>}
  */
 async function verifyApiKey(rawKey) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!rawKey || typeof rawKey !== 'string') {
     return null;
   }
@@ -145,7 +140,6 @@ async function verifyApiKey(rawKey) {
     [keyHash]
   );
   const row = result.rows[0];
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!row || row.revoked_at) {
     return null;
   }
@@ -165,7 +159,6 @@ async function verifyApiKey(rawKey) {
  * @returns {boolean}
  */
 function keyHasScope(apiKey, scope) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!apiKey || !Array.isArray(apiKey.scopes)) {
     return false;
   }

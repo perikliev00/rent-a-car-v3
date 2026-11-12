@@ -66,7 +66,6 @@ async function computeOrderPricing(car, start, end, pickupLocation, returnLocati
 function applyOrderExpiryStatus(order, endDate, now = new Date()) {
   if (endDate <= now) {
     order.status = 'expired';
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!order.expiredAt) {
       order.expiredAt = now;
     }

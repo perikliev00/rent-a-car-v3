@@ -25,11 +25,9 @@ function getConfig() {
   const publicBaseUrl = (process.env.STORAGE_PUBLIC_BASE_URL || '').replace(/\/$/, '');
   const keyPrefix = process.env.S3_KEY_PREFIX || 'uploads/';
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!bucket) {
     throw new Error('S3_BUCKET is required when STORAGE_DRIVER=s3.');
   }
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!publicBaseUrl) {
     throw new Error('STORAGE_PUBLIC_BASE_URL is required when STORAGE_DRIVER=s3.');
   }
@@ -90,7 +88,6 @@ function buildPublicUrl(filename) {
  * @returns {*}
  */
 function filenameFromPublicUrl(publicUrl) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!publicUrl || typeof publicUrl !== 'string') return null;
   return path.posix.basename(publicUrl.split('?')[0]);
 }
@@ -113,7 +110,6 @@ function generateStoredFilename(originalName) {
  */
 function isManagedPublicUrl(publicUrl) {
   const filename = filenameFromPublicUrl(publicUrl);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!filename || !filename.startsWith(MANAGED_FILENAME_PREFIX)) {
     return false;
   }
@@ -136,9 +132,7 @@ async function ensureTempDir() {
  * @returns {Promise<*>}
  */
 async function deleteByPath(filePath) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!filePath) return;
-  // Protected block: isolate failure modes.
   try {
     await fs.promises.unlink(filePath);
   } catch {
@@ -152,7 +146,6 @@ async function deleteByPath(filePath) {
  * @returns {Promise<*>}
  */
 async function processUploadedFile({ tempPath, tempFilename }) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!tempPath) {
     throw new Error('Missing temp upload path.');
   }
@@ -191,7 +184,6 @@ async function processUploadedFile({ tempPath, tempFilename }) {
  * @returns {Promise<*>}
  */
 async function deleteByPublicUrl(publicUrl) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!isManagedPublicUrl(publicUrl)) return false;
 
   const filename = filenameFromPublicUrl(publicUrl);
@@ -214,14 +206,12 @@ async function deleteByPublicUrl(publicUrl) {
  * @returns {Promise<*>}
  */
 async function openManagedPublicReadStream(publicUrl) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!isManagedPublicUrl(publicUrl)) return null;
 
   const filename = filenameFromPublicUrl(publicUrl);
   const { bucket } = getConfig();
   const client = createS3Client();
 
-  // Protected block: isolate failure modes.
   try {
     const response = await client.send(
       new GetObjectCommand({
@@ -229,7 +219,6 @@ async function openManagedPublicReadStream(publicUrl) {
         Key: buildObjectKey(filename),
       })
     );
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!response.Body) return null;
     return {
       stream: response.Body,
@@ -255,6 +244,7 @@ async function listManagedPublicUrls() {
   const urls = [];
   let continuationToken;
 
+  // Enter the do-while body before re-checking the condition.
   do {
     const response = await client.send(
       new ListObjectsV2Command({
@@ -305,7 +295,6 @@ async function cleanupStaleTempFiles(maxAgeMs) {
   const removed = [];
   let entries;
 
-  // Protected block: isolate failure modes.
   try {
     entries = await fs.promises.readdir(UPLOAD_TEMP_DIR, { withFileTypes: true });
   } catch (err) {
@@ -316,7 +305,6 @@ async function cleanupStaleTempFiles(maxAgeMs) {
   const cutoff = Date.now() - maxAgeMs;
 
   for (const entry of entries) {
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!entry.isFile()) continue;
     const filePath = path.join(UPLOAD_TEMP_DIR, entry.name);
     const stat = await fs.promises.stat(filePath);

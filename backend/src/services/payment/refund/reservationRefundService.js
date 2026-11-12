@@ -39,7 +39,6 @@ const { driveStripeForOperation } = require('./refundStripeDriver');
  */
 async function requestReservationRefund(req, { reservationId, reason = null }) {
   const reservation = await reservationRepository.findById(reservationId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!reservation) {
     throw refundError('NOT_FOUND', 'Reservation not found.', 404);
   }
@@ -65,7 +64,6 @@ async function requestReservationRefund(req, { reservationId, reason = null }) {
   // Open a DB transaction so writes commit atomically.
   const reserved = await runWithTransaction(async (tx) => {
     const locked = await reservationSql.findByIdForUpdate(reservationId, tx);
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!locked) {
       throw refundError('NOT_FOUND', 'Reservation not found.', 404);
     }
@@ -106,7 +104,6 @@ async function requestReservationRefund(req, { reservationId, reason = null }) {
       };
     }
 
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!op) {
       const amountCents = amountCentsFromReservation(locked, resolved);
       const latest = await refundOpSql.findLatestByReservationId(locked.id, tx);

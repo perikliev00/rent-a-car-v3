@@ -83,7 +83,6 @@ async function assertNoOpenPhysicalRental(carId, client, options = {}) {
  * Falls back to prevStart/prevEnd if date blocks cannot be loaded.
  */
 async function resolveStoredDateRange(carId, prevStart, prevEnd, client) {
-  // Protected block: isolate failure modes.
   try {
     const blocks = await fetchDateBlocksForCar(carId, client);
     return extractStoredRange(blocks, prevStart, prevEnd);
@@ -111,7 +110,6 @@ async function getAvailabilityConflicts(carId, start, end) {
   }
 
   const overlap = await findBookedOverlap(carId, start, end);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!overlap) {
     return [];
   }

@@ -44,7 +44,6 @@ function buildPublicUrl(filename) {
  * @returns {*}
  */
 function isManagedPublicUrl(publicUrl) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!publicUrl || typeof publicUrl !== 'string') return false;
   const filename = path.posix.basename(publicUrl);
   return (
@@ -59,11 +58,9 @@ function isManagedPublicUrl(publicUrl) {
  * @returns {*}
  */
 function resolveLocalPathFromPublicUrl(publicUrl) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!isManagedPublicUrl(publicUrl)) return null;
   const filename = path.basename(publicUrl);
   const resolved = path.resolve(PUBLIC_CAR_IMAGES_DIR, filename);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!resolved.startsWith(path.resolve(PUBLIC_CAR_IMAGES_DIR))) {
     return null;
   }
@@ -84,9 +81,7 @@ async function ensureTempDir() {
  * @returns {Promise<*>}
  */
 async function deleteByPath(filePath) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!filePath) return;
-  // Protected block: isolate failure modes.
   try {
     await fs.promises.unlink(filePath);
   } catch {
@@ -101,9 +96,7 @@ async function deleteByPath(filePath) {
  */
 async function openManagedPublicReadStream(publicUrl) {
   const filePath = resolveLocalPathFromPublicUrl(publicUrl);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!filePath) return null;
-  // Protected block: isolate failure modes.
   try {
     await fs.promises.access(filePath, fs.constants.R_OK);
   } catch {
@@ -121,7 +114,6 @@ async function openManagedPublicReadStream(publicUrl) {
  * @returns {Promise<*>}
  */
 async function processUploadedFile({ tempPath, tempFilename }) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!tempPath) {
     throw new Error('Missing temp upload path.');
   }
@@ -150,7 +142,6 @@ async function processUploadedFile({ tempPath, tempFilename }) {
  */
 async function deleteByPublicUrl(publicUrl) {
   const filePath = resolveLocalPathFromPublicUrl(publicUrl);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!filePath) return false;
   await deleteByPath(filePath);
   return true;
@@ -161,7 +152,6 @@ async function deleteByPublicUrl(publicUrl) {
  * @returns {Promise<*>}
  */
 async function listManagedPublicUrls() {
-  // Protected block: isolate failure modes.
   try {
     const entries = await fs.promises.readdir(PUBLIC_CAR_IMAGES_DIR, {
       withFileTypes: true,
@@ -206,7 +196,6 @@ async function cleanupStaleTempFiles(maxAgeMs) {
   const removed = [];
   let entries;
 
-  // Protected block: isolate failure modes.
   try {
     entries = await fs.promises.readdir(UPLOAD_TEMP_DIR, { withFileTypes: true });
   } catch (err) {
@@ -217,7 +206,6 @@ async function cleanupStaleTempFiles(maxAgeMs) {
   const cutoff = Date.now() - maxAgeMs;
 
   for (const entry of entries) {
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!entry.isFile()) continue;
     const filePath = path.join(UPLOAD_TEMP_DIR, entry.name);
     const stat = await fs.promises.stat(filePath);

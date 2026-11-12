@@ -8,7 +8,6 @@ const { getSessionId } = require('../../utils/reservationHelpers');
 
 /** @param {import('express').Request|null|undefined} req */
 function getClientIp(req) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!req) {
     return null;
   }
@@ -29,14 +28,11 @@ function getAdminUserId(req) {
 function buildCustomerMetadata(req, metadata = null) {
   const base = metadata && typeof metadata === 'object' ? { ...metadata } : {};
   const userId = req?.session?.user?.id;
-  // Guard: early-return or throw when required input is missing/invalid.
   if (userId != null && base.userId == null) {
     base.userId = userId;
   }
-  // Protected block: isolate failure modes.
   try {
     const sessionId = getSessionId(req);
-    // Guard: early-return or throw when required input is missing/invalid.
     if (sessionId && base.sessionId == null) {
       base.sessionId = sessionId;
     }
@@ -52,7 +48,6 @@ function buildCustomerMetadata(req, metadata = null) {
  * @param {object|null} [client] Optional PG client for transactional audits
  */
 async function logAuditEvent(payload, client = null) {
-  // Protected block: isolate failure modes.
   try {
     const {
       actorType = 'admin',
@@ -89,7 +84,6 @@ async function logAuditEvent(payload, client = null) {
  * @param {object|null} [client]
  */
 async function logAdminAction(req, payload, client = null) {
-  // Protected block: isolate failure modes.
   try {
     await adminAuditSql.insertAuditLog(
       {
@@ -111,7 +105,6 @@ async function logAdminAction(req, payload, client = null) {
  * @param {object|null} [client]
  */
 async function logSystemAction(payload, client = null) {
-  // Protected block: isolate failure modes.
   try {
     await adminAuditSql.insertAuditLog(
       {
@@ -133,7 +126,6 @@ async function logSystemAction(payload, client = null) {
  * @param {object|null} [client]
  */
 async function logCustomerAction(req, payload, client = null) {
-  // Protected block: isolate failure modes.
   try {
     const { metadata, ...rest } = payload || {};
     await adminAuditSql.insertAuditLog(

@@ -10,7 +10,6 @@ const { formatLocationName } = require('../../utils/dateFormatter');
  * @returns {*}
  */
 function locationLabel(id) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!id) return 'the agreed location';
   return LOCATION_LABELS[id] || formatLocationName(id) || id;
 }

@@ -28,7 +28,6 @@ const PAYMENT_EVENT_COLUMNS = `
  * @returns {*}
  */
 function normalizeReservationId(value) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (value == null || value === '') {
     return null;
   }
@@ -85,7 +84,6 @@ async function insertPaymentEvent(
  * @returns {Promise<*>}
  */
 async function findByEventId(eventId, client = null) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!eventId) return null;
   const result = await clientQuery(
     client,

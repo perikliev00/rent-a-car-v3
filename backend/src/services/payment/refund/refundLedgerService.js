@@ -20,7 +20,6 @@ async function persistPaidAmountIfNeeded(
   }
 
   const cents = Number(paidAmountCents);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isFinite(cents) || cents <= 0) {
     return reservation;
   }
@@ -126,7 +125,6 @@ async function createPendingOperation({
   client = null,
 }) {
   const idempotencyKey = buildIdempotencyKey(reservation.id, attempt);
-  // Protected block: isolate failure modes.
   try {
     return await refundOpSql.insertRefundOperation(
       {
@@ -143,7 +141,6 @@ async function createPendingOperation({
       client
     );
   } catch (err) {
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!isUniqueViolation(err)) {
       throw err;
     }

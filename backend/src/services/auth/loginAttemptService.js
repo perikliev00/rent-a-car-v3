@@ -25,11 +25,9 @@ function normalizeEmail(email) {
 /** Mask email for logs (PII minimization). */
 function maskEmail(email) {
   const normalized = normalizeEmail(email);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalized) return '[unknown]';
 
   const [local, domain] = normalized.split('@');
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!domain) {
     return `${normalized.charAt(0)}***`;
   }
@@ -39,7 +37,6 @@ function maskEmail(email) {
 
 /** Short hash of IP for correlation without storing raw addresses. */
 function hashIp(ip) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!ip) return undefined;
   return crypto.createHash('sha256').update(String(ip)).digest('hex').slice(0, 12);
 }
@@ -51,11 +48,9 @@ function hashIp(ip) {
  */
 function getRecord(email) {
   const key = normalizeEmail(email);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!key) return null;
 
   const record = attempts.get(key);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!record) return null;
 
   const now = Date.now();
@@ -81,7 +76,6 @@ function getRecord(email) {
  */
 function isLocked(email) {
   const record = getRecord(email);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!record) return false;
   return record.count >= MAX_ATTEMPTS;
 }
@@ -93,13 +87,11 @@ function isLocked(email) {
  */
 function recordFailure(email, meta = {}) {
   const key = normalizeEmail(email);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!key) return;
 
   const now = Date.now();
   let record = getRecord(email);
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!record) {
     record = { count: 0, firstAttemptAt: now, lockedUntil: null };
   }

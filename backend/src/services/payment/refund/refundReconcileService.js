@@ -21,7 +21,6 @@ const IGNORE_REASONS = new Set(['no_matching_operation', 'partial_or_amount_mism
  */
 function inboxPayloadObject(row) {
   const payload = row.payload;
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!payload || typeof payload !== 'object') {
     return { object: null, eventType: row.event_type };
   }
@@ -52,7 +51,6 @@ async function reconcileStuckRefundInbox({ dryRun = false, olderThanMinutes = 5,
     };
 
     const { object, eventType } = inboxPayloadObject(row);
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!object) {
       summary.reason = 'missing_payload_object';
       results.push(summary);
@@ -65,7 +63,6 @@ async function reconcileStuckRefundInbox({ dryRun = false, olderThanMinutes = 5,
       continue;
     }
 
-    // Protected block: isolate failure modes.
     try {
       const result = await applyRefundFromStripeObject(object, { eventType });
       const nextStatus =
@@ -116,7 +113,6 @@ async function reconcilePendingRefunds({ dryRun = false, olderThanMinutes = 5, l
     }
 
     let refund;
-    // Protected block: isolate failure modes.
     try {
       refund = await retrieveRefund(op.stripeRefundId);
     } catch (err) {
@@ -169,7 +165,6 @@ async function reconcilePendingRefunds({ dryRun = false, olderThanMinutes = 5, l
     };
 
     let refund;
-    // Protected block: isolate failure modes.
     try {
       refund = await retrieveRefund(op.stripeRefundId);
     } catch (err) {

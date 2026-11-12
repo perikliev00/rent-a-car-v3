@@ -28,7 +28,6 @@ async function listUsers() {
  */
 async function getUser(userId) {
   const user = await userSql.findUserById(userId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!user) {
     throw createHttpError('NOT_FOUND', 'User not found.', 404);
   }
@@ -51,7 +50,6 @@ async function getUser(userId) {
  * @param {{email: string, password: string, roleIds?: number[]}} params
  */
 async function createStaffUser({ email, password, roleIds = [] }) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!email || !password) {
     throw createHttpError('VALIDATION_ERROR', 'Email and password are required.', 422);
   }
@@ -69,7 +67,6 @@ async function createStaffUser({ email, password, roleIds = [] }) {
 
     const hashedPassword = await bcrypt.hash(password, 10);
     let user;
-    // Protected block: isolate failure modes.
     try {
       user = await userSql.createUser(
         {
@@ -110,18 +107,15 @@ async function createStaffUser({ email, password, roleIds = [] }) {
  */
 async function updateStaffUser(userId, { email } = {}) {
   const user = await userSql.findUserById(userId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!user) {
     throw createHttpError('NOT_FOUND', 'User not found.', 404);
   }
 
   if (email != null) {
     const normalized = String(email).trim().toLowerCase();
-    // Guard: early-return or throw when required input is missing/invalid.
     if (!normalized) {
       throw createHttpError('VALIDATION_ERROR', 'Email is required.', 422);
     }
-    // Protected block: isolate failure modes.
     try {
       await clientQuery(
         null,
