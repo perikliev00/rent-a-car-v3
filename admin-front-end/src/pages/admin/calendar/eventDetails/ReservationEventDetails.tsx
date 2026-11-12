@@ -2,40 +2,71 @@
  * Detail panel UI for reservation calendar events.
  */
 import { Link, useNavigate } from 'react-router-dom';
+// Import named exports from '../../../../components/ui/Button'.
 import { Button } from '../../../../components/ui/Button';
+// Import named exports from '../reservationDeepLink'.
 import { opsReservationUrl } from '../reservationDeepLink';
+// Import named exports from './EventDetailsPrimitives'.
 import { Field, Section } from './EventDetailsPrimitives';
+// Import named exports from './formatEventDate'.
 import { fmt } from './formatEventDate';
 
 /** Detail panel UI for reservation calendar events. */
 export function ReservationEventDetails({
+  // Contribute this line to the enclosing declaration or statement.
   reservation,
+  // Contribute this line to the enclosing declaration or statement.
   documents,
+  // Contribute this line to the enclosing declaration or statement.
   auditHistory,
+  // Contribute this line to the enclosing declaration or statement.
   actions,
+  // Contribute this line to the enclosing declaration or statement.
   canOps,
+  // Contribute this line to the enclosing declaration or statement.
   canChangeStatus,
+  // Contribute this line to the enclosing declaration or statement.
   busy,
+  // Contribute this line to the enclosing declaration or statement.
   onCreateTask,
+  // Contribute this line to the enclosing declaration or statement.
   markStatus,
+  // Contribute this line to the enclosing declaration or statement.
   copyPhone,
+  // Contribute this line to the enclosing declaration or statement.
   cancelReservation,
+// Contribute this line to the enclosing declaration or statement.
 }: {
+  // Provide the reservation field value.
   reservation: Record<string, unknown>;
+  // Provide the documents field value.
   documents: Array<Record<string, unknown>>;
+  // Provide the audit history field value.
   auditHistory: Array<Record<string, unknown>>;
+  // Continue the surrounding logic with this statement.
   actions?: Record<string, boolean>;
+  // Provide the can ops field value.
   canOps: boolean;
+  // Provide the can change status field value.
   canChangeStatus: boolean;
+  // Provide the busy field value.
   busy: boolean;
+  // Continue the surrounding logic with this statement.
   onCreateTask?: (carId: string | null) => void;
+  // Provide the mark status field value.
   markStatus: (next: 'picked_up' | 'returned') => void | Promise<void>;
+  // Provide the copy phone field value.
   copyPhone: () => void | Promise<void>;
+  // Provide the cancel reservation field value.
   cancelReservation: () => void | Promise<void>;
+// Continue the surrounding logic with this statement.
 }) {
+  // Create the navigate constant.
   const navigate = useNavigate();
+  // Create the ops url constant.
   const opsUrl = reservation?.id ? opsReservationUrl(String(reservation.id)) : null;
 
+  // Return control to the caller with the following value.
   return (
     <div className="flex min-h-0 flex-1 flex-col text-sm">
       <div className="flex-1 space-y-5">

@@ -3,6 +3,7 @@
  * Mounted on `/webhook/stripe` with raw body parsing (see `server.js`).
  */
 const { handleStripeWebhookFlow } = require('../services/payment/webhookService');
+// Require the '../utils/asyncHandler' module as asyncHandler.
 const asyncHandler = require('../utils/asyncHandler');
 
 /**
@@ -13,6 +14,8 @@ const asyncHandler = require('../utils/asyncHandler');
  * @returns {Promise<import('express').Response>} JSON ack with status from the flow result
  */
 exports.handleStripeWebhook = asyncHandler(async (req, res) => {
+  // Create the result constant.
   const result = await handleStripeWebhookFlow(req);
+  // Return the resulting value to the caller.
   return res.status(result.statusCode).json(result.body);
 });

@@ -2,12 +2,19 @@
  * Long-rental / early / last-minute discount editors.
  */
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+// Import named exports from the referenced module.
 import {
+  // Contribute this line to the enclosing declaration or statement.
   updateDiscount,
+  // Declare the PricingDiscountRule TypeScript type alias.
   type PricingDiscountRule,
+// Contribute this line to the enclosing declaration or statement.
 } from '../../../api/admin/pricing';
+// Import named exports from '../../../components/ui/Input'.
 import { Input } from '../../../components/ui/Input';
+// Import named exports from '../../../components/ui/toastStore'.
 import { toast } from '../../../components/ui/toastStore';
+// Import named exports from './PricingSection'.
 import { PricingSection } from './PricingSection';
 
 /**
@@ -15,29 +22,47 @@ import { PricingSection } from './PricingSection';
  * @param rules - Discount rules from the pricing bundle
  */
 export function DiscountsSection({ rules }: { rules: PricingDiscountRule[] }) {
+  // Create the query client constant.
   const queryClient = useQueryClient();
 
   // Wrap so callers pass `{ id, ...fields }` while the API takes (id, data).
   const discountMutation = useMutation({
+    // Provide the mutation fn field value.
     mutationFn: ({
+      // Contribute this line to the enclosing declaration or statement.
       id,
+      // Spread data into the surrounding structure.
       ...data
+    // Contribute this line to the enclosing declaration or statement.
     }: {
+      // Provide the id field value.
       id: number;
+    // Continue the surrounding logic with this statement.
     } & Partial<{
+      // Provide the name field value.
       name: string;
+      // Provide the threshold field value.
       threshold: number;
+      // Provide the adj type field value.
       adjType: 'percent' | 'fixed';
+      // Provide the adj value field value.
       adjValue: number;
+      // Provide the active field value.
       active: boolean;
+    // Continue the surrounding logic with this statement.
     }>) => updateDiscount(id, data),
+    // Provide the on success field value.
     onSuccess: () => {
+      // Call queryClient.invalidateQueries to perform this step.
       queryClient.invalidateQueries({ queryKey: ['admin', 'pricing'] });
+      // Call toast to perform this step.
       toast('Discount rule saved', 'success');
     },
+    // Provide the on error field value.
     onError: (e) => toast((e as Error).message, 'error'),
   });
 
+  // Return control to the caller with the following value.
   return (
     <PricingSection
       title="Discounts & last-minute"

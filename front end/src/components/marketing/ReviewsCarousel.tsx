@@ -1,5 +1,6 @@
 /** Horizontally scrollable customer-quote carousel for the home page. */
 import { useRef } from 'react';
+// Import named exports from '../../data/marketingAssets'.
 import { reviews } from '../../data/marketingAssets';
 
 /**
@@ -9,18 +10,24 @@ import { reviews } from '../../data/marketingAssets';
  * @remarks Side effect: `scrollNext` mutates the scroller’s scrollLeft smoothly.
  */
 export function ReviewsCarousel() {
+  // Create the scroller ref constant.
   const scrollerRef = useRef<HTMLDivElement>(null);
 
   /** Scroll by roughly one card width (plus gap) toward the next review. */
   const scrollNext = () => {
+    // Create the el constant.
     const el = scrollerRef.current;
+    // Evaluate the condition and enter the branch when it is true.
     if (!el) return;
     // Prefer measuring a real card so the step stays aligned with snap points.
     const card = el.querySelector<HTMLElement>('[data-review-card]');
+    // Create the step constant.
     const step = card ? card.offsetWidth + 16 : 280;
+    // Call el.scrollBy to perform this step.
     el.scrollBy({ left: step, behavior: 'smooth' });
   };
 
+  // Return control to the caller with the following value.
   return (
     <section className="bg-[var(--color-surface)] py-12 sm:py-14">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">

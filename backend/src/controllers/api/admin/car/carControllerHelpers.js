@@ -2,7 +2,9 @@
  * Shared helpers for admin car controllers (validation errors, upload cleanup, not-found mapping).
  */
 const { removeUploadedFile } = require('../../../../middleware/fileUpload/uploadUtils');
+// Require the '../../../../utils/apiResponse' module as apiResponse.
 const apiResponse = require('../../../../utils/apiResponse');
+// Destructure object properties into local variables.
 const { forwardControllerError } = require('../../../../utils/controllerError');
 
 /**
@@ -13,10 +15,15 @@ const { forwardControllerError } = require('../../../../utils/controllerError');
  * @returns {import('express').Response}
  */
 function validationErrorResponse(res, errors) {
+  // Return the resulting value to the caller.
   return apiResponse.error(
+    // Contribute this line to the enclosing declaration or statement.
     res,
+    // Supply the literal value used by the enclosing expression.
     'VALIDATION_ERROR',
+    // Call errors.array to perform this step.
     errors.array()[0].msg,
+    // Supply the literal value used by the enclosing expression.
     422
   );
 }
@@ -28,9 +35,13 @@ function validationErrorResponse(res, errors) {
  * @returns {Promise<void>}
  */
 async function cleanupUploads(req) {
+  // Evaluate the condition and enter the branch when it is true.
   if (req.file) await removeUploadedFile(req.file);
+  // Evaluate the condition and enter the branch when it is true.
   if (Array.isArray(req.files)) {
+    // Iterate using the loop initializer, condition, and step.
     for (const file of req.files) {
+      // Wait until the asynchronous operation resolves.
       await removeUploadedFile(file);
     }
   }
@@ -48,14 +59,21 @@ async function cleanupUploads(req) {
  * @returns {*|void}
  */
 function notFoundOrForward(err, req, res, next, context, publicMessage) {
+  // Evaluate the condition and enter the branch when it is true.
   if (err.message === 'Car not found' || err.message?.includes('not found')) {
+    // Return the resulting value to the caller.
     return apiResponse.error(res, 'NOT_FOUND', err.message, 404);
   }
+  // Return the resulting value to the caller.
   return forwardControllerError(err, req, next, { context, publicMessage });
 }
 
+// Assign the CommonJS module exports.
 module.exports = {
+  // Contribute this line to the enclosing declaration or statement.
   validationErrorResponse,
+  // Contribute this line to the enclosing declaration or statement.
   cleanupUploads,
+  // Contribute this line to the enclosing declaration or statement.
   notFoundOrForward,
 };

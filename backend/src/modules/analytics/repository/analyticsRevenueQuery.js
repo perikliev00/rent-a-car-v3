@@ -4,6 +4,7 @@
  */
 
 const { clientQuery } = require('../../../db/transaction');
+// Destructure object properties into local variables.
 const { REVENUE_STATUSES } = require('../analytics.domain');
 
 /**
@@ -14,7 +15,9 @@ const { REVENUE_STATUSES } = require('../analytics.domain');
 async function getRevenueTotals({ from, to }, client = null) {
   // Single-row SUM/COUNT over revenue-eligible orders in the Sofia day range.
   const result = await clientQuery(
+    // Contribute this line to the enclosing declaration or statement.
     client,
+    // Continue the surrounding logic with this statement.
     `
     SELECT
       COALESCE(SUM(o.total_price), 0)::float AS revenue,
@@ -27,8 +30,10 @@ async function getRevenueTotals({ from, to }, client = null) {
       AND (o.created_at AT TIME ZONE 'Europe/Sofia')::date >= $1::date
       AND (o.created_at AT TIME ZONE 'Europe/Sofia')::date <= $2::date
     `,
+    // Contribute this line to the enclosing declaration or statement.
     [from, to, REVENUE_STATUSES]
   );
+  // Return the resulting value to the caller.
   return result.rows[0];
 }
 
@@ -40,7 +45,9 @@ async function getRevenueTotals({ from, to }, client = null) {
 async function getRevenueSeries({ from, to }, client = null) {
   // Group by Sofia calendar day for chart series.
   const result = await clientQuery(
+    // Contribute this line to the enclosing declaration or statement.
     client,
+    // Continue the surrounding logic with this statement.
     `
     SELECT
       (o.created_at AT TIME ZONE 'Europe/Sofia')::date::text AS day,
@@ -55,8 +62,10 @@ async function getRevenueSeries({ from, to }, client = null) {
     GROUP BY 1
     ORDER BY 1
     `,
+    // Contribute this line to the enclosing declaration or statement.
     [from, to, REVENUE_STATUSES]
   );
+  // Return the resulting value to the caller.
   return result.rows;
 }
 
@@ -68,7 +77,9 @@ async function getRevenueSeries({ from, to }, client = null) {
 async function getRevenueByCar({ from, to }, client = null) {
   // Join cars for display fields; order by highest revenue first.
   const result = await clientQuery(
+    // Contribute this line to the enclosing declaration or statement.
     client,
+    // Continue the surrounding logic with this statement.
     `
     SELECT
       c.id AS car_id,
@@ -87,8 +98,10 @@ async function getRevenueByCar({ from, to }, client = null) {
     GROUP BY c.id, c.name, c.registration_number
     ORDER BY revenue DESC
     `,
+    // Contribute this line to the enclosing declaration or statement.
     [from, to, REVENUE_STATUSES]
   );
+  // Return the resulting value to the caller.
   return result.rows;
 }
 
@@ -100,7 +113,9 @@ async function getRevenueByCar({ from, to }, client = null) {
 async function getRevenueByLocation({ from, to }, client = null) {
   // Group by order.pickup_location string as stored at checkout.
   const result = await clientQuery(
+    // Contribute this line to the enclosing declaration or statement.
     client,
+    // Continue the surrounding logic with this statement.
     `
     SELECT
       o.pickup_location AS location,
@@ -115,14 +130,21 @@ async function getRevenueByLocation({ from, to }, client = null) {
     GROUP BY o.pickup_location
     ORDER BY revenue DESC
     `,
+    // Contribute this line to the enclosing declaration or statement.
     [from, to, REVENUE_STATUSES]
   );
+  // Return the resulting value to the caller.
   return result.rows;
 }
 
+// Assign the CommonJS module exports.
 module.exports = {
+  // Contribute this line to the enclosing declaration or statement.
   getRevenueTotals,
+  // Contribute this line to the enclosing declaration or statement.
   getRevenueSeries,
+  // Contribute this line to the enclosing declaration or statement.
   getRevenueByCar,
+  // Contribute this line to the enclosing declaration or statement.
   getRevenueByLocation,
 };

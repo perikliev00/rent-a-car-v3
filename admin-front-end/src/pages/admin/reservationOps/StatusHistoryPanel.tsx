@@ -2,36 +2,61 @@
  * Audit-style status transition history for a reservation.
  */
 import { useQuery } from '@tanstack/react-query';
+// Import named exports from '../../../api/admin/reservations'.
 import { getReservationDetail } from '../../../api/admin/reservations';
+// Import named exports from '../../../components/ui/Button'.
 import { Button } from '../../../components/ui/Button';
+// Import named exports from '../../../components/ui/Card'.
 import { Card, CardBody } from '../../../components/ui/Card';
+// Import named exports from './opsFormat'.
 import { formatChangedBy, formatTimestamp, statusChipClass } from './opsFormat';
 
 /** Audit-style status transition history for a reservation. */
 export function StatusHistoryPanel({
+  // Contribute this line to the enclosing declaration or statement.
   reservationId,
+  // Contribute this line to the enclosing declaration or statement.
   onClose,
+// Contribute this line to the enclosing declaration or statement.
 }: {
+  // Provide the reservation id field value.
   reservationId: string;
+  // Provide the on close field value.
   onClose: () => void;
+// Continue the surrounding logic with this statement.
 }) {
+  // Destructure object properties into local variables.
   const { data, isLoading, isError, error } = useQuery({
+    // Provide the query key field value.
     queryKey: ['admin', 'reservations', reservationId, 'detail'],
+    // Provide the query fn field value.
     queryFn: () => getReservationDetail(reservationId),
   });
 
+  // Create the reservation constant.
   const reservation = data?.reservation;
+  // Create the history constant.
   const history = data?.history ?? [];
+  // Create the car label constant.
   const carLabel =
+    // Contribute this line to the enclosing declaration or statement.
     reservation &&
+    // Continue the surrounding logic with this statement.
     typeof reservation.carId === 'object' &&
+    // Continue the surrounding logic with this statement.
     reservation.carId !== null &&
+    // Supply the literal value used by the enclosing expression.
     'name' in reservation.carId
+      // Continue the surrounding logic with this statement.
       ? String((reservation.carId as { name?: string }).name || '')
+      // Contribute this line to the enclosing declaration or statement.
       : reservation?.carName
+        // Continue the surrounding logic with this statement.
         ? String(reservation.carName)
+        // Contribute this line to the enclosing declaration or statement.
         : '';
 
+  // Return control to the caller with the following value.
   return (
     <Card className="shadow-none">
       <CardBody className="px-5 py-4">

@@ -7,6 +7,7 @@ const { ACTIVE_RESERVATION_STATUSES } = require('../../utils/reservationHelpers'
 
 /** Reservation statuses that may accept a new Checkout session link. */
 const CHECKOUT_LINKABLE_STATUSES = ACTIVE_RESERVATION_STATUSES;
+// Create the expected stripe currency constant.
 const EXPECTED_STRIPE_CURRENCY = 'eur';
 
 /**
@@ -15,6 +16,7 @@ const EXPECTED_STRIPE_CURRENCY = 'eur';
  * @returns {boolean}
  */
 function canLinkNewStripeSession(reservation) {
+  // Return the resulting value to the caller.
   return CHECKOUT_LINKABLE_STATUSES.includes(reservation?.status);
 }
 
@@ -27,23 +29,31 @@ function canLinkNewStripeSession(reservation) {
  * @returns {{ ok: boolean, orphanRecovery?: boolean, reason?: string, activeSessionId?: string, incomingSessionId?: string }}
  */
 function validateActiveStripeSessionLink(reservation, incomingSessionId) {
+  // Create the active session id constant.
   const activeSessionId = reservation?.stripeSessionId || null;
 
   // Guard: early-return or throw when required input is missing/invalid.
   if (!activeSessionId) {
+    // Return the resulting value to the caller.
     return { ok: true, orphanRecovery: true };
   }
 
   // Reject events for an older/superseded Checkout session still in flight.
   if (String(activeSessionId) !== String(incomingSessionId)) {
+    // Return the resulting value to the caller.
     return {
+      // Provide the ok field value.
       ok: false,
+      // Provide the reason field value.
       reason: 'stale_stripe_session',
+      // Provide the active session id field value.
       activeSessionId: String(activeSessionId),
+      // Provide the incoming session id field value.
       incomingSessionId: String(incomingSessionId),
     };
   }
 
+  // Return the resulting value to the caller.
   return { ok: true, orphanRecovery: false };
 }
 
@@ -53,6 +63,7 @@ function validateActiveStripeSessionLink(reservation, incomingSessionId) {
  * @returns {number}
  */
 function getExpectedStripeAmountCents(reservation) {
+  // Return the resulting value to the caller.
   return Math.round(Number(reservation.totalPrice) * 100);
 }
 
@@ -65,28 +76,40 @@ function getExpectedStripeAmountCents(reservation) {
  * @returns {{ ok: boolean, reason?: string, expectedAmount?: number, actualAmount?: *, expectedCurrency?: string, actualCurrency?: * }}
  */
 function validateStripePaymentDetails(stripeSession, reservation) {
+  // Create the expected amount constant.
   const expectedAmount = getExpectedStripeAmountCents(reservation);
 
   // Stripe / payment-related branch.
   if (stripeSession.amount_total !== expectedAmount) {
+    // Return the resulting value to the caller.
     return {
+      // Provide the ok field value.
       ok: false,
+      // Provide the reason field value.
       reason: 'stripe_amount_mismatch',
+      // Contribute this line to the enclosing declaration or statement.
       expectedAmount,
+      // Provide the actual amount field value.
       actualAmount: stripeSession.amount_total,
     };
   }
 
   // Stripe / payment-related branch.
   if (stripeSession.currency !== EXPECTED_STRIPE_CURRENCY) {
+    // Return the resulting value to the caller.
     return {
+      // Provide the ok field value.
       ok: false,
+      // Provide the reason field value.
       reason: 'stripe_currency_mismatch',
+      // Provide the expected currency field value.
       expectedCurrency: EXPECTED_STRIPE_CURRENCY,
+      // Provide the actual currency field value.
       actualCurrency: stripeSession.currency,
     };
   }
 
+  // Return the resulting value to the caller.
   return { ok: true };
 }
 
@@ -98,16 +121,24 @@ function validateStripePaymentDetails(stripeSession, reservation) {
 function paidSnapshotFromStripeSession(stripeSession) {
   // Stripe / payment-related branch.
   if (!stripeSession) {
+    // Return the resulting value to the caller.
     return { paidAmountCents: null, paidCurrency: null };
   }
 
+  // Create the cents constant.
   const cents = Number(stripeSession.amount_total);
+  // Create the currency constant.
   const currency = stripeSession.currency
+    // Continue the surrounding logic with this statement.
     ? String(stripeSession.currency).toLowerCase()
+    // Contribute this line to the enclosing declaration or statement.
     : null;
 
+  // Return the resulting value to the caller.
   return {
+    // Provide the paid amount cents field value.
     paidAmountCents: Number.isFinite(cents) && cents > 0 ? Math.round(cents) : null,
+    // Provide the paid currency field value.
     paidCurrency: currency || null,
   };
 }
@@ -121,17 +152,22 @@ function paidSnapshotFromStripeSession(stripeSession) {
 function paidSnapshotFromFinalizationContext(options = {}, stripeSession = null) {
   // Stripe / payment-related branch.
   if (stripeSession && stripeSession.amount_total != null) {
+    // Return the resulting value to the caller.
     return paidSnapshotFromStripeSession(stripeSession);
   }
 
   // Stripe / payment-related branch.
   if (options.stripeSessionAmountTotal != null) {
+    // Return the resulting value to the caller.
     return paidSnapshotFromStripeSession({
+      // Provide the amount total field value.
       amount_total: options.stripeSessionAmountTotal,
+      // Provide the currency field value.
       currency: options.stripeSessionCurrency,
     });
   }
 
+  // Return the resulting value to the caller.
   return { paidAmountCents: null, paidCurrency: null };
 }
 
@@ -144,11 +180,15 @@ function paidSnapshotFromFinalizationContext(options = {}, stripeSession = null)
 function paidAmountPatch(paidAmountCents, paidCurrency) {
   // Guard: early-return or throw when required input is missing/invalid.
   if (!(Number(paidAmountCents) > 0)) {
+    // Return the resulting value to the caller.
     return {};
   }
 
+  // Return the resulting value to the caller.
   return {
+    // Provide the paid amount cents field value.
     paidAmountCents: Math.round(Number(paidAmountCents)),
+    // Provide the paid currency field value.
     paidCurrency: paidCurrency ? String(paidCurrency).toLowerCase() : 'eur',
   };
 }
@@ -161,26 +201,43 @@ function paidAmountPatch(paidAmountCents, paidCurrency) {
 function buildStripeSessionSnapshot(session) {
   // Guard: early-return or throw when required input is missing/invalid.
   if (!session) {
+    // Return the resulting value to the caller.
     return null;
   }
 
+  // Return the resulting value to the caller.
   return {
+    // Provide the id field value.
     id: session.id,
+    // Provide the payment status field value.
     payment_status: session.payment_status,
+    // Provide the amount total field value.
     amount_total: session.amount_total,
+    // Provide the currency field value.
     currency: session.currency,
   };
 }
 
+// Assign the CommonJS module exports.
 module.exports = {
+  // Contribute this line to the enclosing declaration or statement.
   CHECKOUT_LINKABLE_STATUSES,
+  // Contribute this line to the enclosing declaration or statement.
   EXPECTED_STRIPE_CURRENCY,
+  // Contribute this line to the enclosing declaration or statement.
   canLinkNewStripeSession,
+  // Contribute this line to the enclosing declaration or statement.
   validateActiveStripeSessionLink,
+  // Contribute this line to the enclosing declaration or statement.
   getExpectedStripeAmountCents,
+  // Contribute this line to the enclosing declaration or statement.
   validateStripePaymentDetails,
+  // Contribute this line to the enclosing declaration or statement.
   paidSnapshotFromStripeSession,
+  // Contribute this line to the enclosing declaration or statement.
   paidSnapshotFromFinalizationContext,
+  // Contribute this line to the enclosing declaration or statement.
   paidAmountPatch,
+  // Contribute this line to the enclosing declaration or statement.
   buildStripeSessionSnapshot,
 };

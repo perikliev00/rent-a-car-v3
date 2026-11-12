@@ -3,8 +3,11 @@
  */
 import type { TextareaHTMLAttributes } from 'react';
 
+// Declare the TextareaProps TypeScript interface.
 interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
+  // Contribute this line to the enclosing declaration or statement.
   label?: string;
+  // Contribute this line to the enclosing declaration or statement.
   error?: string;
 }
 
@@ -18,7 +21,9 @@ interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
  * @param className - Extra classes on the `<textarea>`
  */
 export function Textarea({ label, error, id, className = '', ...props }: TextareaProps) {
+  // Create the textarea id constant.
   const textareaId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
+  // Return control to the caller with the following value.
   return (
     <div className="space-y-1.5">
       {label && (

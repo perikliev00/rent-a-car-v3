@@ -2,47 +2,84 @@
  * Compliance items UI (insurance, vignette, equipment, etc.).
  */
 import {
+  // Contribute this line to the enclosing declaration or statement.
   COMPLIANCE_TYPE_OPTIONS,
+  // Contribute this line to the enclosing declaration or statement.
   complianceTypeHasExpiry,
+// Contribute this line to the enclosing declaration or statement.
 } from '../../../api/admin/cars';
+// Import named exports from '../../../components/ui/Button'.
 import { Button } from '../../../components/ui/Button';
+// Import named exports from '../../../components/ui/Card'.
 import { Card, CardBody } from '../../../components/ui/Card';
+// Import named exports from '../../../components/ui/Input'.
 import { Input } from '../../../components/ui/Input';
+// Import named exports from '../../../components/ui/Select'.
 import { Select } from '../../../components/ui/Select';
+// Import named exports from './carDetailTypes'.
 import { complianceStatusClass, type ComplianceForm } from './carDetailTypes';
 
+// Declare the ComplianceItem TypeScript type alias.
 type ComplianceItem = {
+  // Provide the id field value.
   id: number;
+  // Provide the label field value.
   label: string;
+  // Contribute this line to the enclosing declaration or statement.
   itemType?: string;
+  // Contribute this line to the enclosing declaration or statement.
   hasDocument?: boolean;
+  // Contribute this line to the enclosing declaration or statement.
   referenceNumber?: string | null;
+  // Contribute this line to the enclosing declaration or statement.
   expiresAt?: string | null;
+  // Provide the status field value.
   status: string;
 };
 
 /** Compliance items UI (insurance, vignette, equipment, etc.). */
 export function CarComplianceTab({
+  // Contribute this line to the enclosing declaration or statement.
   complianceForm,
+  // Contribute this line to the enclosing declaration or statement.
   setComplianceForm,
+  // Contribute this line to the enclosing declaration or statement.
   setComplianceFile,
+  // Contribute this line to the enclosing declaration or statement.
   complianceMutationPending,
+  // Contribute this line to the enclosing declaration or statement.
   onAddCompliance,
+  // Contribute this line to the enclosing declaration or statement.
   complianceLoading,
+  // Contribute this line to the enclosing declaration or statement.
   items,
+  // Contribute this line to the enclosing declaration or statement.
   onDownloadDocument,
+  // Contribute this line to the enclosing declaration or statement.
   onDeleteItem,
+// Contribute this line to the enclosing declaration or statement.
 }: {
+  // Provide the compliance form field value.
   complianceForm: ComplianceForm;
+  // Provide the set compliance form field value.
   setComplianceForm: (v: ComplianceForm | ((prev: ComplianceForm) => ComplianceForm)) => void;
+  // Provide the set compliance file field value.
   setComplianceFile: (f: File | null) => void;
+  // Provide the compliance mutation pending field value.
   complianceMutationPending: boolean;
+  // Provide the on add compliance field value.
   onAddCompliance: () => void;
+  // Provide the compliance loading field value.
   complianceLoading: boolean;
+  // Provide the items field value.
   items: ComplianceItem[] | undefined;
+  // Provide the on download document field value.
   onDownloadDocument: (itemId: number, filename: string) => void;
+  // Provide the on delete item field value.
   onDeleteItem: (itemId: number) => void;
+// Continue the surrounding logic with this statement.
 }) {
+  // Return control to the caller with the following value.
   return (
     <div className="mt-6 space-y-4">
       <Card className="shadow-none">

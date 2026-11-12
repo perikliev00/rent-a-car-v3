@@ -4,20 +4,34 @@
  * prevents invalid ranges before submit.
  */
 import { useQuery } from '@tanstack/react-query';
+// Import named exports from '../../api/locations'.
 import { getLocations } from '../../api/locations';
+// Contribute this line to the enclosing declaration or statement.
 import type { LocationId, SearchParams } from '../../types/api';
+// Import named exports from '../ui/DateSelect'.
 import { DateSelect } from '../ui/DateSelect';
+// Import named exports from '../ui/DropdownSelect'.
 import { DropdownSelect } from '../ui/DropdownSelect';
+// Import named exports from '../ui/TimeSelect'.
 import { TimeSelect } from '../ui/TimeSelect';
+// Import named exports from '../ui/Button'.
 import { Button } from '../ui/Button';
 
+// Declare the SearchFormProps TypeScript interface.
 interface SearchFormProps {
+  // Provide the values field value.
   values: SearchParams;
+  // Provide the on change field value.
   onChange: (values: SearchParams) => void;
+  // Provide the on submit field value.
   onSubmit: () => void;
+  // Contribute this line to the enclosing declaration or statement.
   loading?: boolean;
+  // Contribute this line to the enclosing declaration or statement.
   compact?: boolean;
+  // Contribute this line to the enclosing declaration or statement.
   tone?: 'light' | 'onDark';
+  // Contribute this line to the enclosing declaration or statement.
   submitLabel?: string;
 }
 
@@ -34,36 +48,55 @@ interface SearchFormProps {
  * @returns Controlled search form.
  */
 export function SearchForm({
+  // Contribute this line to the enclosing declaration or statement.
   values,
+  // Contribute this line to the enclosing declaration or statement.
   onChange,
+  // Contribute this line to the enclosing declaration or statement.
   onSubmit,
+  // Contribute this line to the enclosing declaration or statement.
   loading,
+  // Contribute this line to the enclosing declaration or statement.
   compact,
+  // Update tone with the right-hand side value.
   tone = 'light',
+  // Update submitLabel with the right-hand side value.
   submitLabel = 'Get your quote',
+// Continue the surrounding logic with this statement.
 }: SearchFormProps) {
+  // Destructure object properties into local variables.
   const { data: locationsData } = useQuery({
+    // Provide the query key field value.
     queryKey: ['locations'],
+    // Provide the query fn field value.
     queryFn: getLocations,
+    // Provide the stale time field value.
     staleTime: 1000 * 60 * 30,
   });
 
   // Fall back to a single Office option until locations load.
   const locationOptions =
+    // Continue the surrounding logic with this statement.
     locationsData?.locations.map((l) => ({ value: l.id, label: l.label })) ?? [
+      // Contribute this line to the enclosing declaration or statement.
       { value: 'office', label: 'Office' },
     ];
 
   /** Patch a single search field while preserving the rest. */
   const set = <K extends keyof SearchParams>(key: K, val: SearchParams[K]) => {
+    // Call onChange to perform this step.
     onChange({ ...values, [key]: val });
   };
 
+  // Create the handle submit constant.
   const handleSubmit = (e: React.FormEvent) => {
+    // Call e.preventDefault to perform this step.
     e.preventDefault();
+    // Call onSubmit to perform this step.
     onSubmit();
   };
 
+  // Return control to the caller with the following value.
   return (
     <form
       onSubmit={handleSubmit}

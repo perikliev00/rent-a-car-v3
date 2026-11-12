@@ -3,11 +3,17 @@
  * Content is local to this module; contact submits via {@link ContactForm}.
  */
 import type { ReactNode } from 'react';
+// Import named exports from 'react-router-dom'.
 import { Link } from 'react-router-dom';
+// Import named exports from '../../components/static/ContactForm'.
 import { ContactForm } from '../../components/static/ContactForm';
+// Import named exports from '../../components/static/FaqAccordion'.
 import { FaqAccordion, type FaqItem } from '../../components/static/FaqAccordion';
+// Import named exports from '../../components/static/StaticPageHero'.
 import { StaticPageHero } from '../../components/static/StaticPageHero';
+// Import named exports from '../../components/static/StaticSection'.
 import { StaticSection } from '../../components/static/StaticSection';
+// Import named exports from '../../components/ui/Button'.
 import { Button } from '../../components/ui/Button';
 
 /**
@@ -17,6 +23,7 @@ import { Button } from '../../components/ui/Button';
  * @returns Aria-hidden mail SVG.
  */
 function IconMail({ className = '' }: { className?: string }) {
+  // Return control to the caller with the following value.
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path
@@ -36,6 +43,7 @@ function IconMail({ className = '' }: { className?: string }) {
  * @returns Aria-hidden phone SVG.
  */
 function IconPhone({ className = '' }: { className?: string }) {
+  // Return control to the caller with the following value.
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path
@@ -55,6 +63,7 @@ function IconPhone({ className = '' }: { className?: string }) {
  * @returns Aria-hidden clock SVG.
  */
 function IconClock({ className = '' }: { className?: string }) {
+  // Return control to the caller with the following value.
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.5" />
@@ -70,6 +79,7 @@ function IconClock({ className = '' }: { className?: string }) {
  * @returns Aria-hidden map SVG.
  */
 function IconMap({ className = '' }: { className?: string }) {
+  // Return control to the caller with the following value.
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path
@@ -82,112 +92,172 @@ function IconMap({ className = '' }: { className?: string }) {
   );
 }
 
+// Create the about values constant.
 const ABOUT_VALUES = [
   {
+    // Provide the title field value.
     title: 'Transparent pricing',
+    // Provide the body field value.
     body: 'See the full total for your dates before you pay — delivery, return, and extras included in the summary.',
   },
   {
+    // Provide the title field value.
     title: 'Flexible pickup',
+    // Provide the body field value.
     body: "Airport delivery and city pickup across Bulgaria's busiest travel hubs, with clear fees shown at booking.",
   },
   {
+    // Provide the title field value.
     title: 'Trusted fleet',
+    // Provide the body field value.
     body: 'Regularly maintained automatic and manual vehicles for beach holidays, business trips, and countryside drives.',
   },
 ];
 
+// Create the locations constant.
 const LOCATIONS = [
+  // Contribute this line to the enclosing declaration or statement.
   { name: 'Burgas Airport', detail: 'Meet & greet delivery' },
+  // Contribute this line to the enclosing declaration or statement.
   { name: 'Sunny Beach', detail: 'Resort pickup & return' },
+  // Contribute this line to the enclosing declaration or statement.
   { name: 'Sofia', detail: 'City & airport coverage' },
+  // Contribute this line to the enclosing declaration or statement.
   { name: 'Varna', detail: 'Airport & coastal pickup' },
 ];
 
+// Create the booking steps constant.
 const BOOKING_STEPS = [
   {
+    // Provide the title field value.
     title: 'Search',
+    // Provide the body field value.
     body: 'Enter your pickup and return dates, times, and locations on the home page.',
+    // Provide the tip field value.
     tip: 'Tip: Flexible times help us match more cars in peak season.',
   },
   {
+    // Provide the title field value.
     title: 'Choose a car',
+    // Provide the body field value.
     body: 'Browse available vehicles with transparent total pricing for your dates.',
+    // Provide the tip field value.
     tip: 'Tip: Filter by category, transmission, or seats to narrow the fleet.',
   },
   {
+    // Provide the title field value.
     title: 'Review',
+    // Provide the body field value.
     body: 'Confirm your booking details and rental summary before checkout.',
+    // Provide the tip field value.
     tip: 'Tip: Double-check pickup location and return time to avoid extra fees.',
   },
   {
+    // Provide the title field value.
     title: 'Checkout',
+    // Provide the body field value.
     body: 'Enter your contact details and pay securely via Stripe.',
+    // Provide the tip field value.
     tip: 'Tip: Your card is charged when you confirm — no hidden hold at this step.',
   },
   {
+    // Provide the title field value.
     title: 'Confirmation',
+    // Provide the body field value.
     body: 'Receive a booking reference and pickup instructions by email.',
+    // Provide the tip field value.
     tip: 'Tip: Keep the confirmation handy for airport meet & greet.',
   },
 ];
 
+// Create the support channels constant.
 const SUPPORT_CHANNELS = [
   {
+    // Provide the label field value.
     label: 'Email',
+    // Provide the value field value.
     value: 'support@luxride.bg',
+    // Provide the href field value.
     href: 'mailto:support@luxride.bg',
+    // Provide the icon field value.
     icon: IconMail,
   },
   {
+    // Provide the label field value.
     label: 'Phone',
+    // Provide the value field value.
     value: '+359 888 000 000',
+    // Provide the href field value.
     href: 'tel:+359888000000',
+    // Provide the icon field value.
     icon: IconPhone,
   },
   {
+    // Provide the label field value.
     label: 'Hours',
+    // Provide the value field value.
     value: 'Mon–Sat 08:00–20:00 (EET)',
+    // Provide the href field value.
     href: undefined,
+    // Provide the icon field value.
     icon: IconClock,
   },
 ];
 
+// Continue the surrounding logic with this statement.
 const FAQ_ITEMS: FaqItem[] = [
   {
+    // Provide the q field value.
     q: 'What documents do I need?',
+    // Provide the a field value.
     a: 'A valid driving licence held for at least one year and a passport or national ID card. Bring the same documents at pickup that you used for the booking.',
   },
   {
+    // Provide the q field value.
     q: 'What is the minimum driver age?',
+    // Provide the a field value.
     a: 'Drivers must be at least 21 years old and hold a valid licence for a minimum of one year. Younger drivers may not be eligible for all vehicle categories.',
   },
   {
+    // Provide the q field value.
     q: 'Is insurance included?',
+    // Provide the a field value.
     a: 'Basic third-party insurance is included with every rental. Additional coverage options may be available at pickup — ask our team if you want extra protection.',
   },
   {
+    // Provide the q field value.
     q: 'Can I pick up at the airport?',
+    // Provide the a field value.
     a: 'Yes. We offer delivery to Burgas, Sofia, and Varna airports. Delivery fees apply and are shown during booking before you pay.',
   },
   {
+    // Provide the q field value.
     q: 'Is a deposit required?',
+    // Provide the a field value.
     a: 'A security deposit may be required at pickup depending on the vehicle category. The amount and payment method are confirmed in your booking details.',
   },
   {
+    // Provide the q field value.
     q: 'What is the fuel policy?',
+    // Provide the a field value.
     a: 'Cars are typically provided with a full tank and should be returned with a full tank unless your booking states otherwise. Fuel costs are not included in the rental price.',
   },
   {
+    // Provide the q field value.
     q: 'What is your cancellation policy?',
+    // Provide the a field value.
     a: 'Free cancellation up to 48 hours before pickup. Later cancellations may incur a fee. See our Terms of Service for full details.',
   },
   {
+    // Provide the q field value.
     q: 'How does payment work?',
+    // Provide the a field value.
     a: 'You pay securely online via Stripe at checkout. Your card is charged when you confirm your booking. We do not store your full card details on our servers.',
   },
   {
+    // Provide the q field value.
     q: 'Can I add additional drivers?',
+    // Provide the a field value.
     a: 'Yes. Additional drivers must be registered at pickup and meet the same licence and age requirements as the primary driver.',
   },
 ];
@@ -201,14 +271,23 @@ const FAQ_ITEMS: FaqItem[] = [
  * @returns A section with heading and body.
  */
 function LegalArticle({
+  // Contribute this line to the enclosing declaration or statement.
   title,
+  // Contribute this line to the enclosing declaration or statement.
   updated,
+  // Contribute this line to the enclosing declaration or statement.
   sections,
+// Contribute this line to the enclosing declaration or statement.
 }: {
+  // Provide the title field value.
   title: string;
+  // Provide the updated field value.
   updated: string;
+  // Provide the sections field value.
   sections: Array<{ id: string; heading: string; body: ReactNode }>;
+// Continue the surrounding logic with this statement.
 }) {
+  // Return control to the caller with the following value.
   return (
     <div>
       <StaticPageHero title={title} description={`Last updated: ${updated}`} />
@@ -267,6 +346,7 @@ function LegalArticle({
  * @returns About marketing content under the shared static hero.
  */
 export function AboutPage() {
+  // Return control to the caller with the following value.
   return (
     <div>
       <StaticPageHero
@@ -352,6 +432,7 @@ export function AboutPage() {
  * @returns FAQ hero + accordion list.
  */
 export function FaqPage() {
+  // Return control to the caller with the following value.
   return (
     <div>
       <StaticPageHero
@@ -391,6 +472,7 @@ export function FaqPage() {
  * @returns Step-by-step booking instructions.
  */
 export function HowToBookPage() {
+  // Return control to the caller with the following value.
   return (
     <div>
       <StaticPageHero
@@ -428,6 +510,7 @@ export function HowToBookPage() {
  * @returns Support channels and hours.
  */
 export function SupportPage() {
+  // Return control to the caller with the following value.
   return (
     <div>
       <StaticPageHero
@@ -507,6 +590,7 @@ export function SupportPage() {
  * @returns Contact hero + form section.
  */
 export function ContactPage() {
+  // Return control to the caller with the following value.
   return (
     <div>
       <StaticPageHero
@@ -581,6 +665,7 @@ export function ContactPage() {
  * @returns Terms articles under the static hero.
  */
 export function TermsPage() {
+  // Return control to the caller with the following value.
   return (
     <LegalArticle
       title="Terms of Service"
@@ -685,6 +770,7 @@ export function TermsPage() {
  * @returns Privacy articles under the static hero.
  */
 export function PrivacyPage() {
+  // Return control to the caller with the following value.
   return (
     <LegalArticle
       title="Privacy Policy"

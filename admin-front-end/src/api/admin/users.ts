@@ -2,12 +2,14 @@
  * Staff user CRUD and role assignment APIs for the Users admin page.
  */
 import type { AdminStaffUser, RoleSummary } from '../../types/api';
+// Import named exports from '../client'.
 import { api } from '../client';
 
 /**
  * List all staff users (with roles) for the Users admin table.
  */
 export async function getAdminUsers(): Promise<{ users: AdminStaffUser[] }> {
+  // Return the resulting value to the caller.
   return api<{ users: AdminStaffUser[] }>('/api/admin/users');
 }
 
@@ -19,12 +21,19 @@ export async function getAdminUsers(): Promise<{ users: AdminStaffUser[] }> {
  * @param payload.roleIds - Role ids assigned at creation
  */
 export async function createAdminUser(payload: {
+  // Provide the email field value.
   email: string;
+  // Provide the password field value.
   password: string;
+  // Provide the role ids field value.
   roleIds: string[];
+// Continue the surrounding logic with this statement.
 }): Promise<{ user: AdminStaffUser }> {
+  // Return the resulting value to the caller.
   return api('/api/admin/users', {
+    // Provide the method field value.
     method: 'POST',
+    // Provide the body field value.
     body: JSON.stringify(payload),
   });
 }
@@ -36,11 +45,17 @@ export async function createAdminUser(payload: {
  * @param payload.email - Optional new email
  */
 export async function updateAdminUser(
+  // Provide the id field value.
   id: string,
+  // Provide the payload field value.
   payload: { email?: string }
+// Continue the surrounding logic with this statement.
 ): Promise<{ user: AdminStaffUser }> {
+  // Return the resulting value to the caller.
   return api(`/api/admin/users/${id}`, {
+    // Provide the method field value.
     method: 'PATCH',
+    // Provide the body field value.
     body: JSON.stringify(payload),
   });
 }
@@ -52,11 +67,17 @@ export async function updateAdminUser(
  * @param roleIds - Complete replacement set of role ids
  */
 export async function putUserRoles(
+  // Provide the user id field value.
   userId: string,
+  // Provide the role ids field value.
   roleIds: string[]
+// Continue the surrounding logic with this statement.
 ): Promise<{ userId: string; roles: RoleSummary[] }> {
+  // Return the resulting value to the caller.
   return api(`/api/admin/users/${userId}/roles`, {
+    // Provide the method field value.
     method: 'PUT',
+    // Provide the body field value.
     body: JSON.stringify({ roleIds }),
   });
 }
@@ -68,9 +89,13 @@ export async function putUserRoles(
  * @param roleId - Role to assign
  */
 export async function assignUserRole(
+  // Provide the user id field value.
   userId: string,
+  // Provide the role id field value.
   roleId: string
+// Continue the surrounding logic with this statement.
 ): Promise<{ userId: string; roles: RoleSummary[] }> {
+  // Return the resulting value to the caller.
   return api(`/api/admin/users/${userId}/roles/${roleId}`, { method: 'POST' });
 }
 
@@ -81,8 +106,12 @@ export async function assignUserRole(
  * @param roleId - Role to revoke
  */
 export async function revokeUserRole(
+  // Provide the user id field value.
   userId: string,
+  // Provide the role id field value.
   roleId: string
+// Continue the surrounding logic with this statement.
 ): Promise<{ userId: string; roles: RoleSummary[] }> {
+  // Return the resulting value to the caller.
   return api(`/api/admin/users/${userId}/roles/${roleId}`, { method: 'DELETE' });
 }

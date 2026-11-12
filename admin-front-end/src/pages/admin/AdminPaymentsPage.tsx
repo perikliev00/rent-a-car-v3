@@ -2,81 +2,137 @@
  * Payment events/failures monitor, reconcile, and refund queue.
  */
 import { useState } from 'react';
+// Import named exports from '@tanstack/react-query'.
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+// Import named exports from the referenced module.
 import {
+  // Contribute this line to the enclosing declaration or statement.
   getPaymentRefundQueue,
+  // Contribute this line to the enclosing declaration or statement.
   getPayments,
+  // Contribute this line to the enclosing declaration or statement.
   reconcilePayments,
+  // Declare the PaymentRefundQueueFilters TypeScript type alias.
   type PaymentRefundQueueFilters,
+// Contribute this line to the enclosing declaration or statement.
 } from '../../api/admin/payments';
+// Import named exports from '../../api/admin/reservations'.
 import { refundReservation, type OpsReservationRow } from '../../api/admin/reservations';
+// Import named exports from '../../components/ui/Button'.
 import { Button } from '../../components/ui/Button';
+// Import named exports from '../../components/ui/Card'.
 import { Card, CardBody } from '../../components/ui/Card';
+// Import named exports from '../../components/ui/Input'.
 import { Input } from '../../components/ui/Input';
+// Import named exports from '../../components/ui/Loading'.
 import { PageLoader } from '../../components/ui/Loading';
+// Import named exports from '../../components/ui/Select'.
 import { Select } from '../../components/ui/Select';
+// Import named exports from '../../components/ui/toastStore'.
 import { toast } from '../../components/ui/toastStore';
+// Import named exports from '../../auth/useAuth'.
 import { useAuth } from '../../auth/useAuth';
+// Import named exports from '../../auth/permissions'.
 import { hasPermission } from '../../auth/permissions';
+// Import named exports from './refund/RefundConfirmModal'.
 import { RefundConfirmModal } from './refund/RefundConfirmModal';
+// Import named exports from './refund/RefundLedgerBadge'.
 import { RefundLedgerBadge } from './refund/RefundLedgerBadge';
+// Import named exports from './refund/refundFormat'.
 import { formatRefundMoney } from './refund/refundFormat';
 
+// Create the status options constant.
 const STATUS_OPTIONS = [
+  // Contribute this line to the enclosing declaration or statement.
   { value: '', label: 'All refundable' },
+  // Contribute this line to the enclosing declaration or statement.
   { value: 'paid', label: 'paid' },
+  // Contribute this line to the enclosing declaration or statement.
   { value: 'confirmed', label: 'confirmed' },
+  // Contribute this line to the enclosing declaration or statement.
   { value: 'car_prepared', label: 'car_prepared' },
+  // Contribute this line to the enclosing declaration or statement.
   { value: 'manual_review', label: 'manual_review' },
 ];
 
+// Create the refund state options constant.
 const REFUND_STATE_OPTIONS = [
+  // Contribute this line to the enclosing declaration or statement.
   { value: '', label: 'Any ledger' },
+  // Contribute this line to the enclosing declaration or statement.
   { value: 'none', label: 'none' },
+  // Contribute this line to the enclosing declaration or statement.
   { value: 'pending', label: 'pending' },
+  // Contribute this line to the enclosing declaration or statement.
   { value: 'failed', label: 'failed' },
 ];
 
 /** Format When. */
 function formatWhen(value?: string | null) {
+  // Evaluate the condition and enter the branch when it is true.
   if (!value) return '—';
+  // Start a try block for operations that may fail.
   try {
+    // Return the resulting value to the caller.
     return new Date(value).toLocaleString();
+  // Contribute this line to the enclosing declaration or statement.
   } catch {
+    // Return the resulting value to the caller.
     return String(value);
   }
 }
 
 /** Empty Filters. */
 function emptyFilters(): PaymentRefundQueueFilters {
+  // Return the resulting value to the caller.
   return { q: '', status: '', refundState: '', pickupFrom: '', pickupTo: '' };
 }
 
 /** Refund Queue Actions. */
 function RefundQueueActions({
+  // Contribute this line to the enclosing declaration or statement.
   row,
+  // Contribute this line to the enclosing declaration or statement.
   onChanged,
+// Contribute this line to the enclosing declaration or statement.
 }: {
+  // Provide the row field value.
   row: OpsReservationRow;
+  // Provide the on changed field value.
   onChanged: () => void;
+// Continue the surrounding logic with this statement.
 }) {
+  // Create the ledger status constant.
   const ledgerStatus = row.refundOperation?.status;
+  // Create the refund pending constant.
   const refundPending = ledgerStatus === 'pending';
+  // Destructure array values into local variables.
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // Create the refund mutation constant.
   const refundMutation = useMutation({
+    // Provide the mutation fn field value.
     mutationFn: (reason: string) => refundReservation(row.id, { reason }),
+    // Provide the on success field value.
     onSuccess: (result) => {
+      // Evaluate the condition and enter the branch when it is true.
       if (result.status === 'pending') {
+        // Call toast to perform this step.
         toast('Refund in progress — waiting for Stripe confirmation', 'info');
+      // Contribute this line to the enclosing declaration or statement.
       } else {
+        // Call toast to perform this step.
         toast('Refund completed', 'success');
       }
+      // Call setConfirmOpen to perform this step.
       setConfirmOpen(false);
+      // Call onChanged to perform this step.
       onChanged();
     },
+    // Provide the on error field value.
     onError: (err) => toast((err as Error).message, 'error'),
   });
 
+  // Return control to the caller with the following value.
   return (
     <div>
       <Button
@@ -104,16 +160,24 @@ function RefundQueueActions({
 
 /** Refundable Table. */
 function RefundableTable({
+  // Contribute this line to the enclosing declaration or statement.
   rows,
+  // Contribute this line to the enclosing declaration or statement.
   onChanged,
+// Contribute this line to the enclosing declaration or statement.
 }: {
+  // Provide the rows field value.
   rows: OpsReservationRow[];
+  // Provide the on changed field value.
   onChanged: () => void;
+// Continue the surrounding logic with this statement.
 }) {
+  // Evaluate the condition and enter the branch when it is true.
   if (!rows.length) {
     return <p className="text-sm text-[var(--color-muted)]">No refundable bookings</p>;
   }
 
+  // Return control to the caller with the following value.
   return (
     <div className="mt-4 overflow-x-auto">
       <table className="w-full text-left text-xs">
@@ -157,10 +221,12 @@ function RefundableTable({
 
 /** Recent Refunds Table. */
 function RecentRefundsTable({ rows }: { rows: OpsReservationRow[] }) {
+  // Evaluate the condition and enter the branch when it is true.
   if (!rows.length) {
     return <p className="mt-4 text-sm text-[var(--color-muted)]">No recent refunds</p>;
   }
 
+  // Return control to the caller with the following value.
   return (
     <div className="mt-4 overflow-x-auto">
       <table className="w-full text-left text-xs">
@@ -198,47 +264,75 @@ function RecentRefundsTable({ rows }: { rows: OpsReservationRow[] }) {
 
 /** Payment events/failures monitor, reconcile, and refund queue. */
 export function AdminPaymentsPage() {
+  // Destructure object properties into local variables.
   const { user } = useAuth();
+  // Create the can refund constant.
   const canRefund = hasPermission(user, 'can_refund_payments');
+  // Create the query client constant.
   const queryClient = useQueryClient();
+  // Destructure array values into local variables.
   const [dryRun, setDryRun] = useState(true);
+  // Destructure array values into local variables.
   const [draft, setDraft] = useState<PaymentRefundQueueFilters>(emptyFilters);
+  // Destructure array values into local variables.
   const [filters, setFilters] = useState<PaymentRefundQueueFilters>(emptyFilters);
 
+  // Destructure object properties into local variables.
   const { data, isLoading } = useQuery({ queryKey: ['admin', 'payments'], queryFn: getPayments });
 
+  // Create the queue query constant.
   const queueQuery = useQuery({
+    // Provide the query key field value.
     queryKey: ['admin', 'payments', 'refund-queue', filters],
+    // Provide the query fn field value.
     queryFn: () => getPaymentRefundQueue(filters),
+    // Provide the enabled field value.
     enabled: canRefund,
   });
 
+  // Create the reconcile mutation constant.
   const reconcileMutation = useMutation({
+    // Provide the mutation fn field value.
     mutationFn: () => reconcilePayments(dryRun),
+    // Provide the on success field value.
     onSuccess: (result) => {
+      // Call queryClient.invalidateQueries to perform this step.
       queryClient.invalidateQueries({ queryKey: ['admin', 'payments'] });
+      // Call toast to perform this step.
       toast(`Reconcile ${result.dryRun ? '(dry run) ' : ''}completed`, 'success');
     },
+    // Provide the on error field value.
     onError: (err) => toast((err as Error).message, 'error'),
   });
 
+  // Create the refresh queue constant.
   const refreshQueue = () => {
+    // Call queryClient.invalidateQueries to perform this step.
     queryClient.invalidateQueries({ queryKey: ['admin', 'payments'] });
+    // Call queryClient.invalidateQueries to perform this step.
     queryClient.invalidateQueries({ queryKey: ['admin', 'reservations'] });
   };
 
+  // Create the apply filters constant.
   const applyFilters = () => {
+    // Call setFilters to perform this step.
     setFilters({
+      // Provide the q field value.
       q: String(draft.q || '').trim(),
+      // Provide the status field value.
       status: draft.status || '',
+      // Provide the refund state field value.
       refundState: draft.refundState || '',
+      // Provide the pickup from field value.
       pickupFrom: draft.pickupFrom || '',
+      // Provide the pickup to field value.
       pickupTo: draft.pickupTo || '',
     });
   };
 
   if (isLoading) return <PageLoader />;
 
+  // Return control to the caller with the following value.
   return (
     <div>
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-4">

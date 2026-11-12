@@ -2,42 +2,65 @@
  * Contact-form inbox triage (status updates and delete).
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+// Import named exports from '../../api/admin/contacts'.
 import { getContacts, updateContactStatus, deleteContact } from '../../api/admin/contacts';
+// Import named exports from '../../components/ui/Button'.
 import { Button } from '../../components/ui/Button';
+// Import named exports from '../../components/ui/Select'.
 import { Select } from '../../components/ui/Select';
+// Import named exports from '../../components/ui/Card'.
 import { Card, CardBody } from '../../components/ui/Card';
+// Import named exports from '../../components/ui/Loading'.
 import { PageLoader } from '../../components/ui/Loading';
+// Import named exports from '../../components/ui/toastStore'.
 import { toast } from '../../components/ui/toastStore';
+// Contribute this line to the enclosing declaration or statement.
 import type { ContactStatus } from '../../types/api';
 
 /**
  * Contact-form inbox: list messages, change status, confirm-delete.
  */
 export function AdminContactsPage() {
+  // Create the query client constant.
   const queryClient = useQueryClient();
+  // Destructure object properties into local variables.
   const { data, isLoading } = useQuery({ queryKey: ['admin', 'contacts'], queryFn: getContacts });
 
+  // Create the status mutation constant.
   const statusMutation = useMutation({
+    // Provide the mutation fn field value.
     mutationFn: ({ id, status }: { id: string; status: ContactStatus }) =>
+      // Call updateContactStatus to perform this step.
       updateContactStatus(id, status),
+    // Provide the on success field value.
     onSuccess: () => {
+      // Call queryClient.invalidateQueries to perform this step.
       queryClient.invalidateQueries({ queryKey: ['admin', 'contacts'] });
+      // Call toast to perform this step.
       toast('Status updated', 'success');
     },
+    // Provide the on error field value.
     onError: (err) => toast((err as Error).message, 'error'),
   });
 
+  // Create the delete mutation constant.
   const deleteMutation = useMutation({
+    // Provide the mutation fn field value.
     mutationFn: deleteContact,
+    // Provide the on success field value.
     onSuccess: () => {
+      // Call queryClient.invalidateQueries to perform this step.
       queryClient.invalidateQueries({ queryKey: ['admin', 'contacts'] });
+      // Call toast to perform this step.
       toast('Message deleted', 'success');
     },
+    // Provide the on error field value.
     onError: (err) => toast((err as Error).message, 'error'),
   });
 
   if (isLoading) return <PageLoader />;
 
+  // Return control to the caller with the following value.
   return (
     <div className="min-w-0">
       <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--color-ink)] sm:text-3xl">Contacts</h1>

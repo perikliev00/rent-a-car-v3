@@ -4,6 +4,7 @@
  * so another shopper can book the same car.
  */
 import type { CreateOrderBody } from '../types/api';
+// Import named exports from './client'.
 import { api } from './client';
 
 /**
@@ -13,6 +14,7 @@ import { api } from './client';
  * @remarks Side effect: frees the car for other shoppers immediately.
  */
 export async function releaseReservation(): Promise<{ released: true }> {
+  // Return the resulting value to the caller.
   return api<{ released: true }>('/api/reservations/release', { method: 'POST' });
 }
 
@@ -24,8 +26,11 @@ export async function releaseReservation(): Promise<{ released: true }> {
  * @remarks Used when dates/locations change on the order page so the previous hold is not left dangling.
  */
 export async function releaseAndRehold(body: CreateOrderBody): Promise<{ reheld: true }> {
+  // Return the resulting value to the caller.
   return api<{ reheld: true }>('/api/reservations/release-and-rehold', {
+    // Provide the method field value.
     method: 'POST',
+    // Provide the body field value.
     body: JSON.stringify(body),
   });
 }

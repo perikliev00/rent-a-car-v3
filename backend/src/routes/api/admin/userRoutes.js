@@ -2,10 +2,14 @@
  * Admin user listing and role assignment routes.
  */
 const express = require('express');
+// Require the '../../../controllers/api/admin/userController' module as userController.
 const userController = require('../../../controllers/api/admin/userController');
+// Destructure object properties into local variables.
 const { requirePermission } = require('../../../middleware/auth');
 
+// Create the router constant.
 const router = express.Router();
+// Create the can manage users constant.
 const canManageUsers = requirePermission('can_manage_users');
 
 // Paginated staff/customer user list.
@@ -23,4 +27,5 @@ router.post('/:id/roles/:roleId', canManageUsers, userController.assignUserRole)
 // Revoke one role assignment.
 router.delete('/:id/roles/:roleId', canManageUsers, userController.revokeUserRole);
 
+// Assign the CommonJS module exports.
 module.exports = router;

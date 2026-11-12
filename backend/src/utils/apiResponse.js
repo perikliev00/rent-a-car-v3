@@ -14,8 +14,11 @@ const { getRequestIdFromReq } = require('./httpResponse');
  * @throws {never}
  */
 function success(res, data, status = 200) {
+  // Return the resulting value to the caller.
   return res.status(status).json({
+    // Provide the success field value.
     success: true,
+    // Contribute this line to the enclosing declaration or statement.
     data,
   });
 }
@@ -34,17 +37,26 @@ function success(res, data, status = 200) {
 function error(res, code, message, status = 500, req = null) {
   // Correlate errors to the inbound request when available.
   const requestId = req ? getRequestIdFromReq(req) : null;
+  // Return the resulting value to the caller.
   return res.status(status).json({
+    // Provide the success field value.
     success: false,
+    // Provide the error field value.
     error: {
+      // Contribute this line to the enclosing declaration or statement.
       code,
+      // Contribute this line to the enclosing declaration or statement.
       message,
+      // Call ... to perform this step.
       ...(requestId ? { requestId, correlationId: requestId } : {}),
     },
   });
 }
 
+// Assign the CommonJS module exports.
 module.exports = {
+  // Contribute this line to the enclosing declaration or statement.
   success,
+  // Contribute this line to the enclosing declaration or statement.
   error,
 };

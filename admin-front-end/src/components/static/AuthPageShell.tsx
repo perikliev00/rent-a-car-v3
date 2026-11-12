@@ -2,13 +2,20 @@
  * Branded two-column shell for the admin login page.
  */
 import type { ReactNode } from 'react';
+// Import named exports from '../../data/marketingAssets'.
 import { authAsideImage } from '../../data/marketingAssets';
 
+// Declare the AuthPageShellProps TypeScript interface.
 interface AuthPageShellProps {
+  // Provide the title field value.
   title: string;
+  // Provide the subtitle field value.
   subtitle: string;
+  // Provide the children field value.
   children: ReactNode;
+  // Contribute this line to the enclosing declaration or statement.
   sideTitle?: string;
+  // Contribute this line to the enclosing declaration or statement.
   sideDescription?: string;
 }
 
@@ -22,11 +29,17 @@ interface AuthPageShellProps {
  * @param sideDescription - Aside supporting sentence
  */
 export function AuthPageShell({
+  // Contribute this line to the enclosing declaration or statement.
   title,
+  // Contribute this line to the enclosing declaration or statement.
   subtitle,
+  // Contribute this line to the enclosing declaration or statement.
   children,
+  // Update sideTitle with the right-hand side value.
   sideTitle = 'Drive Bulgaria in style',
+  // Update sideDescription with the right-hand side value.
   sideDescription = 'Premium car rental with transparent pricing and instant online booking.',
+// Continue the surrounding logic with this statement.
 }: AuthPageShellProps) {
   // Photo aside is lg+ only; form column always renders.
   return (

@@ -4,8 +4,11 @@
  * a simple rental + delivery/return fee layout when no lines are present.
  */
 import type { OrderPageData, PriceBreakdown as PriceBreakdownType } from '../../types/api';
+// Import named exports from '../../utils/format'.
 import { formatPrice } from '../../utils/format';
+// Import named exports from '../ui/Card'.
 import { Card, CardBody, CardHeader } from '../ui/Card';
+// Import named exports from './PriceBreakdownView'.
 import { PriceBreakdownView } from './PriceBreakdownView';
 
 /**
@@ -17,16 +20,25 @@ import { PriceBreakdownView } from './PriceBreakdownView';
 export function OrderSummary({ order }: { order: OrderPageData }) {
   // Prefer the live breakdown; snapshot is used when rehydrating an older order.
   const breakdown: PriceBreakdownType | null =
+    // Contribute this line to the enclosing declaration or statement.
     order.priceBreakdown ||
+    // Continue the surrounding logic with this statement.
     (order.priceSnapshot
+      // Contribute this line to the enclosing declaration or statement.
       ? {
+          // Provide the lines field value.
           lines: order.priceSnapshot.lines || [],
+          // Provide the total price field value.
           totalPrice: order.priceSnapshot.totalPrice ?? order.totalPrice,
+          // Provide the deposit field value.
           deposit: order.priceSnapshot.deposit ?? order.deposit ?? 0,
+          // Provide the currency field value.
           currency: 'EUR',
         }
+      // Continue the surrounding logic with this statement.
       : null);
 
+  // Return control to the caller with the following value.
   return (
     <Card>
       <CardHeader>

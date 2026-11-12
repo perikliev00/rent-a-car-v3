@@ -4,20 +4,33 @@
  */
 
 const startTime = Date.now();
+// Require the './prometheus' module as prometheus.
 const prometheus = require('./prometheus');
 
+// Create the state constant.
 const state = {
+  // Provide the requests field value.
   requests: {
+    // Provide the total field value.
     total: 0,
+    // Provide the by status field value.
     byStatus: {},
+    // Provide the by method field value.
     byMethod: {},
+    // Provide the total duration ms field value.
     totalDurationMs: 0,
   },
+  // Provide the payment failures field value.
   paymentFailures: 0,
+  // Provide the webhook failures field value.
   webhookFailures: 0,
+  // Provide the errors field value.
   errors: 0,
+  // Provide the checkout started field value.
   checkoutStarted: 0,
+  // Provide the checkout completed field value.
   checkoutCompleted: 0,
+  // Provide the checkout abandoned field value.
   checkoutAbandoned: 0,
 };
 
@@ -28,6 +41,7 @@ const state = {
  * @throws {never}
  */
 function getUptimeSeconds() {
+  // Return the resulting value to the caller.
   return Math.floor((Date.now() - startTime) / 1000);
 }
 
@@ -45,12 +59,17 @@ function getUptimeSeconds() {
 function recordRequest(method, path, statusCode, durationMs, route) {
   // Update in-process counters used by getSnapshot().
   state.requests.total += 1;
+  // Update state.requests.totalDurationMs with the right-hand side value.
   state.requests.totalDurationMs += durationMs;
 
+  // Create the status key constant.
   const statusKey = String(statusCode);
+  // Update state.requests.byStatus[statusKey] with the right-hand side value.
   state.requests.byStatus[statusKey] = (state.requests.byStatus[statusKey] || 0) + 1;
 
+  // Create the method key constant.
   const methodKey = method || 'UNKNOWN';
+  // Update state.requests.byMethod[methodKey] with the right-hand side value.
   state.requests.byMethod[methodKey] = (state.requests.byMethod[methodKey] || 0) + 1;
 
   // Forward to Prometheus histograms/counters.
@@ -64,7 +83,9 @@ function recordRequest(method, path, statusCode, durationMs, route) {
  * @throws {never}
  */
 function incrementPaymentFailures() {
+  // Update state.paymentFailures with the right-hand side value.
   state.paymentFailures += 1;
+  // Call prometheus.incrementPaymentFailures to perform this step.
   prometheus.incrementPaymentFailures();
 }
 
@@ -76,7 +97,9 @@ function incrementPaymentFailures() {
  * @throws {never}
  */
 function incrementWebhookFailures(reason) {
+  // Update state.webhookFailures with the right-hand side value.
   state.webhookFailures += 1;
+  // Call prometheus.incrementWebhookFailures to perform this step.
   prometheus.incrementWebhookFailures(reason);
 }
 
@@ -87,7 +110,9 @@ function incrementWebhookFailures(reason) {
  * @throws {never}
  */
 function incrementErrors() {
+  // Update state.errors with the right-hand side value.
   state.errors += 1;
+  // Call prometheus.incrementErrors to perform this step.
   prometheus.incrementErrors();
 }
 
@@ -98,7 +123,9 @@ function incrementErrors() {
  * @throws {never}
  */
 function incrementCheckoutStarted() {
+  // Update state.checkoutStarted with the right-hand side value.
   state.checkoutStarted += 1;
+  // Call prometheus.incrementCheckoutStarted to perform this step.
   prometheus.incrementCheckoutStarted();
 }
 
@@ -109,7 +136,9 @@ function incrementCheckoutStarted() {
  * @throws {never}
  */
 function incrementCheckoutCompleted() {
+  // Update state.checkoutCompleted with the right-hand side value.
   state.checkoutCompleted += 1;
+  // Call prometheus.incrementCheckoutCompleted to perform this step.
   prometheus.incrementCheckoutCompleted();
 }
 
@@ -121,9 +150,11 @@ function incrementCheckoutCompleted() {
  * @throws {never}
  */
 function incrementCheckoutAbandoned(count = 1) {
+  // Update state.checkoutAbandoned with the right-hand side value.
   state.checkoutAbandoned += count;
   // Prometheus counter has no bulk helper — tick once per abandon.
   for (let i = 0; i < count; i += 1) {
+    // Call prometheus.incrementCheckoutAbandoned to perform this step.
     prometheus.incrementCheckoutAbandoned();
   }
 }
@@ -136,6 +167,7 @@ function incrementCheckoutAbandoned(count = 1) {
  * @throws {never}
  */
 function incrementReservationConflict(reason) {
+  // Call prometheus.incrementReservationConflict to perform this step.
   prometheus.incrementReservationConflict(reason);
 }
 
@@ -146,6 +178,7 @@ function incrementReservationConflict(reason) {
  * @throws {never}
  */
 function incrementAdminLoginFailures() {
+  // Call prometheus.incrementAdminLoginFailures to perform this step.
   prometheus.incrementAdminLoginFailures();
 }
 
@@ -156,6 +189,7 @@ function incrementAdminLoginFailures() {
  * @throws {never}
  */
 function incrementEmailConfirmationFailures() {
+  // Call prometheus.incrementEmailConfirmationFailures to perform this step.
   prometheus.incrementEmailConfirmationFailures();
 }
 
@@ -167,6 +201,7 @@ function incrementEmailConfirmationFailures() {
  * @throws {never}
  */
 function incrementBusinessEvent(event) {
+  // Call prometheus.incrementBusinessEvent to perform this step.
   prometheus.incrementBusinessEvent(event);
 }
 
@@ -179,6 +214,7 @@ function incrementBusinessEvent(event) {
  * @throws {never}
  */
 function recordDbQuery(operation, durationMs) {
+  // Call prometheus.recordDbQuery to perform this step.
   prometheus.recordDbQuery(operation, durationMs);
 }
 
@@ -190,6 +226,7 @@ function recordDbQuery(operation, durationMs) {
  * @throws {never}
  */
 function setGaugeValues(values) {
+  // Call prometheus.setGaugeValues to perform this step.
   prometheus.setGaugeValues(values);
 }
 
@@ -201,6 +238,7 @@ function setGaugeValues(values) {
  * @throws {never}
  */
 function setWorkerHeartbeat(unixtime) {
+  // Call prometheus.setWorkerHeartbeat to perform this step.
   prometheus.setWorkerHeartbeat(unixtime);
 }
 
@@ -212,6 +250,7 @@ function setWorkerHeartbeat(unixtime) {
  * @throws {never}
  */
 function incrementBackgroundJobFailure(job) {
+  // Call prometheus.incrementBackgroundJobFailure to perform this step.
   prometheus.incrementBackgroundJobFailure(job);
 }
 
@@ -224,6 +263,7 @@ function incrementBackgroundJobFailure(job) {
  * @throws {never}
  */
 function setBackgroundJobLastSuccess(job, unixtime) {
+  // Call prometheus.setBackgroundJobLastSuccess to perform this step.
   prometheus.setBackgroundJobLastSuccess(job, unixtime);
 }
 
@@ -236,6 +276,7 @@ function setBackgroundJobLastSuccess(job, unixtime) {
  * @throws {never}
  */
 function incrementStorageErrors(driver, op) {
+  // Call prometheus.incrementStorageErrors to perform this step.
   prometheus.incrementStorageErrors(driver, op);
 }
 
@@ -248,49 +289,88 @@ function incrementStorageErrors(driver, op) {
 function getSnapshot() {
   // Average duration from cumulative totals (0 when no requests yet).
   const avgDurationMs =
+    // Continue the surrounding logic with this statement.
     state.requests.total > 0
+      // Continue the surrounding logic with this statement.
       ? Math.round((state.requests.totalDurationMs / state.requests.total) * 100) / 100
+      // Contribute this line to the enclosing declaration or statement.
       : 0;
 
+  // Return the resulting value to the caller.
   return {
+    // Provide the uptime seconds field value.
     uptimeSeconds: getUptimeSeconds(),
+    // Provide the started at field value.
     startedAt: new Date(startTime).toISOString(),
+    // Provide the requests field value.
     requests: {
+      // Provide the total field value.
       total: state.requests.total,
+      // Contribute this line to the enclosing declaration or statement.
       avgDurationMs,
+      // Provide the by status field value.
       byStatus: { ...state.requests.byStatus },
+      // Provide the by method field value.
       byMethod: { ...state.requests.byMethod },
     },
+    // Provide the payment failures field value.
     paymentFailures: state.paymentFailures,
+    // Provide the webhook failures field value.
     webhookFailures: state.webhookFailures,
+    // Provide the errors field value.
     errors: state.errors,
+    // Provide the checkout field value.
     checkout: {
+      // Provide the started field value.
       started: state.checkoutStarted,
+      // Provide the completed field value.
       completed: state.checkoutCompleted,
+      // Provide the abandoned field value.
       abandoned: state.checkoutAbandoned,
     },
   };
 }
 
+// Assign the CommonJS module exports.
 module.exports = {
+  // Contribute this line to the enclosing declaration or statement.
   getUptimeSeconds,
+  // Contribute this line to the enclosing declaration or statement.
   recordRequest,
+  // Contribute this line to the enclosing declaration or statement.
   incrementPaymentFailures,
+  // Contribute this line to the enclosing declaration or statement.
   incrementWebhookFailures,
+  // Contribute this line to the enclosing declaration or statement.
   incrementErrors,
+  // Contribute this line to the enclosing declaration or statement.
   incrementCheckoutStarted,
+  // Contribute this line to the enclosing declaration or statement.
   incrementCheckoutCompleted,
+  // Contribute this line to the enclosing declaration or statement.
   incrementCheckoutAbandoned,
+  // Contribute this line to the enclosing declaration or statement.
   incrementReservationConflict,
+  // Contribute this line to the enclosing declaration or statement.
   incrementAdminLoginFailures,
+  // Contribute this line to the enclosing declaration or statement.
   incrementEmailConfirmationFailures,
+  // Contribute this line to the enclosing declaration or statement.
   incrementBusinessEvent,
+  // Contribute this line to the enclosing declaration or statement.
   recordDbQuery,
+  // Contribute this line to the enclosing declaration or statement.
   setGaugeValues,
+  // Contribute this line to the enclosing declaration or statement.
   setWorkerHeartbeat,
+  // Contribute this line to the enclosing declaration or statement.
   incrementBackgroundJobFailure,
+  // Contribute this line to the enclosing declaration or statement.
   setBackgroundJobLastSuccess,
+  // Contribute this line to the enclosing declaration or statement.
   incrementStorageErrors,
+  // Contribute this line to the enclosing declaration or statement.
   getSnapshot,
+  // Provide the get prometheus metrics field value.
   getPrometheusMetrics: prometheus.getMetrics,
 };

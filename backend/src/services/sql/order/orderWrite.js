@@ -2,6 +2,7 @@
  * Order insert/update/soft-delete and hard-purge of aged soft-deleted rows.
  */
 const { clientQuery } = require('../../../db/transaction');
+// Destructure object properties into local variables.
 const { normalizeId, mapSqlOrder } = require('./orderMapper');
 
 /**
@@ -11,16 +12,22 @@ const { normalizeId, mapSqlOrder } = require('./orderMapper');
  * @param {object|null} [client]
  */
 async function createOrderFromReservation(reservation, carId, client = null) {
+  // Create the normalized car id constant.
   const normalizedCarId = normalizeId(carId);
+  // Create the normalized reservation id constant.
   const normalizedReservationId = normalizeId(reservation.id);
 
   // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId || !normalizedReservationId) {
+    // Throw an error to stop the current control flow.
     throw new Error('Invalid car or reservation id for order creation');
   }
 
+  // Create the result constant.
   const result = await clientQuery(
+    // Contribute this line to the enclosing declaration or statement.
     client,
+    // Continue the surrounding logic with this statement.
     `
     INSERT INTO orders (
       reservation_id,
@@ -57,32 +64,56 @@ async function createOrderFromReservation(reservation, carId, client = null) {
     RETURNING *
     `,
     [
+      // Contribute this line to the enclosing declaration or statement.
       normalizedReservationId,
+      // Contribute this line to the enclosing declaration or statement.
       normalizedCarId,
+      // Contribute this line to the enclosing declaration or statement.
       reservation.pickupDate,
+      // Contribute this line to the enclosing declaration or statement.
       reservation.pickupTime || null,
+      // Contribute this line to the enclosing declaration or statement.
       reservation.returnDate,
+      // Contribute this line to the enclosing declaration or statement.
       reservation.returnTime || null,
+      // Contribute this line to the enclosing declaration or statement.
       reservation.pickupLocation,
+      // Contribute this line to the enclosing declaration or statement.
       reservation.returnLocation,
+      // Contribute this line to the enclosing declaration or statement.
       reservation.rentalDays,
+      // Contribute this line to the enclosing declaration or statement.
       reservation.deliveryPrice ?? 0,
+      // Contribute this line to the enclosing declaration or statement.
       reservation.returnPrice ?? 0,
+      // Contribute this line to the enclosing declaration or statement.
       reservation.totalPrice,
+      // Contribute this line to the enclosing declaration or statement.
       reservation.deposit ?? 0,
+      // Continue the surrounding logic with this statement.
       reservation.priceSnapshot ? JSON.stringify(reservation.priceSnapshot) : null,
+      // Call JSON.stringify to perform this step.
       JSON.stringify(reservation.selectedExtras || []),
+      // Call Boolean to perform this step.
       Boolean(reservation.hotelDelivery),
+      // Contribute this line to the enclosing declaration or statement.
       reservation.fullName || '',
+      // Contribute this line to the enclosing declaration or statement.
       reservation.phoneNumber || '',
+      // Contribute this line to the enclosing declaration or statement.
       reservation.email || '',
+      // Contribute this line to the enclosing declaration or statement.
       reservation.address || '',
+      // Contribute this line to the enclosing declaration or statement.
       reservation.hotelName || null,
+      // Continue the surrounding logic with this statement.
       reservation.userId != null ? Number(reservation.userId) : null,
+      // Contribute this line to the enclosing declaration or statement.
       reservation.stripeSessionId || null,
     ]
   );
 
+  // Return the resulting value to the caller.
   return mapSqlOrder(result.rows[0]);
 }
 
@@ -92,14 +123,19 @@ async function createOrderFromReservation(reservation, carId, client = null) {
  * @param {object|null} [client]
  */
 async function createAdminOrder(orderPayload, client = null) {
+  // Create the normalized car id constant.
   const normalizedCarId = normalizeId(orderPayload.carId);
   // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId) {
+    // Throw an error to stop the current control flow.
     throw new Error('Invalid car id for order creation');
   }
 
+  // Create the result constant.
   const result = await clientQuery(
+    // Contribute this line to the enclosing declaration or statement.
     client,
+    // Continue the surrounding logic with this statement.
     `
     INSERT INTO orders (
       reservation_id,
@@ -134,30 +170,52 @@ async function createAdminOrder(orderPayload, client = null) {
     RETURNING *
     `,
     [
+      // Call normalizeId to perform this step.
       normalizeId(orderPayload.reservationId) || null,
+      // Contribute this line to the enclosing declaration or statement.
       normalizedCarId,
+      // Contribute this line to the enclosing declaration or statement.
       orderPayload.pickupDate,
+      // Contribute this line to the enclosing declaration or statement.
       orderPayload.pickupTime || null,
+      // Contribute this line to the enclosing declaration or statement.
       orderPayload.returnDate,
+      // Contribute this line to the enclosing declaration or statement.
       orderPayload.returnTime || null,
+      // Contribute this line to the enclosing declaration or statement.
       orderPayload.pickupLocation,
+      // Contribute this line to the enclosing declaration or statement.
       orderPayload.returnLocation,
+      // Contribute this line to the enclosing declaration or statement.
       orderPayload.rentalDays,
+      // Contribute this line to the enclosing declaration or statement.
       orderPayload.deliveryPrice ?? 0,
+      // Contribute this line to the enclosing declaration or statement.
       orderPayload.returnPrice ?? 0,
+      // Contribute this line to the enclosing declaration or statement.
       orderPayload.totalPrice,
+      // Contribute this line to the enclosing declaration or statement.
       orderPayload.deposit ?? 0,
+      // Continue the surrounding logic with this statement.
       orderPayload.priceSnapshot ? JSON.stringify(orderPayload.priceSnapshot) : null,
+      // Call JSON.stringify to perform this step.
       JSON.stringify(orderPayload.selectedExtras || []),
+      // Call Boolean to perform this step.
       Boolean(orderPayload.hotelDelivery),
+      // Contribute this line to the enclosing declaration or statement.
       orderPayload.fullName || '',
+      // Contribute this line to the enclosing declaration or statement.
       orderPayload.phoneNumber || '',
+      // Contribute this line to the enclosing declaration or statement.
       orderPayload.email || '',
+      // Contribute this line to the enclosing declaration or statement.
       orderPayload.address || '',
+      // Contribute this line to the enclosing declaration or statement.
       orderPayload.hotelName || null,
     ]
   );
 
+  // Return the resulting value to the caller.
   return mapSqlOrder(result.rows[0]);
 }
 
@@ -167,14 +225,19 @@ async function createAdminOrder(orderPayload, client = null) {
  * @param {object|null} [client]
  */
 async function updateOrderFromDoc(order, client = null) {
+  // Create the order id constant.
   const orderId = normalizeId(order.id);
   // Guard: early-return or throw when required input is missing/invalid.
   if (!orderId) {
+    // Throw an error to stop the current control flow.
     throw new Error('Invalid order id');
   }
 
+  // Create the result constant.
   const result = await clientQuery(
+    // Contribute this line to the enclosing declaration or statement.
     client,
+    // Continue the surrounding logic with this statement.
     `
     UPDATE orders
     SET
@@ -208,35 +271,62 @@ async function updateOrderFromDoc(order, client = null) {
     RETURNING *
     `,
     [
+      // Contribute this line to the enclosing declaration or statement.
       orderId,
+      // Call normalizeId to perform this step.
       normalizeId(order.carId?.id || order.carId),
+      // Call normalizeId to perform this step.
       normalizeId(order.reservationId) || null,
+      // Contribute this line to the enclosing declaration or statement.
       order.pickupDate,
+      // Contribute this line to the enclosing declaration or statement.
       order.pickupTime || null,
+      // Contribute this line to the enclosing declaration or statement.
       order.returnDate,
+      // Contribute this line to the enclosing declaration or statement.
       order.returnTime || null,
+      // Contribute this line to the enclosing declaration or statement.
       order.pickupLocation,
+      // Contribute this line to the enclosing declaration or statement.
       order.returnLocation,
+      // Contribute this line to the enclosing declaration or statement.
       order.rentalDays,
+      // Contribute this line to the enclosing declaration or statement.
       order.deliveryPrice ?? 0,
+      // Contribute this line to the enclosing declaration or statement.
       order.returnPrice ?? 0,
+      // Contribute this line to the enclosing declaration or statement.
       order.totalPrice,
+      // Continue the surrounding logic with this statement.
       order.deposit != null ? order.deposit : null,
+      // Continue the surrounding logic with this statement.
       order.priceSnapshot ? JSON.stringify(order.priceSnapshot) : null,
+      // Continue the surrounding logic with this statement.
       order.selectedExtras != null ? JSON.stringify(order.selectedExtras) : null,
+      // Continue the surrounding logic with this statement.
       order.hotelDelivery != null ? Boolean(order.hotelDelivery) : null,
+      // Contribute this line to the enclosing declaration or statement.
       order.fullName || '',
+      // Contribute this line to the enclosing declaration or statement.
       order.phoneNumber || '',
+      // Contribute this line to the enclosing declaration or statement.
       order.email || '',
+      // Contribute this line to the enclosing declaration or statement.
       order.address || '',
+      // Contribute this line to the enclosing declaration or statement.
       order.hotelName || null,
+      // Contribute this line to the enclosing declaration or statement.
       order.status || 'active',
+      // Contribute this line to the enclosing declaration or statement.
       order.expiredAt || null,
+      // Call Boolean to perform this step.
       Boolean(order.isDeleted),
+      // Contribute this line to the enclosing declaration or statement.
       order.deletedAt || null,
     ]
   );
 
+  // Return the resulting value to the caller.
   return mapSqlOrder(result.rows[0]);
 }
 
@@ -246,24 +336,39 @@ async function updateOrderFromDoc(order, client = null) {
  * @param {object|null} [client]
  */
 async function permanentlyDeleteSoftDeletedOrders(
+  // Continue the surrounding logic with this statement.
   { retentionDays = 30 } = {},
+  // Update client with the right-hand side value.
   client = null
+// Continue the surrounding logic with this statement.
 ) {
+  // Create the params constant.
   const params = [];
+  // Initialize the mutable sql variable.
   let sql = `DELETE FROM orders WHERE is_deleted = TRUE`;
 
+  // Evaluate the condition and enter the branch when it is true.
   if (Number.isFinite(retentionDays) && retentionDays > 0) {
+    // Call params.push to perform this step.
     params.push(retentionDays);
+    // Update sql with the right-hand side value.
     sql += ` AND deleted_at IS NOT NULL AND deleted_at < NOW() - ($1 || ' days')::interval`;
   }
 
+  // Create the result constant.
   const result = await clientQuery(client, sql, params);
+  // Return the resulting value to the caller.
   return result.rowCount || 0;
 }
 
+// Assign the CommonJS module exports.
 module.exports = {
+  // Contribute this line to the enclosing declaration or statement.
   createOrderFromReservation,
+  // Contribute this line to the enclosing declaration or statement.
   createAdminOrder,
+  // Contribute this line to the enclosing declaration or statement.
   updateOrderFromDoc,
+  // Contribute this line to the enclosing declaration or statement.
   permanentlyDeleteSoftDeletedOrders,
 };

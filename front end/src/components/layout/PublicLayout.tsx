@@ -3,10 +3,15 @@
  * Account/admin links adapt to the signed-in user’s staff vs customer role.
  */
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
+// Import named exports from 'react'.
 import { useEffect, useState } from 'react';
+// Import named exports from '../../auth/useAuth'.
 import { useAuth } from '../../auth/useAuth';
+// Import named exports from '../../auth/permissions'.
 import { isStaffUser } from '../../auth/permissions';
+// Import named exports from '../ui/Button'.
 import { Button } from '../ui/Button';
+// Import named exports from '../ui/Drawer'.
 import { Drawer } from '../ui/Drawer';
 
 /**
@@ -15,25 +20,38 @@ import { Drawer } from '../ui/Drawer';
  * @returns Absolute admin frontend URL, or `undefined` when unset.
  */
 function adminFrontendUrl(): string | undefined {
+  // Create the raw constant.
   const raw = import.meta.env.VITE_ADMIN_FRONTEND_URL;
+  // Evaluate the condition and enter the branch when it is true.
   if (!raw || !raw.trim()) return undefined;
+  // Return the resulting value to the caller.
   return raw.replace(/\/+$/, '');
 }
 
 /** Desktop header NavLink class factory (active underline accent). */
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
+  // Continue the surrounding logic with this statement.
   `relative text-sm font-semibold uppercase tracking-[0.06em] transition-colors ${
+    // Reference the identifier used by the enclosing expression.
     isActive
+      // Continue the surrounding logic with this statement.
       ? 'text-[var(--color-navy)] after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-full after:bg-[var(--color-accent)]'
+      // Continue the surrounding logic with this statement.
       : 'text-[var(--color-muted)] hover:text-[var(--color-navy)]'
+  // Continue the surrounding logic with this statement.
   }`;
 
 /** Mobile drawer NavLink class factory (filled active chip). */
 const drawerLinkClass = ({ isActive }: { isActive: boolean }) =>
+  // Continue the surrounding logic with this statement.
   `flex min-h-11 items-center rounded-xl px-3 py-2.5 text-sm font-semibold ${
+    // Reference the identifier used by the enclosing expression.
     isActive
+      // Continue the surrounding logic with this statement.
       ? 'bg-[var(--color-navy)] text-white'
+      // Continue the surrounding logic with this statement.
       : 'bg-[var(--color-surface)] text-[var(--color-ink)]'
+  // Continue the surrounding logic with this statement.
   }`;
 
 /**
@@ -43,15 +61,21 @@ const drawerLinkClass = ({ isActive }: { isActive: boolean }) =>
  * @remarks Side effect: closes the mobile drawer whenever `location.pathname` changes.
  */
 export function PublicLayout() {
+  // Destructure object properties into local variables.
   const { user, logout } = useAuth();
+  // Create the location constant.
   const location = useLocation();
+  // Destructure array values into local variables.
   const [menuOpen, setMenuOpen] = useState(false);
 
   // Close the drawer after in-app navigations so it does not stay open on the next page.
   useEffect(() => {
+    // Call setMenuOpen to perform this step.
     setMenuOpen(false);
+  // Continue the surrounding logic with this statement.
   }, [location.pathname]);
 
+  // Return control to the caller with the following value.
   return (
     <div className="flex min-h-screen min-w-0 flex-col bg-[var(--color-surface)]">
       <div className="bg-[var(--color-navy)] text-white">

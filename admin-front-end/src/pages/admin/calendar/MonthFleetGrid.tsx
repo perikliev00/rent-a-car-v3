@@ -2,84 +2,138 @@
  * Month grid overview of fleet occupancy density.
  */
 import { useMemo, type MouseEvent } from 'react';
+// Import named exports from the referenced module.
 import {
+  // Contribute this line to the enclosing declaration or statement.
   eachDayOfInterval,
+  // Contribute this line to the enclosing declaration or statement.
   format,
+  // Contribute this line to the enclosing declaration or statement.
   formatISO,
+  // Contribute this line to the enclosing declaration or statement.
   isSameMonth,
+  // Contribute this line to the enclosing declaration or statement.
   parseISO,
+  // Contribute this line to the enclosing declaration or statement.
   startOfDay,
+// Contribute this line to the enclosing declaration or statement.
 } from 'date-fns';
+// Contribute this line to the enclosing declaration or statement.
 import type { CalendarCar, CalendarEvent } from './calendar.types';
+// Import named exports from './eventStyles'.
 import { eventChipClass, eventTypeLabel } from './eventStyles';
 
+// Declare the BucketKey TypeScript type alias.
 type BucketKey = 'reservation' | 'block' | 'task' | 'problem';
 
 /** Bucket Type. */
 function bucketType(type: string): BucketKey {
+  // Evaluate the condition and enter the branch when it is true.
   if (type === 'task') return 'task';
+  // Evaluate the condition and enter the branch when it is true.
   if (type === 'blocked' || type === 'maintenance' || type === 'cleaning') return 'block';
+  // Evaluate the condition and enter the branch when it is true.
   if (type === 'payment_issue' || type === 'manual_review') return 'problem';
+  // Return the resulting value to the caller.
   return 'reservation';
 }
 
 /** Events On Day. */
 function eventsOnDay(events: CalendarEvent[], day: Date): CalendarEvent[] {
+  // Create the day start constant.
   const dayStart = startOfDay(day).getTime();
+  // Create the day end constant.
   const dayEnd = dayStart + 24 * 60 * 60 * 1000 - 1;
+  // Return the resulting value to the caller.
   return events.filter((e) => {
+    // Create the s constant.
     const s = parseISO(e.start).getTime();
+    // Create the en constant.
     const en = parseISO(e.end).getTime();
+    // Return the resulting value to the caller.
     return s <= dayEnd && en >= dayStart;
   });
 }
 
 /** Month grid overview of fleet occupancy density. */
 export function MonthFleetGrid({
+  // Contribute this line to the enclosing declaration or statement.
   cars,
+  // Contribute this line to the enclosing declaration or statement.
   events,
+  // Contribute this line to the enclosing declaration or statement.
   from,
+  // Contribute this line to the enclosing declaration or statement.
   to,
+  // Contribute this line to the enclosing declaration or statement.
   onDayClick,
+  // Contribute this line to the enclosing declaration or statement.
   onEventClick,
+// Contribute this line to the enclosing declaration or statement.
 }: {
+  // Provide the cars field value.
   cars: CalendarCar[];
+  // Provide the events field value.
   events: CalendarEvent[];
+  // Provide the from field value.
   from: Date;
+  // Provide the to field value.
   to: Date;
+  // Provide the on day click field value.
   onDayClick: (date: string, carId?: string) => void;
+  // Provide the on event click field value.
   onEventClick: (event: CalendarEvent) => void;
+// Continue the surrounding logic with this statement.
 }) {
+  // Create the days constant.
   const days = useMemo(
+    // Continue the surrounding logic with this statement.
     () => eachDayOfInterval({ start: from, end: to }).filter((d) => isSameMonth(d, from)),
+    // Contribute this line to the enclosing declaration or statement.
     [from, to]
   );
 
   /** Handle Cell Click. */
   function handleCellClick(day: Date, carId: string, dayEvents: CalendarEvent[]) {
+    // Create the date str constant.
     const dateStr = formatISO(day, { representation: 'date' });
+    // Evaluate the condition and enter the branch when it is true.
     if (dayEvents.length === 1) {
+      // Call onEventClick to perform this step.
       onEventClick(dayEvents[0]);
+      // Return control to the caller with the following value.
       return;
     }
+    // Call onDayClick to perform this step.
     onDayClick(dateStr, carId);
   }
 
   /** Handle Chip Click. */
   function handleChipClick(
+    // Provide the e field value.
     e: MouseEvent,
+    // Provide the day field value.
     day: Date,
+    // Provide the car id field value.
     carId: string,
+    // Provide the bucket events field value.
     bucketEvents: CalendarEvent[]
+  // Continue the surrounding logic with this statement.
   ) {
+    // Call e.stopPropagation to perform this step.
     e.stopPropagation();
+    // Evaluate the condition and enter the branch when it is true.
     if (bucketEvents.length === 1) {
+      // Call onEventClick to perform this step.
       onEventClick(bucketEvents[0]);
+      // Return control to the caller with the following value.
       return;
     }
+    // Call onDayClick to perform this step.
     onDayClick(formatISO(day, { representation: 'date' }), carId);
   }
 
+  // Return control to the caller with the following value.
   return (
     <div
       className="max-w-full min-w-0 overflow-x-auto overflow-y-auto overscroll-x-contain rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] shadow-[var(--shadow-soft)]"

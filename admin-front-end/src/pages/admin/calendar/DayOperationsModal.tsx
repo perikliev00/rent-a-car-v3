@@ -2,65 +2,111 @@
  * Modal summarizing a single days operational workload.
  */
 import { useState, type ReactNode } from 'react';
+// Import named exports from '@tanstack/react-query'.
 import { useQuery } from '@tanstack/react-query';
+// Import named exports from 'date-fns'.
 import { format, parseISO } from 'date-fns';
+// Import named exports from '../../../api/admin/calendar'.
 import { getCalendarDay } from '../../../api/admin/calendar';
+// Import named exports from '../../../components/ui/Modal'.
 import { Modal } from '../../../components/ui/Modal';
+// Import named exports from '../../../components/ui/Loading'.
 import { PageLoader } from '../../../components/ui/Loading';
 
+// Declare the TabId TypeScript type alias.
 type TabId = 'pickups' | 'returns' | 'fleet' | 'problems' | 'warnings';
 
 /** Modal summarizing a single days operational workload. */
 export function DayOperationsModal({
+  // Contribute this line to the enclosing declaration or statement.
   date,
+  // Contribute this line to the enclosing declaration or statement.
   open,
+  // Contribute this line to the enclosing declaration or statement.
   onClose,
+  // Contribute this line to the enclosing declaration or statement.
   onOpenEvent,
+  // Contribute this line to the enclosing declaration or statement.
   onOpenReservation,
+  // Contribute this line to the enclosing declaration or statement.
   onFreeCarAction,
+// Contribute this line to the enclosing declaration or statement.
 }: {
+  // Provide the date field value.
   date: string | null;
+  // Provide the open field value.
   open: boolean;
+  // Provide the on close field value.
   onClose: () => void;
+  // Continue the surrounding logic with this statement.
   onOpenEvent?: (eventId: string) => void;
+  // Continue the surrounding logic with this statement.
   onOpenReservation?: (reservationId: string) => void;
+  // Continue the surrounding logic with this statement.
   onFreeCarAction?: (carId: string) => void;
+// Continue the surrounding logic with this statement.
 }) {
+  // Destructure array values into local variables.
   const [tab, setTab] = useState<TabId>('pickups');
+  // Destructure object properties into local variables.
   const { data, isLoading } = useQuery({
+    // Provide the query key field value.
     queryKey: ['admin', 'calendar', 'day', date],
+    // Provide the query fn field value.
     queryFn: () => getCalendarDay(date!),
+    // Provide the enabled field value.
     enabled: open && Boolean(date),
   });
 
+  // Create the title date constant.
   const titleDate = date
+    // Continue the surrounding logic with this statement.
     ? (() => {
+        // Start a try block for operations that may fail.
         try {
+          // Return the resulting value to the caller.
           return format(parseISO(date), 'EEE d MMM yyyy');
+        // Contribute this line to the enclosing declaration or statement.
         } catch {
+          // Return the resulting value to the caller.
           return date;
         }
+      // Continue the surrounding logic with this statement.
       })()
+    // Contribute this line to the enclosing declaration or statement.
     : 'Day ops';
 
+  // Continue the surrounding logic with this statement.
   const tabs: { id: TabId; label: string; count: number }[] = data
+    // Contribute this line to the enclosing declaration or statement.
     ? [
+        // Contribute this line to the enclosing declaration or statement.
         { id: 'pickups', label: 'Pickups', count: data.pickups.length },
+        // Contribute this line to the enclosing declaration or statement.
         { id: 'returns', label: 'Returns', count: data.returns.length },
         {
+          // Provide the id field value.
           id: 'fleet',
+          // Provide the label field value.
           label: 'Free/Busy',
+          // Provide the count field value.
           count: data.freeCars.length + data.busyCars.length,
         },
+        // Contribute this line to the enclosing declaration or statement.
         { id: 'problems', label: 'Problems', count: data.problems.length },
         {
+          // Provide the id field value.
           id: 'warnings',
+          // Provide the label field value.
           label: 'Warnings',
+          // Provide the count field value.
           count: data.insuranceWarnings.length + data.paidNotConfirmed.length,
         },
       ]
+    // Contribute this line to the enclosing declaration or statement.
     : [];
 
+  // Return control to the caller with the following value.
   return (
     <Modal open={open} onClose={onClose} title={`Day ops · ${titleDate}`} wide>
       <div className="animate-lux-fade">
@@ -202,14 +248,23 @@ export function DayOperationsModal({
 
 /** Stat. */
 function Stat({
+  // Contribute this line to the enclosing declaration or statement.
   label,
+  // Contribute this line to the enclosing declaration or statement.
   value,
+  // Contribute this line to the enclosing declaration or statement.
   urgency,
+// Contribute this line to the enclosing declaration or statement.
 }: {
+  // Provide the label field value.
   label: string;
+  // Provide the value field value.
   value: number;
+  // Contribute this line to the enclosing declaration or statement.
   urgency?: boolean;
+// Continue the surrounding logic with this statement.
 }) {
+  // Return control to the caller with the following value.
   return (
     <div
       className={`rounded-xl border px-3 py-2 ${
@@ -233,6 +288,7 @@ function List({ children }: { children: ReactNode }) {
 
 /** Sub. */
 function Sub({ title, children }: { title: string; children: ReactNode }) {
+  // Return control to the caller with the following value.
   return (
     <section>
       <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">
@@ -250,24 +306,42 @@ function Empty() {
 
 /** Ops Row. */
 function OpsRow({
+  // Contribute this line to the enclosing declaration or statement.
   label,
+  // Contribute this line to the enclosing declaration or statement.
   meta,
+  // Contribute this line to the enclosing declaration or statement.
   onClick,
+  // Contribute this line to the enclosing declaration or statement.
   onOpen,
+  // Contribute this line to the enclosing declaration or statement.
   urgency,
+// Contribute this line to the enclosing declaration or statement.
 }: {
+  // Provide the label field value.
   label: string;
+  // Provide the meta field value.
   meta: string;
+  // Continue the surrounding logic with this statement.
   onClick?: () => void;
+  // Continue the surrounding logic with this statement.
   onOpen?: () => void;
+  // Contribute this line to the enclosing declaration or statement.
   urgency?: boolean;
+// Continue the surrounding logic with this statement.
 }) {
+  // Create the class name constant.
   const className = `flex w-full items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left transition-colors ${
+    // Reference the identifier used by the enclosing expression.
     urgency
+      // Continue the surrounding logic with this statement.
       ? 'border-[var(--color-danger)]/25 bg-[var(--color-danger)]/5'
+      // Continue the surrounding logic with this statement.
       : 'border-[var(--color-line)]'
+  // Continue the surrounding logic with this statement.
   } ${onClick ? 'cursor-pointer hover:border-[var(--color-accent)]' : ''}`;
 
+  // Return control to the caller with the following value.
   return (
     <div className={className}>
       <button

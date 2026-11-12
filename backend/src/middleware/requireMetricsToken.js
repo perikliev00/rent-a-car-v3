@@ -3,9 +3,12 @@
  * Non-production environments skip the check.
  */
 const crypto = require('crypto');
+// Require the '../utils/logger' module as logger.
 const logger = require('../utils/logger');
 
+// Create the is prod constant.
 const isProd = process.env.NODE_ENV === 'production';
+// Create the metrics token constant.
 const metricsToken = process.env.METRICS_TOKEN || '';
 
 /**
@@ -13,19 +16,28 @@ const metricsToken = process.env.METRICS_TOKEN || '';
  * @returns {Set<string>|null} Allowed client IPs, or null when unset
  */
 function parseAllowedIps() {
+  // Create the raw constant.
   const raw = process.env.METRICS_ALLOWED_IPS;
+  // Evaluate the condition and enter the branch when it is true.
   if (!raw) {
+    // Return the resulting value to the caller.
     return null;
   }
 
+  // Create the ips constant.
   const ips = raw
+    // Call .split to perform this step.
     .split(',')
+    // Call .map to perform this step.
     .map((entry) => entry.trim())
+    // Call .filter to perform this step.
     .filter(Boolean);
 
+  // Return the resulting value to the caller.
   return ips.length ? new Set(ips) : null;
 }
 
+// Create the allowed ips constant.
 const allowedIps = parseAllowedIps();
 
 /**
@@ -35,18 +47,24 @@ const allowedIps = parseAllowedIps();
  * @returns {boolean}
  */
 function safeEqual(a, b) {
+  // Evaluate the condition and enter the branch when it is true.
   if (!a || !b) {
+    // Return the resulting value to the caller.
     return false;
   }
 
+  // Create the buf a constant.
   const bufA = Buffer.from(a);
+  // Create the buf b constant.
   const bufB = Buffer.from(b);
 
   // timingSafeEqual throws on length mismatch — treat as non-equal.
   if (bufA.length !== bufB.length) {
+    // Return the resulting value to the caller.
     return false;
   }
 
+  // Return the resulting value to the caller.
   return crypto.timingSafeEqual(bufA, bufB);
 }
 
@@ -56,11 +74,15 @@ function safeEqual(a, b) {
  * @returns {string} Presented token (may be empty)
  */
 function extractToken(req) {
+  // Create the auth header constant.
   const authHeader = req.get('authorization') || '';
+  // Evaluate the condition and enter the branch when it is true.
   if (authHeader.startsWith('Bearer ')) {
+    // Return the resulting value to the caller.
     return authHeader.slice('Bearer '.length);
   }
 
+  // Return the resulting value to the caller.
   return req.get('x-metrics-token') || '';
 }
 
@@ -70,10 +92,13 @@ function extractToken(req) {
  * @returns {boolean}
  */
 function isIpAllowed(req) {
+  // Evaluate the condition and enter the branch when it is true.
   if (!allowedIps) {
+    // Return the resulting value to the caller.
     return false;
   }
 
+  // Return the resulting value to the caller.
   return allowedIps.has(req.ip);
 }
 
@@ -83,10 +108,13 @@ function isIpAllowed(req) {
  * @returns {boolean}
  */
 function isTokenValid(req) {
+  // Evaluate the condition and enter the branch when it is true.
   if (!metricsToken) {
+    // Return the resulting value to the caller.
     return false;
   }
 
+  // Return the resulting value to the caller.
   return safeEqual(extractToken(req), metricsToken);
 }
 
@@ -95,6 +123,7 @@ function isTokenValid(req) {
  * @returns {boolean}
  */
 function isMetricsConfigured() {
+  // Return the resulting value to the caller.
   return Boolean(metricsToken || allowedIps);
 }
 
@@ -107,36 +136,52 @@ function isMetricsConfigured() {
  * @returns {void|import('express').Response}
  */
 function requireMetricsToken(req, res, next) {
+  // Evaluate the condition and enter the branch when it is true.
   if (!isProd) {
+    // Return the resulting value to the caller.
     return next();
   }
 
   // Misconfigured prod: fail closed rather than expose metrics publicly.
   if (!isMetricsConfigured()) {
+    // Return the resulting value to the caller.
     return res.status(503).json({
+      // Provide the error field value.
       error: {
+        // Provide the code field value.
         code: 'METRICS_UNAVAILABLE',
+        // Provide the message field value.
         message: 'Metrics endpoint is not configured.',
       },
     });
   }
 
+  // Evaluate the condition and enter the branch when it is true.
   if (isIpAllowed(req) || isTokenValid(req)) {
+    // Return the resulting value to the caller.
     return next();
   }
 
+  // Return the resulting value to the caller.
   return res.status(401).json({
+    // Provide the error field value.
     error: {
+      // Provide the code field value.
       code: 'UNAUTHORIZED',
+      // Provide the message field value.
       message: 'Valid metrics credentials required.',
     },
   });
 }
 
+// Evaluate the condition and enter the branch when it is true.
 if (isProd && !isMetricsConfigured()) {
+  // Call logger.warn to perform this step.
   logger.warn(
+    // Supply the literal value used by the enclosing expression.
     'METRICS_TOKEN and METRICS_ALLOWED_IPS are unset; /metrics is disabled in production'
   );
 }
 
+// Assign the CommonJS module exports.
 module.exports = requireMetricsToken;

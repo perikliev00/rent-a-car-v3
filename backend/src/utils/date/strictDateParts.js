@@ -4,8 +4,11 @@
  */
 
 const DATE_PARTS_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+// Create the time parts re constant.
 const TIME_PARTS_RE = /^(\d{2}):(\d{2})$/;
+// Create the combined datetime re constant.
 const COMBINED_DATETIME_RE = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})$/;
+// Destructure object properties into local variables.
 const { toHHMM } = require('./normalizeTime');
 
 /**
@@ -16,6 +19,7 @@ const { toHHMM } = require('./normalizeTime');
  * @throws {never}
  */
 function isLeapYear(year) {
+  // Return the resulting value to the caller.
   return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
 }
 
@@ -28,14 +32,19 @@ function isLeapYear(year) {
  * @throws {never}
  */
 function daysInMonth(year, month) {
+  // Evaluate the condition and enter the branch when it is true.
   if (month === 2) {
+    // Return the resulting value to the caller.
     return isLeapYear(year) ? 29 : 28;
   }
 
+  // Evaluate the condition and enter the branch when it is true.
   if (month === 4 || month === 6 || month === 9 || month === 11) {
+    // Return the resulting value to the caller.
     return 30;
   }
 
+  // Return the resulting value to the caller.
   return 31;
 }
 
@@ -47,27 +56,37 @@ function daysInMonth(year, month) {
  * @throws {never}
  */
 function validateCalendarDateTimeParts({ year, month, day, hour, minute }) {
+  // Evaluate the condition and enter the branch when it is true.
   if (!Number.isInteger(year)) {
+    // Return the resulting value to the caller.
     return false;
   }
 
+  // Evaluate the condition and enter the branch when it is true.
   if (!Number.isInteger(month) || month < 1 || month > 12) {
+    // Return the resulting value to the caller.
     return false;
   }
 
   // Day must exist in that month (rejects Feb 30, Apr 31, etc.).
   if (!Number.isInteger(day) || day < 1 || day > daysInMonth(year, month)) {
+    // Return the resulting value to the caller.
     return false;
   }
 
+  // Evaluate the condition and enter the branch when it is true.
   if (!Number.isInteger(hour) || hour < 0 || hour > 23) {
+    // Return the resulting value to the caller.
     return false;
   }
 
+  // Evaluate the condition and enter the branch when it is true.
   if (!Number.isInteger(minute) || minute < 0 || minute > 59) {
+    // Return the resulting value to the caller.
     return false;
   }
 
+  // Return the resulting value to the caller.
   return true;
 }
 
@@ -84,11 +103,17 @@ function validateCalendarDateTimeParts({ year, month, day, hour, minute }) {
  * @throws {never}
  */
 function utcDateMatchesParts(date, year, month, day, hour, minute) {
+  // Return control to the caller with the following value.
   return (
+    // Call date.getUTCFullYear to perform this step.
     date.getUTCFullYear() === year &&
+    // Call date.getUTCMonth to perform this step.
     date.getUTCMonth() === month - 1 &&
+    // Call date.getUTCDate to perform this step.
     date.getUTCDate() === day &&
+    // Call date.getUTCHours to perform this step.
     date.getUTCHours() === hour &&
+    // Call date.getUTCMinutes to perform this step.
     date.getUTCMinutes() === minute
   );
 }
@@ -104,45 +129,67 @@ function utcDateMatchesParts(date, year, month, day, hour, minute) {
 function parseStrictDateTimeInput(dateString, timeString = '00:00') {
   // Empty / missing date → unparseable.
   if (dateString === undefined || dateString === null || dateString === '') {
+    // Return the resulting value to the caller.
     return null;
   }
 
+  // Create the date input constant.
   const dateInput = String(dateString).trim();
+  // Create the time input constant.
   const timeInput = String(timeString ?? '00:00').trim();
   // Prefer normalized HH:MM; fall back to raw trimmed time for regex match.
   const normalizedTimeInput = toHHMM(timeInput) ?? timeInput;
 
+  // Reserve the year str variable for later assignment.
   let yearStr;
+  // Reserve the month str variable for later assignment.
   let monthStr;
+  // Reserve the day str variable for later assignment.
   let dayStr;
+  // Reserve the hour str variable for later assignment.
   let hourStr;
+  // Reserve the minute str variable for later assignment.
   let minuteStr;
 
   // Prefer combined datetime form when present (time in the string wins).
   const combinedMatch = COMBINED_DATETIME_RE.exec(dateInput);
+  // Evaluate the condition and enter the branch when it is true.
   if (combinedMatch) {
+    // Continue the surrounding logic with this statement.
     [, yearStr, monthStr, dayStr, hourStr, minuteStr] = combinedMatch;
+  // Contribute this line to the enclosing declaration or statement.
   } else {
     // Date-only + separate time string.
     const dateMatch = DATE_PARTS_RE.exec(dateInput);
+    // Create the time match constant.
     const timeMatch = TIME_PARTS_RE.exec(normalizedTimeInput);
 
+    // Evaluate the condition and enter the branch when it is true.
     if (!dateMatch || !timeMatch) {
+      // Return the resulting value to the caller.
       return null;
     }
 
+    // Continue the surrounding logic with this statement.
     [, yearStr, monthStr, dayStr] = dateMatch;
+    // Continue the surrounding logic with this statement.
     [, hourStr, minuteStr] = timeMatch;
   }
 
+  // Create the year constant.
   const year = Number(yearStr);
+  // Create the month constant.
   const month = Number(monthStr);
+  // Create the day constant.
   const day = Number(dayStr);
+  // Create the hour constant.
   const hour = Number(hourStr);
+  // Create the minute constant.
   const minute = Number(minuteStr);
 
   // Reject impossible calendar combinations before constructing a Date.
   if (!validateCalendarDateTimeParts({ year, month, day, hour, minute })) {
+    // Return the resulting value to the caller.
     return null;
   }
 
@@ -151,17 +198,26 @@ function parseStrictDateTimeInput(dateString, timeString = '00:00') {
 
   // Guard against Date overflow/underflow changing components.
   if (!utcDateMatchesParts(baseline, year, month, day, hour, minute)) {
+    // Return the resulting value to the caller.
     return null;
   }
 
+  // Return the resulting value to the caller.
   return { year, month, day, hour, minute, baseline };
 }
 
+// Assign the CommonJS module exports.
 module.exports = {
+  // Contribute this line to the enclosing declaration or statement.
   DATE_PARTS_RE,
+  // Contribute this line to the enclosing declaration or statement.
   TIME_PARTS_RE,
+  // Contribute this line to the enclosing declaration or statement.
   COMBINED_DATETIME_RE,
+  // Contribute this line to the enclosing declaration or statement.
   validateCalendarDateTimeParts,
+  // Contribute this line to the enclosing declaration or statement.
   utcDateMatchesParts,
+  // Contribute this line to the enclosing declaration or statement.
   parseStrictDateTimeInput,
 };

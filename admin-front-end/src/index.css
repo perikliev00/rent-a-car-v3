@@ -1,138 +1,224 @@
+/* Import an external stylesheet dependency. */
 @import "tailwindcss";
 
+/* Continue the stylesheet rule definitions. */
 @theme {
+  /* Set the CSS --font-sans property. */
   --font-sans: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+  /* Set the CSS --font-display property. */
   --font-display: "Outfit", ui-sans-serif, system-ui, sans-serif;
 
+  /* Set the CSS --color-ink property. */
   --color-ink: #0c1222;
+  /* Set the CSS --color-ink-soft property. */
   --color-ink-soft: #1a2336;
+  /* Set the CSS --color-navy property. */
   --color-navy: #0a2a4a;
+  /* Set the CSS --color-navy-deep property. */
   --color-navy-deep: #061d35;
+  /* Set the CSS --color-surface property. */
   --color-surface: #f0f3f7;
+  /* Set the CSS --color-surface-elevated property. */
   --color-surface-elevated: #ffffff;
+  /* Set the CSS --color-accent property. */
   --color-accent: #f5c518;
+  /* Set the CSS --color-accent-hover property. */
   --color-accent-hover: #e0b010;
+  /* Set the CSS --color-accent-ink property. */
   --color-accent-ink: #8a6a08;
+  /* Set the CSS --color-accent-muted property. */
   --color-accent-muted: #fef3c7;
+  /* Set the CSS --color-line property. */
   --color-line: #d5dce6;
+  /* Set the CSS --color-muted property. */
   --color-muted: #4a5568;
+  /* Set the CSS --color-success property. */
   --color-success: #0f7a4c;
+  /* Set the CSS --color-danger property. */
   --color-danger: #c0392b;
 
+  /* Set the CSS --shadow-soft property. */
   --shadow-soft: 0 10px 40px -18px rgb(10 42 74 / 0.35);
+  /* Set the CSS --shadow-lift property. */
   --shadow-lift: 0 18px 50px -20px rgb(10 42 74 / 0.45);
+  /* Set the CSS --ease-out property. */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* Declare style rules for the html selector. */
 html {
+  /* Set the CSS scroll-behavior property. */
   scroll-behavior: smooth;
 }
 
+/* Declare style rules for the body selector. */
 body {
+  /* Apply Tailwind utility classes to the current selector. */
   @apply font-sans antialiased;
+  /* Set the CSS color property. */
   color: var(--color-ink);
+  /* Set the CSS background-color property. */
   background-color: var(--color-surface);
 }
 
+/* Declare style rules for the .font-display selector. */
 .font-display {
+  /* Set the CSS font-family property. */
   font-family: var(--font-display);
 }
 
+/* Continue the stylesheet rule definitions. */
 .bg-asphalt,
+/* Declare style rules for the .bg-navy selector. */
 .bg-navy {
+  /* Set the CSS background-color property. */
   background-color: var(--color-navy);
+  /* Set the CSS background-image property. */
   background-image:
+    /* Continue the stylesheet rule definitions. */
     url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgdmlld0JveD0iMCAwIDEyMCAxMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGcgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIwLjAzIj48Y2lyY2xlIGN4PSIyIiBjeT0iMiIgcj0iMSIvPjxjaXJjbGUgY3g9IjYyIiBjeT0iNDIiIHI9IjEiLz48Y2lyY2xlIGN4PSIzMiIgY3k9IjgyIiByPSIxIi8+PGNpcmNsZSBjeD0iOTIiIGN5PSIxMDIiIHI9IjEiLz48L2c+PC9zdmc+"),
+    /* Continue the stylesheet rule definitions. */
     linear-gradient(165deg, var(--color-navy-deep) 0%, var(--color-navy) 48%, #0c3558 100%);
 }
 
+/* Declare style rules for the .hero-photo-overlay selector. */
 .hero-photo-overlay {
+  /* Set the CSS background property. */
   background:
+    /* Continue the stylesheet rule definitions. */
     linear-gradient(180deg, rgb(6 29 53 / 0.55) 0%, rgb(6 29 53 / 0.35) 40%, rgb(6 29 53 / 0.72) 100%);
 }
 
+/* Continue the stylesheet rule definitions. */
 @keyframes lux-rise {
+  /* Declare style rules for the from selector. */
   from {
+    /* Set the CSS opacity property. */
     opacity: 0;
+    /* Set the CSS transform property. */
     transform: translateY(14px);
   }
+  /* Declare style rules for the to selector. */
   to {
+    /* Set the CSS opacity property. */
     opacity: 1;
+    /* Set the CSS transform property. */
     transform: translateY(0);
   }
 }
 
+/* Continue the stylesheet rule definitions. */
 @keyframes lux-fade {
+  /* Declare style rules for the from selector. */
   from {
+    /* Set the CSS opacity property. */
     opacity: 0;
   }
+  /* Declare style rules for the to selector. */
   to {
+    /* Set the CSS opacity property. */
     opacity: 1;
   }
 }
 
+/* Declare style rules for the .animate-lux-rise selector. */
 .animate-lux-rise {
+  /* Set the CSS animation property. */
   animation: lux-rise 0.7s var(--ease-out) both;
 }
 
+/* Declare style rules for the .animate-lux-fade selector. */
 .animate-lux-fade {
+  /* Set the CSS animation property. */
   animation: lux-fade 0.6s var(--ease-out) both;
 }
 
+/* Declare style rules for the .animate-lux-rise-delay selector. */
 .animate-lux-rise-delay {
+  /* Set the CSS animation property. */
   animation: lux-rise 0.75s var(--ease-out) 0.12s both;
 }
 
+/* Continue the stylesheet rule definitions. */
 @keyframes lux-drawer {
+  /* Declare style rules for the from selector. */
   from {
+    /* Set the CSS opacity property. */
     opacity: 0;
+    /* Set the CSS transform property. */
     transform: translateX(18px);
   }
+  /* Declare style rules for the to selector. */
   to {
+    /* Set the CSS opacity property. */
     opacity: 1;
+    /* Set the CSS transform property. */
     transform: translateX(0);
   }
 }
 
+/* Open a CSS media-query block for responsive rules. */
 @media (prefers-reduced-motion: reduce) {
+  /* Declare style rules for the html selector. */
   html {
+    /* Set the CSS scroll-behavior property. */
     scroll-behavior: auto;
   }
 
+  /* Continue the stylesheet rule definitions. */
   .animate-lux-rise,
+  /* Continue the stylesheet rule definitions. */
   .animate-lux-fade,
+  /* Continue the stylesheet rule definitions. */
   .animate-lux-rise-delay,
+  /* Continue the stylesheet rule definitions. */
   [class*='lux-drawer'] {
+    /* Set the CSS animation property. */
     animation: none;
   }
 
+  /* Declare style rules for the .motion-safe-lift selector. */
   .motion-safe-lift {
+    /* Set the CSS transition property. */
     transition: none !important;
   }
 
+  /* Declare style rules for the .motion-safe-lift:hover selector. */
   .motion-safe-lift:hover {
+    /* Set the CSS transform property. */
     transform: none !important;
   }
 
+  /* Declare style rules for the .motion-safe-zoom selector. */
   .motion-safe-zoom {
+    /* Set the CSS transition property. */
     transition: none !important;
   }
 
+  /* Declare style rules for the .group:hover .motion-safe-zoom selector. */
   .group:hover .motion-safe-zoom {
+    /* Set the CSS transform property. */
     transform: none !important;
   }
 
+  /* Set the CSS button property. */
   button:active {
+    /* Set the CSS transform property. */
     transform: none !important;
   }
 }
 
+/* Declare style rules for the .motion-safe-lift selector. */
 .motion-safe-lift {
+  /* Set the CSS transition property. */
   transition: transform 0.3s var(--ease-out), box-shadow 0.3s var(--ease-out);
 }
 
+/* Open a CSS media-query block for responsive rules. */
 @media (prefers-reduced-motion: no-preference) {
+  /* Declare style rules for the .motion-safe-lift:hover selector. */
   .motion-safe-lift:hover {
+    /* Set the CSS transform property. */
     transform: translateY(-0.25rem);
   }
 }

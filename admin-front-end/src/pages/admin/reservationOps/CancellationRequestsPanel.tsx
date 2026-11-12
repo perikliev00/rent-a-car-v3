@@ -2,49 +2,77 @@
  * Customer cancellation-request review (approve/deny).
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+// Import named exports from the referenced module.
 import {
+  // Contribute this line to the enclosing declaration or statement.
   listCancellationRequests,
+  // Contribute this line to the enclosing declaration or statement.
   reviewCancellationRequest,
+// Contribute this line to the enclosing declaration or statement.
 } from '../../../api/admin/reservations';
+// Import named exports from '../../../auth/usePermission'.
 import { usePermission } from '../../../auth/usePermission';
+// Import named exports from '../../../components/ui/Button'.
 import { Button } from '../../../components/ui/Button';
+// Import named exports from '../../../components/ui/Card'.
 import { Card, CardBody } from '../../../components/ui/Card';
+// Import named exports from '../../../components/ui/toastStore'.
 import { toast } from '../../../components/ui/toastStore';
 
+// Create the refundable statuses constant.
 const REFUNDABLE_STATUSES = new Set(['paid', 'manual_review', 'confirmed', 'car_prepared']);
 
 /** Is Refundable Status. */
 function isRefundableStatus(status: string | undefined): boolean {
+  // Return the resulting value to the caller.
   return Boolean(status && REFUNDABLE_STATUSES.has(status));
 }
 
 /** Customer cancellation-request review (approve/deny). */
 export function CancellationRequestsPanel({ onChanged }: { onChanged: () => void }) {
+  // Create the query client constant.
   const queryClient = useQueryClient();
+  // Create the can refund payments constant.
   const canRefundPayments = usePermission('can_refund_payments');
+  // Create the query constant.
   const query = useQuery({
+    // Provide the query key field value.
     queryKey: ['admin', 'cancellation-requests'],
+    // Provide the query fn field value.
     queryFn: listCancellationRequests,
   });
 
+  // Create the review mutation constant.
   const reviewMutation = useMutation({
+    // Provide the mutation fn field value.
     mutationFn: ({ id, approve }: { id: number; approve: boolean }) =>
+      // Call reviewCancellationRequest to perform this step.
       reviewCancellationRequest(id, { approve }),
+    // Provide the on success field value.
     onSuccess: () => {
+      // Call toast to perform this step.
       toast('Cancellation request updated', 'success');
+      // Call queryClient.invalidateQueries to perform this step.
       queryClient.invalidateQueries({ queryKey: ['admin', 'cancellation-requests'] });
+      // Call onChanged to perform this step.
       onChanged();
     },
+    // Provide the on error field value.
     onError: (err) => toast((err as Error).message || 'Review failed', 'error'),
   });
 
+  // Create the requests constant.
   const requests = query.data?.requests ?? [];
+  // Evaluate the condition and enter the branch when it is true.
   if (query.isLoading) return null;
 
+  // Create the needs finance hint constant.
   const needsFinanceHint = requests.some(
+    // Continue the surrounding logic with this statement.
     (req) => isRefundableStatus(req.reservationStatus) && !canRefundPayments
   );
 
+  // Return control to the caller with the following value.
   return (
     <Card className="mt-6 shadow-none">
       <CardBody className="px-5 py-4">

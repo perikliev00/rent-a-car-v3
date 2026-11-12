@@ -56,6 +56,9 @@ desktop.ini
 # Local validation scratch
 .tmp-am-validate-*/
 
+# One-shot scripts that may embed host secrets (never commit)
+ops/*.once.sh
+
 # Editor
 .idea/
 *.suo

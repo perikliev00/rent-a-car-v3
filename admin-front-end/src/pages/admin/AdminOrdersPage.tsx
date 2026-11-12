@@ -2,87 +2,148 @@
  * Order list with filters, soft-delete bin, and restore/empty flows.
  */
 import { useState } from 'react';
+// Import named exports from 'react-router-dom'.
 import { Link } from 'react-router-dom';
+// Import named exports from '@tanstack/react-query'.
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+// Import named exports from the referenced module.
 import {
+  // Contribute this line to the enclosing declaration or statement.
   getAdminOrders,
+  // Contribute this line to the enclosing declaration or statement.
   getDeletedOrders,
+  // Contribute this line to the enclosing declaration or statement.
   getExpiredOrders,
+  // Contribute this line to the enclosing declaration or statement.
   deleteAdminOrder,
+  // Contribute this line to the enclosing declaration or statement.
   restoreAdminOrder,
+  // Contribute this line to the enclosing declaration or statement.
   emptyDeletedOrders,
+// Contribute this line to the enclosing declaration or statement.
 } from '../../api/admin/orders';
+// Import named exports from '../../components/ui/Button'.
 import { Button } from '../../components/ui/Button';
+// Import named exports from '../../components/ui/Input'.
 import { Input } from '../../components/ui/Input';
+// Import named exports from '../../components/ui/Select'.
 import { Select } from '../../components/ui/Select';
+// Import named exports from '../../components/ui/Card'.
 import { Card, CardBody } from '../../components/ui/Card';
+// Import named exports from '../../components/ui/Loading'.
 import { PageLoader } from '../../components/ui/Loading';
+// Import named exports from '../../components/ui/toastStore'.
 import { toast } from '../../components/ui/toastStore';
+// Import named exports from '../../utils/format'.
 import { formatPrice } from '../../utils/format';
+// Import named exports from '../../types/api'.
 import { getCarFromOrder } from '../../types/api';
+// Contribute this line to the enclosing declaration or statement.
 import type { OrderStatus } from '../../types/api';
 
+// Declare the Tab TypeScript type alias.
 type Tab = 'active' | 'expired' | 'deleted';
 
 /** Order list with filters, soft-delete bin, and restore/empty flows. */
 export function AdminOrdersPage() {
+  // Create the query client constant.
   const queryClient = useQueryClient();
+  // Destructure array values into local variables.
   const [tab, setTab] = useState<Tab>('active');
+  // Destructure array values into local variables.
   const [filters, setFilters] = useState({ status: '' as OrderStatus | '', startDate: '', endDate: '', search: '' });
+  // Destructure array values into local variables.
   const [confirmEmpty, setConfirmEmpty] = useState('');
 
+  // Create the active query constant.
   const activeQuery = useQuery({
+    // Provide the query key field value.
     queryKey: ['admin', 'orders', filters],
+    // Provide the query fn field value.
     queryFn: () => getAdminOrders(filters),
+    // Provide the enabled field value.
     enabled: tab === 'active',
   });
 
+  // Create the expired query constant.
   const expiredQuery = useQuery({
+    // Provide the query key field value.
     queryKey: ['admin', 'orders', 'expired'],
+    // Provide the query fn field value.
     queryFn: getExpiredOrders,
+    // Provide the enabled field value.
     enabled: tab === 'expired',
   });
 
+  // Create the deleted query constant.
   const deletedQuery = useQuery({
+    // Provide the query key field value.
     queryKey: ['admin', 'orders', 'deleted'],
+    // Provide the query fn field value.
     queryFn: getDeletedOrders,
+    // Provide the enabled field value.
     enabled: tab === 'deleted',
   });
 
+  // Create the delete mutation constant.
   const deleteMutation = useMutation({
+    // Provide the mutation fn field value.
     mutationFn: deleteAdminOrder,
+    // Provide the on success field value.
     onSuccess: () => {
+      // Call queryClient.invalidateQueries to perform this step.
       queryClient.invalidateQueries({ queryKey: ['admin', 'orders'] });
+      // Call toast to perform this step.
       toast('Order moved to bin', 'success');
     },
+    // Provide the on error field value.
     onError: (err) => toast((err as Error).message, 'error'),
   });
 
+  // Create the restore mutation constant.
   const restoreMutation = useMutation({
+    // Provide the mutation fn field value.
     mutationFn: restoreAdminOrder,
+    // Provide the on success field value.
     onSuccess: () => {
+      // Call queryClient.invalidateQueries to perform this step.
       queryClient.invalidateQueries({ queryKey: ['admin', 'orders'] });
+      // Call toast to perform this step.
       toast('Order restored', 'success');
     },
+    // Provide the on error field value.
     onError: (err) => toast((err as Error).message, 'error'),
   });
 
+  // Create the empty mutation constant.
   const emptyMutation = useMutation({
+    // Provide the mutation fn field value.
     mutationFn: () => emptyDeletedOrders(confirmEmpty),
+    // Provide the on success field value.
     onSuccess: (data) => {
+      // Call queryClient.invalidateQueries to perform this step.
       queryClient.invalidateQueries({ queryKey: ['admin', 'orders'] });
+      // Call toast to perform this step.
       toast(`Permanently deleted ${data.deletedCount} orders`, 'success');
+      // Call setConfirmEmpty to perform this step.
       setConfirmEmpty('');
     },
+    // Provide the on error field value.
     onError: (err) => toast((err as Error).message, 'error'),
   });
 
+  // Create the is loading constant.
   const isLoading = activeQuery.isLoading || expiredQuery.isLoading || deletedQuery.isLoading;
+  // Create the orders constant.
   const orders =
+    // Update tab with the right-hand side value.
     tab === 'active' ? activeQuery.data?.orders :
+    // Update tab with the right-hand side value.
     tab === 'expired' ? expiredQuery.data?.orders :
+    // Contribute this line to the enclosing declaration or statement.
     deletedQuery.data?.orders;
 
+  // Return control to the caller with the following value.
   return (
     <div>
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-4">

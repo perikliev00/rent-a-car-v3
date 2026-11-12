@@ -5,6 +5,7 @@ import { EVENT_TYPE_STYLE, LEGEND_ITEMS } from './eventStyles';
 
 /** Compact swatch + label row for each legend event type. */
 export function EventLegend() {
+  // Return control to the caller with the following value.
   return (
     <div
       className="flex flex-wrap items-center gap-x-3 gap-y-1.5"

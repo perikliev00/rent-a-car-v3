@@ -2,42 +2,74 @@
  * Damage report list/create/resolve UI for a car.
  */
 import { Button } from '../../../components/ui/Button';
+// Import named exports from '../../../components/ui/Card'.
 import { Card, CardBody } from '../../../components/ui/Card';
+// Import named exports from '../../../components/ui/Input'.
 import { Input } from '../../../components/ui/Input';
+// Import named exports from '../../../utils/format'.
 import { imageUrl } from '../../../utils/format';
+// Contribute this line to the enclosing declaration or statement.
 import type { DamageForm } from './carDetailTypes';
 
+// Declare the DamageReport TypeScript type alias.
 type DamageReport = {
+  // Provide the id field value.
   id: number;
+  // Provide the description field value.
   description: string;
+  // Provide the status field value.
   status: string;
+  // Contribute this line to the enclosing declaration or statement.
   reservationId?: string | null;
+  // Contribute this line to the enclosing declaration or statement.
   repairCost?: number | null;
+  // Contribute this line to the enclosing declaration or statement.
   photos?: string[];
 };
 
 /** Damage report list/create/resolve UI for a car. */
 export function CarDamageTab({
+  // Contribute this line to the enclosing declaration or statement.
   damageForm,
+  // Contribute this line to the enclosing declaration or statement.
   setDamageForm,
+  // Contribute this line to the enclosing declaration or statement.
   setDamagePhotos,
+  // Contribute this line to the enclosing declaration or statement.
   damageMutationPending,
+  // Contribute this line to the enclosing declaration or statement.
   onCreateReport,
+  // Contribute this line to the enclosing declaration or statement.
   damageLoading,
+  // Contribute this line to the enclosing declaration or statement.
   reports,
+  // Contribute this line to the enclosing declaration or statement.
   onResolve,
+  // Contribute this line to the enclosing declaration or statement.
   onDelete,
+// Contribute this line to the enclosing declaration or statement.
 }: {
+  // Provide the damage form field value.
   damageForm: DamageForm;
+  // Provide the set damage form field value.
   setDamageForm: (v: DamageForm | ((prev: DamageForm) => DamageForm)) => void;
+  // Provide the set damage photos field value.
   setDamagePhotos: (files: FileList | null) => void;
+  // Provide the damage mutation pending field value.
   damageMutationPending: boolean;
+  // Provide the on create report field value.
   onCreateReport: () => void;
+  // Provide the damage loading field value.
   damageLoading: boolean;
+  // Provide the reports field value.
   reports: DamageReport[] | undefined;
+  // Provide the on resolve field value.
   onResolve: (id: number) => void;
+  // Provide the on delete field value.
   onDelete: (id: number) => void;
+// Continue the surrounding logic with this statement.
 }) {
+  // Return control to the caller with the following value.
   return (
     <div className="mt-6 space-y-4">
       <Card className="shadow-none">

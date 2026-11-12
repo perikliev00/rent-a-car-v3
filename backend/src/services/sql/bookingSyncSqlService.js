@@ -3,7 +3,9 @@
  * Critical for preventing double-booking; callers typically hold advisory locks.
  */
 const { clientQuery, isCarDateBlockOverlapViolation } = require('../../db/transaction');
+// Destructure object properties into local variables.
 const { parseSofiaDate } = require('../../utils/timeZone');
+// Destructure object properties into local variables.
 const { toUtc } = require('../../utils/toUtc');
 
 /**
@@ -12,11 +14,14 @@ const { toUtc } = require('../../utils/toUtc');
  * @returns {*}
  */
 function normalizeCarId(carId) {
+  // Create the id constant.
   const id = Number(carId);
   // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(id) || id <= 0) {
+    // Return the resulting value to the caller.
     return null;
   }
+  // Return the resulting value to the caller.
   return id;
 }
 
@@ -25,11 +30,15 @@ function normalizeCarId(carId) {
  * @returns {*}
  */
 function overlapError() {
+  // Create the err constant.
   const err = new Error('Booking overlaps with existing dates');
+  // Update err.code with the right-hand side value.
   err.code = 'OVERLAP';
+  // Return the resulting value to the caller.
   return err;
 }
 
+// Create the open physical rental statuses constant.
 const OPEN_PHYSICAL_RENTAL_STATUSES = `('picked_up', 'active_rental')`;
 
 /**
@@ -38,6 +47,7 @@ const OPEN_PHYSICAL_RENTAL_STATUSES = `('picked_up', 'active_rental')`;
  * @returns {*}
  */
 function openPhysicalRentalOverlapSql(blockAlias = 'b') {
+  // Return the resulting value to the caller.
   return `
     EXISTS (
       SELECT 1
@@ -59,18 +69,24 @@ function openPhysicalRentalOverlapSql(blockAlias = 'b') {
  * @returns {Promise<*>}
  */
 async function extendOpenPhysicalRentalBlocks(carId = null, now = new Date(), client = null) {
+  // Create the normalized car id constant.
   const normalizedCarId = carId ? normalizeCarId(carId) : null;
   // Guard: early-return or throw when required input is missing/invalid.
   if (carId && normalizedCarId === null) {
+    // Return control to the caller with the following value.
     return;
   }
 
   // Keep end strictly after now so a following DELETE ... end_date <= now leaves the row.
   const extendedEnd = new Date(now.getTime() + 1000);
 
+  // Evaluate the condition and enter the branch when it is true.
   if (normalizedCarId) {
+    // Wait until the asynchronous operation resolves.
     await clientQuery(
+      // Contribute this line to the enclosing declaration or statement.
       client,
+      // Continue the surrounding logic with this statement.
       `
       UPDATE car_date_blocks b
       SET end_date = GREATEST(b.end_date, $2::timestamptz)
@@ -81,13 +97,18 @@ async function extendOpenPhysicalRentalBlocks(carId = null, now = new Date(), cl
         AND b.start_date < r.return_date
         AND b.end_date > r.pickup_date
       `,
+      // Contribute this line to the enclosing declaration or statement.
       [normalizedCarId, extendedEnd]
     );
+    // Return control to the caller with the following value.
     return;
   }
 
+  // Wait until the asynchronous operation resolves.
   await clientQuery(
+    // Contribute this line to the enclosing declaration or statement.
     client,
+    // Continue the surrounding logic with this statement.
     `
     UPDATE car_date_blocks b
     SET end_date = GREATEST(b.end_date, $1::timestamptz)
@@ -97,6 +118,7 @@ async function extendOpenPhysicalRentalBlocks(carId = null, now = new Date(), cl
       AND b.start_date < r.return_date
       AND b.end_date > r.pickup_date
     `,
+    // Contribute this line to the enclosing declaration or statement.
     [extendedEnd]
   );
 }
@@ -109,17 +131,24 @@ async function extendOpenPhysicalRentalBlocks(carId = null, now = new Date(), cl
  * @returns {Promise<*>}
  */
 async function clampClosedPhysicalRentalBlocks(carId = null, now = new Date(), client = null) {
+  // Create the normalized car id constant.
   const normalizedCarId = carId ? normalizeCarId(carId) : null;
   // Guard: early-return or throw when required input is missing/invalid.
   if (carId && normalizedCarId === null) {
+    // Return control to the caller with the following value.
     return;
   }
 
+  // Create the open overlap constant.
   const openOverlap = openPhysicalRentalOverlapSql('b2');
 
+  // Evaluate the condition and enter the branch when it is true.
   if (normalizedCarId) {
+    // Wait until the asynchronous operation resolves.
     await clientQuery(
+      // Contribute this line to the enclosing declaration or statement.
       client,
+      // Continue the surrounding logic with this statement.
       `
       UPDATE car_date_blocks b
       SET end_date = src.clamp_end
@@ -141,13 +170,18 @@ async function clampClosedPhysicalRentalBlocks(carId = null, now = new Date(), c
       WHERE b.id = src.block_id
         AND b.end_date > src.clamp_end
       `,
+      // Contribute this line to the enclosing declaration or statement.
       [normalizedCarId, now]
     );
+    // Return control to the caller with the following value.
     return;
   }
 
+  // Wait until the asynchronous operation resolves.
   await clientQuery(
+    // Contribute this line to the enclosing declaration or statement.
     client,
+    // Continue the surrounding logic with this statement.
     `
     UPDATE car_date_blocks b
     SET end_date = src.clamp_end
@@ -168,6 +202,7 @@ async function clampClosedPhysicalRentalBlocks(carId = null, now = new Date(), c
     WHERE b.id = src.block_id
       AND b.end_date > src.clamp_end
     `,
+    // Contribute this line to the enclosing declaration or statement.
     [now]
   );
 }
@@ -179,26 +214,34 @@ async function clampClosedPhysicalRentalBlocks(carId = null, now = new Date(), c
  * @param {object|null} [client]
  */
 async function purgeExpired(carId = null, client = null) {
+  // Create the now constant.
   const now = new Date();
+  // Create the normalized car id constant.
   const normalizedCarId = carId ? normalizeCarId(carId) : null;
 
   // Guard: early-return or throw when required input is missing/invalid.
   if (carId && normalizedCarId === null) {
+    // Return control to the caller with the following value.
     return;
   }
 
   // Protected block: isolate failure modes.
   try {
+    // Wait until the asynchronous operation resolves.
     await extendOpenPhysicalRentalBlocks(normalizedCarId, now, client);
+  // Continue the surrounding logic with this statement.
   } catch (err) {
     // Extending into a later booking can hit GiST; keep the overdue block via DELETE guard below.
     if (!isCarDateBlockOverlapViolation(err)) {
+      // Throw an error to stop the current control flow.
       throw err;
     }
   }
 
+  // Wait until the asynchronous operation resolves.
   await clampClosedPhysicalRentalBlocks(normalizedCarId, now, client);
 
+  // Create the open rental block guard constant.
   const openRentalBlockGuard = `
     NOT EXISTS (
       SELECT 1
@@ -210,27 +253,37 @@ async function purgeExpired(carId = null, client = null) {
     )
   `;
 
+  // Evaluate the condition and enter the branch when it is true.
   if (normalizedCarId) {
+    // Wait until the asynchronous operation resolves.
     await clientQuery(
+      // Contribute this line to the enclosing declaration or statement.
       client,
+      // Continue the surrounding logic with this statement.
       `
       DELETE FROM car_date_blocks
       WHERE car_id = $1
         AND end_date <= $2
         AND ${openRentalBlockGuard}
       `,
+      // Contribute this line to the enclosing declaration or statement.
       [normalizedCarId, now]
     );
+    // Return control to the caller with the following value.
     return;
   }
 
+  // Wait until the asynchronous operation resolves.
   await clientQuery(
+    // Contribute this line to the enclosing declaration or statement.
     client,
+    // Continue the surrounding logic with this statement.
     `
     DELETE FROM car_date_blocks
     WHERE end_date <= $1
       AND ${openRentalBlockGuard}
     `,
+    // Contribute this line to the enclosing declaration or statement.
     [now]
   );
 }
@@ -245,14 +298,19 @@ async function purgeExpired(carId = null, client = null) {
  * @param {object|null} [client]
  */
 async function assertNoOverlap(carId, start, end, client = null) {
+  // Create the normalized car id constant.
   const normalizedCarId = normalizeCarId(carId);
   // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId) {
+    // Throw an error to stop the current control flow.
     throw new Error('Invalid car id');
   }
 
+  // Create the result constant.
   const result = await clientQuery(
+    // Contribute this line to the enclosing declaration or statement.
     client,
+    // Continue the surrounding logic with this statement.
     `
     SELECT 1
     FROM car_date_blocks
@@ -261,10 +319,13 @@ async function assertNoOverlap(carId, start, end, client = null) {
       AND end_date > $2
     LIMIT 1
     `,
+    // Contribute this line to the enclosing declaration or statement.
     [normalizedCarId, start, end]
   );
 
+  // Evaluate the condition and enter the branch when it is true.
   if (result.rowCount > 0) {
+    // Throw an error to stop the current control flow.
     throw overlapError();
   }
 }
@@ -279,34 +340,51 @@ async function assertNoOverlap(carId, start, end, client = null) {
  * @returns {Promise<*>}
  */
 async function insertDateBlock(carId, start, end, client = null, options = {}) {
+  // Create the block type constant.
   const blockType = options.blockType || 'booking';
+  // Create the reason constant.
   const reason = options.reason || null;
+  // Create the notes constant.
   const notes = options.notes || null;
+  // Create the created by user id constant.
   const createdByUserId = options.createdByUserId != null ? Number(options.createdByUserId) : null;
 
   // Protected block: isolate failure modes.
   try {
+    // Wait until the asynchronous operation resolves.
     await clientQuery(
+      // Contribute this line to the enclosing declaration or statement.
       client,
+      // Continue the surrounding logic with this statement.
       `
       INSERT INTO car_date_blocks (car_id, start_date, end_date, block_type, reason, notes, created_by_user_id)
       VALUES ($1, $2, $3, $4, $5, $6, $7)
       `,
       [
+        // Contribute this line to the enclosing declaration or statement.
         carId,
+        // Contribute this line to the enclosing declaration or statement.
         start,
+        // Contribute this line to the enclosing declaration or statement.
         end,
+        // Contribute this line to the enclosing declaration or statement.
         blockType,
+        // Contribute this line to the enclosing declaration or statement.
         reason,
+        // Contribute this line to the enclosing declaration or statement.
         notes,
+        // Call Number.isInteger to perform this step.
         Number.isInteger(createdByUserId) && createdByUserId > 0 ? createdByUserId : null,
       ]
     );
+  // Continue the surrounding logic with this statement.
   } catch (err) {
     // Concurrency / overlap guard (race-sensitive).
     if (isCarDateBlockOverlapViolation(err)) {
+      // Throw an error to stop the current control flow.
       throw overlapError();
     }
+    // Throw an error to stop the current control flow.
     throw err;
   }
 }
@@ -321,25 +399,37 @@ async function insertDateBlock(carId, start, end, client = null, options = {}) {
  * @param {object} [options]
  */
 async function addRange(carId, start, end, client = null, options = {}) {
+  // Create the normalized car id constant.
   const normalizedCarId = normalizeCarId(carId);
   // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId) {
+    // Throw an error to stop the current control flow.
     throw new Error('Invalid car id');
   }
 
+  // Create the s constant.
   const s = toUtc(start);
+  // Create the e constant.
   const e = toUtc(end);
   // Guard: early-return or throw when required input is missing/invalid.
   if (!(s < e)) {
+    // Throw an error to stop the current control flow.
     throw new Error('Invalid date range');
   }
 
+  // Wait until the asynchronous operation resolves.
   await purgeExpired(normalizedCarId, client);
+  // Wait until the asynchronous operation resolves.
   await assertNoOverlap(normalizedCarId, s, e, client);
+  // Wait until the asynchronous operation resolves.
   await insertDateBlock(normalizedCarId, s, e, client, {
+    // Provide the block type field value.
     blockType: options.blockType || 'booking',
+    // Provide the reason field value.
     reason: options.reason,
+    // Provide the notes field value.
     notes: options.notes,
+    // Provide the created by user id field value.
     createdByUserId: options.createdByUserId,
   });
 }
@@ -354,31 +444,45 @@ async function addRange(carId, start, end, client = null, options = {}) {
  * @param {object|null} [client]
  */
 async function updateRange(carId, prevStart, prevEnd, newStart, newEnd, client = null) {
+  // Create the normalized car id constant.
   const normalizedCarId = normalizeCarId(carId);
   // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId) {
+    // Throw an error to stop the current control flow.
     throw new Error('Invalid car id');
   }
 
+  // Create the ps constant.
   const ps = toUtc(prevStart);
+  // Create the pe constant.
   const pe = toUtc(prevEnd);
+  // Create the ns constant.
   const ns = toUtc(newStart);
+  // Create the ne constant.
   const ne = toUtc(newEnd);
   // Guard: early-return or throw when required input is missing/invalid.
   if (!(ns < ne)) {
+    // Throw an error to stop the current control flow.
     throw new Error('Invalid date range');
   }
 
+  // Wait until the asynchronous operation resolves.
   await purgeExpired(normalizedCarId, client);
+  // Wait until the asynchronous operation resolves.
   await clientQuery(
+    // Contribute this line to the enclosing declaration or statement.
     client,
+    // Continue the surrounding logic with this statement.
     `
     DELETE FROM car_date_blocks
     WHERE car_id = $1 AND start_date = $2 AND end_date = $3
     `,
+    // Contribute this line to the enclosing declaration or statement.
     [normalizedCarId, ps, pe]
   );
+  // Wait until the asynchronous operation resolves.
   await assertNoOverlap(normalizedCarId, ns, ne, client);
+  // Wait until the asynchronous operation resolves.
   await insertDateBlock(normalizedCarId, ns, ne, client);
 }
 
@@ -393,33 +497,49 @@ async function updateRange(carId, prevStart, prevEnd, newStart, newEnd, client =
  * @param {object|null} [client]
  */
 async function moveRange(prevCarId, newCarId, prevStart, prevEnd, newStart, newEnd, client = null) {
+  // Create the prev id constant.
   const prevId = normalizeCarId(prevCarId);
+  // Create the new id constant.
   const newId = normalizeCarId(newCarId);
   // Guard: early-return or throw when required input is missing/invalid.
   if (!prevId || !newId) {
+    // Throw an error to stop the current control flow.
     throw new Error('Invalid car id');
   }
 
+  // Create the ps constant.
   const ps = toUtc(prevStart);
+  // Create the pe constant.
   const pe = toUtc(prevEnd);
+  // Create the ns constant.
   const ns = toUtc(newStart);
+  // Create the ne constant.
   const ne = toUtc(newEnd);
   // Guard: early-return or throw when required input is missing/invalid.
   if (!(ns < ne)) {
+    // Throw an error to stop the current control flow.
     throw new Error('Invalid date range');
   }
 
+  // Wait until the asynchronous operation resolves.
   await purgeExpired(prevId, client);
+  // Wait until the asynchronous operation resolves.
   await purgeExpired(newId, client);
+  // Wait until the asynchronous operation resolves.
   await assertNoOverlap(newId, ns, ne, client);
+  // Wait until the asynchronous operation resolves.
   await clientQuery(
+    // Contribute this line to the enclosing declaration or statement.
     client,
+    // Continue the surrounding logic with this statement.
     `
     DELETE FROM car_date_blocks
     WHERE car_id = $1 AND start_date = $2 AND end_date = $3
     `,
+    // Contribute this line to the enclosing declaration or statement.
     [prevId, ps, pe]
   );
+  // Wait until the asynchronous operation resolves.
   await insertDateBlock(newId, ns, ne, client);
 }
 
@@ -433,21 +553,28 @@ async function moveRange(prevCarId, newCarId, prevStart, prevEnd, newStart, newE
 async function removeRange(carId, startDate, endDate, client = null) {
   // Guard: early-return or throw when required input is missing/invalid.
   if (!carId || !startDate || !endDate) {
+    // Return control to the caller with the following value.
     return;
   }
 
+  // Create the normalized car id constant.
   const normalizedCarId = normalizeCarId(carId);
   // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId) {
+    // Return control to the caller with the following value.
     return;
   }
 
+  // Wait until the asynchronous operation resolves.
   await clientQuery(
+    // Contribute this line to the enclosing declaration or statement.
     client,
+    // Continue the surrounding logic with this statement.
     `
     DELETE FROM car_date_blocks
     WHERE car_id = $1 AND start_date = $2 AND end_date = $3
     `,
+    // Contribute this line to the enclosing declaration or statement.
     [normalizedCarId, startDate, endDate]
   );
 }
@@ -460,63 +587,91 @@ async function removeRange(carId, startDate, endDate, client = null) {
  * @returns {Promise<*>}
  */
 async function purgeOrphaned(carId, client = null) {
+  // Create the normalized car id constant.
   const normalizedCarId = normalizeCarId(carId);
   // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId) {
+    // Return control to the caller with the following value.
     return;
   }
 
+  // Create the blocks result constant.
   const blocksResult = await clientQuery(
+    // Contribute this line to the enclosing declaration or statement.
     client,
+    // Continue the surrounding logic with this statement.
     `
     SELECT id, start_date, end_date
     FROM car_date_blocks
     WHERE car_id = $1
     `,
+    // Contribute this line to the enclosing declaration or statement.
     [normalizedCarId]
   );
 
   // Guard: early-return or throw when required input is missing/invalid.
   if (!blocksResult.rows.length) {
+    // Return control to the caller with the following value.
     return;
   }
 
+  // Create the orders result constant.
   const ordersResult = await clientQuery(
+    // Contribute this line to the enclosing declaration or statement.
     client,
+    // Continue the surrounding logic with this statement.
     `
     SELECT pickup_date, pickup_time, return_date, return_time
     FROM orders
     WHERE car_id = $1 AND is_deleted = FALSE
     `,
+    // Contribute this line to the enclosing declaration or statement.
     [normalizedCarId]
   );
 
+  // Create the has overlap with any order constant.
   const hasOverlapWithAnyOrder = (range) => {
+    // Create the rs constant.
     const rs = new Date(range.start_date);
+    // Create the re constant.
     const re = new Date(range.end_date);
 
+    // Return the resulting value to the caller.
     return ordersResult.rows.some((order) => {
+      // Create the os constant.
       const os = parseSofiaDate(order.pickup_date, order.pickup_time || '00:00');
+      // Create the oe constant.
       const oe = parseSofiaDate(order.return_date, order.return_time || '23:59');
+      // Evaluate the condition and enter the branch when it is true.
       if (!os || !oe || Number.isNaN(os.getTime()) || Number.isNaN(oe.getTime())) {
+        // Return the resulting value to the caller.
         return false;
       }
+      // Return the resulting value to the caller.
       return os < re && oe > rs;
     });
   };
 
+  // Create the orphan ids constant.
   const orphanIds = blocksResult.rows
+    // Call .filter to perform this step.
     .filter((block) => !hasOverlapWithAnyOrder(block))
+    // Call .map to perform this step.
     .map((block) => block.id);
 
   // Guard: early-return or throw when required input is missing/invalid.
   if (!orphanIds.length) {
+    // Return control to the caller with the following value.
     return;
   }
 
+  // Wait until the asynchronous operation resolves.
   await clientQuery(
+    // Contribute this line to the enclosing declaration or statement.
     client,
+    // Continue the surrounding logic with this statement.
     `DELETE FROM car_date_blocks WHERE id = ANY($1::bigint[])`,
+    // Contribute this line to the enclosing declaration or statement.
     [orphanIds]
   );
 }
@@ -526,10 +681,14 @@ async function purgeOrphaned(carId, client = null) {
  * @param {object|null} [client]
  */
 async function expireFinishedOrders(client = null) {
+  // Create the now constant.
   const now = new Date();
 
+  // Wait until the asynchronous operation resolves.
   await clientQuery(
+    // Contribute this line to the enclosing declaration or statement.
     client,
+    // Continue the surrounding logic with this statement.
     `
     UPDATE orders
     SET status = 'expired',
@@ -539,6 +698,7 @@ async function expireFinishedOrders(client = null) {
       AND status NOT IN ('expired', 'cancelled')
       AND is_deleted = FALSE
     `,
+    // Contribute this line to the enclosing declaration or statement.
     [now]
   );
 }
@@ -550,41 +710,58 @@ async function expireFinishedOrders(client = null) {
  * @returns {Promise<*>}
  */
 async function fetchDateBlocksByCarIds(carIds, client = null) {
+  // Create the normalized ids constant.
   const normalizedIds = [...new Set(
+    // Reference the identifier used by the enclosing expression.
     carIds
+      // Call .map to perform this step.
       .map(normalizeCarId)
+      // Call .filter to perform this step.
       .filter((id) => id !== null)
   )];
 
+  // Create the map constant.
   const map = new Map();
   // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedIds.length) {
+    // Return the resulting value to the caller.
     return map;
   }
 
+  // Create the result constant.
   const result = await clientQuery(
+    // Contribute this line to the enclosing declaration or statement.
     client,
+    // Continue the surrounding logic with this statement.
     `
     SELECT car_id, start_date, end_date
     FROM car_date_blocks
     WHERE car_id = ANY($1::bigint[])
     ORDER BY start_date ASC
     `,
+    // Contribute this line to the enclosing declaration or statement.
     [normalizedIds]
   );
 
+  // Iterate using the loop initializer, condition, and step.
   for (const row of result.rows) {
+    // Create the car id constant.
     const carId = Number(row.car_id);
     // Guard: early-return or throw when required input is missing/invalid.
     if (!map.has(carId)) {
+      // Call map.set to perform this step.
       map.set(carId, []);
     }
+    // Call map.get to perform this step.
     map.get(carId).push({
+      // Provide the start date field value.
       startDate: row.start_date,
+      // Provide the end date field value.
       endDate: row.end_date,
     });
   }
 
+  // Return the resulting value to the caller.
   return map;
 }
 
@@ -595,19 +772,32 @@ async function fetchDateBlocksByCarIds(carIds, client = null) {
  * @returns {Promise<*>}
  */
 async function fetchDateBlocksForCar(carId, client = null) {
+  // Create the map constant.
   const map = await fetchDateBlocksByCarIds([carId], client);
+  // Create the normalized car id constant.
   const normalizedCarId = normalizeCarId(carId);
+  // Return the resulting value to the caller.
   return map.get(normalizedCarId) || [];
 }
 
+// Assign the CommonJS module exports.
 module.exports = {
+  // Contribute this line to the enclosing declaration or statement.
   purgeExpired,
+  // Contribute this line to the enclosing declaration or statement.
   purgeOrphaned,
+  // Contribute this line to the enclosing declaration or statement.
   addRange,
+  // Contribute this line to the enclosing declaration or statement.
   updateRange,
+  // Contribute this line to the enclosing declaration or statement.
   moveRange,
+  // Contribute this line to the enclosing declaration or statement.
   removeRange,
+  // Contribute this line to the enclosing declaration or statement.
   expireFinishedOrders,
+  // Contribute this line to the enclosing declaration or statement.
   fetchDateBlocksByCarIds,
+  // Contribute this line to the enclosing declaration or statement.
   fetchDateBlocksForCar,
 };

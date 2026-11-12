@@ -2,32 +2,53 @@
  * Car detail tabs host: overview, service, damage, docs, compliance, performance.
  */
 import { useState } from 'react';
+// Import named exports from 'react-router-dom'.
 import { Link, useParams } from 'react-router-dom';
+// Import named exports from '../../components/ui/Loading'.
 import { PageLoader } from '../../components/ui/Loading';
+// Import named exports from '../../utils/format'.
 import { imageUrl } from '../../utils/format';
+// Import named exports from '../../auth/useAuth'.
 import { useAuth } from '../../auth/useAuth';
+// Import named exports from '../../auth/permissions'.
 import { hasPermission } from '../../auth/permissions';
+// Import named exports from './carDetail/CarComplianceTab'.
 import { CarComplianceTab } from './carDetail/CarComplianceTab';
+// Import named exports from './carDetail/CarDamageTab'.
 import { CarDamageTab } from './carDetail/CarDamageTab';
+// Import named exports from './carDetail/CarDocumentsTab'.
 import { CarDocumentsTab } from './carDetail/CarDocumentsTab';
+// Import named exports from './carDetail/CarOverviewTab'.
 import { CarOverviewTab } from './carDetail/CarOverviewTab';
+// Import named exports from './carDetail/CarPerformanceTab'.
 import { CarPerformanceTab } from './carDetail/CarPerformanceTab';
+// Import named exports from './carDetail/CarServiceTab'.
 import { CarServiceTab } from './carDetail/CarServiceTab';
+// Import named exports from './carDetail/carDetailTypes'.
 import { statusChipClass, type Tab } from './carDetail/carDetailTypes';
+// Import named exports from './carDetail/useAdminCarDetailData'.
 import { useAdminCarDetailData } from './carDetail/useAdminCarDetailData';
 
 /** Car detail tabs host: overview, service, damage, docs, compliance, performance. */
 export function AdminCarDetailPage() {
+  // Destructure object properties into local variables.
   const { id = '' } = useParams();
+  // Destructure object properties into local variables.
   const { user } = useAuth();
+  // Create the can money constant.
   const canMoney = hasPermission(user, 'can_view_revenue');
+  // Destructure array values into local variables.
   const [tab, setTab] = useState<Tab>('overview');
 
+  // Create the data constant.
   const data = useAdminCarDetailData({ id, tab });
+  // Destructure object properties into local variables.
   const { car, carQuery } = data;
 
   if (carQuery.isLoading) return <PageLoader />;
+  // Evaluate the condition and enter the branch when it is true.
   if (carQuery.isError || !car) {
+    // Return control to the caller with the following value.
     return (
       <div className="min-w-0">
         <Link to="/admin/cars" className="text-sm text-[var(--color-muted)] hover:underline">
@@ -40,15 +61,23 @@ export function AdminCarDetailPage() {
     );
   }
 
+  // Continue the surrounding logic with this statement.
   const tabs: { key: Tab; label: string }[] = [
+    // Contribute this line to the enclosing declaration or statement.
     { key: 'overview', label: 'Overview' },
+    // Contribute this line to the enclosing declaration or statement.
     { key: 'compliance', label: 'Compliance' },
+    // Contribute this line to the enclosing declaration or statement.
     { key: 'service', label: 'Service' },
+    // Contribute this line to the enclosing declaration or statement.
     { key: 'damage', label: 'Damage' },
+    // Contribute this line to the enclosing declaration or statement.
     { key: 'documents', label: 'Documents' },
+    // Contribute this line to the enclosing declaration or statement.
     { key: 'performance', label: 'Performance' },
   ];
 
+  // Return control to the caller with the following value.
   return (
     <div className="min-w-0">
       <Link to="/admin/cars" className="text-sm text-[var(--color-muted)] hover:underline">

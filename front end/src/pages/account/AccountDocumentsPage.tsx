@@ -3,26 +3,44 @@
  * Uploads use multipart FormData via the account API.
  */
 import { useState } from 'react';
+// Import named exports from '@tanstack/react-query'.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+// Import named exports from 'react-router-dom'.
 import { Link } from 'react-router-dom';
+// Import named exports from the referenced module.
 import {
+  // Contribute this line to the enclosing declaration or statement.
   deleteCustomerDocument,
+  // Contribute this line to the enclosing declaration or statement.
   downloadCustomerDocument,
+  // Contribute this line to the enclosing declaration or statement.
   listCustomerDocuments,
+  // Contribute this line to the enclosing declaration or statement.
   uploadCustomerDocument,
+  // Declare the CustomerDocType TypeScript type alias.
   type CustomerDocType,
+// Contribute this line to the enclosing declaration or statement.
 } from '../../api/account';
+// Import named exports from '../../components/ui/Button'.
 import { Button } from '../../components/ui/Button';
+// Import named exports from '../../components/ui/Card'.
 import { Card, CardBody } from '../../components/ui/Card';
+// Import named exports from '../../components/ui/Loading'.
 import { PageLoader } from '../../components/ui/Loading';
+// Import named exports from '../../components/ui/Select'.
 import { Select } from '../../components/ui/Select';
+// Import named exports from '../../components/ui/toastStore'.
 import { toast } from '../../components/ui/toastStore';
+// Import named exports from '../../api/client'.
 import { ApiError } from '../../api/client';
 
 /** Human labels for each uploadable document category. */
 const DOC_LABELS: Record<CustomerDocType, string> = {
+  // Provide the driver license field value.
   driver_license: 'Driver license',
+  // Provide the passport id field value.
   passport_id: 'Passport / ID card',
+  // Provide the other field value.
   other: 'Other',
 };
 
@@ -33,48 +51,76 @@ const DOC_LABELS: Record<CustomerDocType, string> = {
  * @remarks Side effects: uploads/deletes via API; invalidates the documents query; shows toasts.
  */
 export function AccountDocumentsPage() {
+  // Create the query client constant.
   const queryClient = useQueryClient();
+  // Destructure array values into local variables.
   const [docType, setDocType] = useState<CustomerDocType>('driver_license');
+  // Destructure array values into local variables.
   const [file, setFile] = useState<File | null>(null);
 
+  // Create the query constant.
   const query = useQuery({
+    // Provide the query key field value.
     queryKey: ['account', 'documents'],
+    // Provide the query fn field value.
     queryFn: listCustomerDocuments,
   });
 
+  // Create the upload mutation constant.
   const uploadMutation = useMutation({
+    // Provide the mutation fn field value.
     mutationFn: async () => {
+      // Evaluate the condition and enter the branch when it is true.
       if (!file) throw new Error('Select a file');
+      // Create the form data constant.
       const formData = new FormData();
+      // Call formData.append to perform this step.
       formData.append('file', file);
+      // Call formData.append to perform this step.
       formData.append('docType', docType);
+      // Return the resulting value to the caller.
       return uploadCustomerDocument(formData);
     },
+    // Provide the on success field value.
     onSuccess: () => {
+      // Call setFile to perform this step.
       setFile(null);
+      // Call queryClient.invalidateQueries to perform this step.
       queryClient.invalidateQueries({ queryKey: ['account', 'documents'] });
+      // Call toast to perform this step.
       toast('Document uploaded', 'success');
     },
+    // Provide the on error field value.
     onError: (err) => {
+      // Call toast to perform this step.
       toast(err instanceof ApiError ? err.message : 'Upload failed', 'error');
     },
   });
 
+  // Create the delete mutation constant.
   const deleteMutation = useMutation({
+    // Provide the mutation fn field value.
     mutationFn: (id: number) => deleteCustomerDocument(id),
+    // Provide the on success field value.
     onSuccess: () => {
+      // Call queryClient.invalidateQueries to perform this step.
       queryClient.invalidateQueries({ queryKey: ['account', 'documents'] });
+      // Call toast to perform this step.
       toast('Document deleted', 'success');
     },
+    // Provide the on error field value.
     onError: (err) => {
+      // Call toast to perform this step.
       toast(err instanceof ApiError ? err.message : 'Delete failed', 'error');
     },
   });
 
   if (query.isLoading) return <PageLoader />;
 
+  // Create the documents constant.
   const documents = query.data?.documents ?? [];
 
+  // Return control to the caller with the following value.
   return (
     <div className="mx-auto min-w-0 max-w-3xl overflow-x-clip px-4 py-10 sm:px-6">
       <div className="flex min-w-0 flex-wrap items-end justify-between gap-4">

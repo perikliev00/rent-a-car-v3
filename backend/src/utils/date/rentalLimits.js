@@ -13,10 +13,14 @@ const MAX_RENTAL_DAYS = 366;
  * @returns {boolean}
  */
 function exceedsRentalDayLimit(rentalDays) {
+  // Return the resulting value to the caller.
   return !Number.isFinite(rentalDays) || rentalDays > MAX_RENTAL_DAYS;
 }
 
+// Assign the CommonJS module exports.
 module.exports = {
+  // Contribute this line to the enclosing declaration or statement.
   MAX_RENTAL_DAYS,
+  // Contribute this line to the enclosing declaration or statement.
   exceedsRentalDayLimit,
 };

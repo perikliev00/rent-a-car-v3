@@ -2,7 +2,9 @@
  * Day-density agenda list of pickups/returns/tasks.
  */
 import { format, parseISO } from 'date-fns';
+// Contribute this line to the enclosing declaration or statement.
 import type { CalendarCar, CalendarEvent } from './calendar.types';
+// Import named exports from './eventStyles'.
 import { EVENT_TYPE_STYLE } from './eventStyles';
 
 /**
@@ -15,45 +17,71 @@ import { EVENT_TYPE_STYLE } from './eventStyles';
  * @param onCarClick - Optional car-row action
  */
 export function DayAgendaList({
+  // Contribute this line to the enclosing declaration or statement.
   cars,
+  // Contribute this line to the enclosing declaration or statement.
   events,
+  // Contribute this line to the enclosing declaration or statement.
   day,
+  // Contribute this line to the enclosing declaration or statement.
   onEventClick,
+  // Contribute this line to the enclosing declaration or statement.
   onCarClick,
+// Contribute this line to the enclosing declaration or statement.
 }: {
+  // Provide the cars field value.
   cars: CalendarCar[];
+  // Provide the events field value.
   events: CalendarEvent[];
+  // Provide the day field value.
   day: Date;
+  // Provide the on event click field value.
   onEventClick: (event: CalendarEvent) => void;
+  // Continue the surrounding logic with this statement.
   onCarClick?: (carId: string) => void;
+// Continue the surrounding logic with this statement.
 }) {
   // Local midnight window for the selected day.
   const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate()).getTime();
+  // Create the day end constant.
   const dayEnd = dayStart + 24 * 60 * 60 * 1000;
   // Overlap test (not “starts on day”) so multi-day bars still appear.
   const dayEvents = events
+    // Call .filter to perform this step.
     .filter((ev) => {
+      // Create the start constant.
       const start = parseISO(ev.start).getTime();
+      // Create the end constant.
       const end = parseISO(ev.end).getTime();
+      // Return the resulting value to the caller.
       return end > dayStart && start < dayEnd;
     })
+    // Call .sort to perform this step.
     .sort((a, b) => parseISO(a.start).getTime() - parseISO(b.start).getTime());
 
   // Group by car; events without a car go under `__none__`.
   const byCar = new Map<string, CalendarEvent[]>();
+  // Iterate using the loop initializer, condition, and step.
   for (const ev of dayEvents) {
+    // Create the key constant.
     const key = ev.carId || '__none__';
+    // Create the list constant.
     const list = byCar.get(key) || [];
+    // Call list.push to perform this step.
     list.push(ev);
+    // Call byCar.set to perform this step.
     byCar.set(key, list);
   }
 
   // Cars with events first (fleet order), then orphan `__none__` if needed.
   const orderedCars = [
+    // Call ...cars.filter to perform this step.
     ...cars.filter((c) => byCar.has(c.id)),
+    // Call ...cars.filter to perform this step.
     ...cars.filter((c) => !byCar.has(c.id)),
   ];
 
+  // Return control to the caller with the following value.
   return (
     <div
       className="space-y-3"

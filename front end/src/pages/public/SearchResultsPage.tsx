@@ -3,22 +3,39 @@
  * Trip criteria and fleet filters stay shareable; invalid params prompt a home redirect.
  */
 import { useMemo } from 'react';
+// Import named exports from 'react-router-dom'.
 import { useSearchParams, Link } from 'react-router-dom';
+// Import named exports from '@tanstack/react-query'.
 import { useQuery } from '@tanstack/react-query';
+// Import named exports from '../../api/cars'.
 import { searchCars } from '../../api/cars';
+// Import named exports from '../../api/locations'.
 import { getCategories } from '../../api/locations';
+// Import named exports from '../../components/booking/SearchForm'.
 import { SearchForm } from '../../components/booking/SearchForm';
+// Import named exports from '../../components/cars/CarCard'.
 import { CarCard } from '../../components/cars/CarCard';
+// Import named exports from the referenced module.
 import {
+  // Contribute this line to the enclosing declaration or statement.
   applyFleetFiltersToParams,
+  // Contribute this line to the enclosing declaration or statement.
   CarFleetFilters,
+  // Contribute this line to the enclosing declaration or statement.
   fleetFiltersFromUrl,
+  // Declare the FleetFilterValue TypeScript type alias.
   type FleetFilterValue,
+// Contribute this line to the enclosing declaration or statement.
 } from '../../components/cars/CarFleetFilters';
+// Import named exports from '../../components/ui/Loading'.
 import { PageLoader } from '../../components/ui/Loading';
+// Import named exports from '../../components/ui/Button'.
 import { Button } from '../../components/ui/Button';
+// Import named exports from '../../utils/searchParams'.
 import { parseSearchFromUrl, searchParamsToQuery } from '../../utils/searchParams';
+// Import named exports from '../../utils/searchParams'.
 import { defaultSearchParams } from '../../utils/searchParams';
+// Contribute this line to the enclosing declaration or statement.
 import type { SearchParams } from '../../types/api';
 
 /**
@@ -28,66 +45,95 @@ import type { SearchParams } from '../../types/api';
  * @remarks Side effects: updates the URL via `setUrlParams`; fetches priced cars when params are valid.
  */
 export function SearchResultsPage() {
+  // Destructure array values into local variables.
   const [urlParams, setUrlParams] = useSearchParams();
 
   // Prefer URL trip criteria; fall back to defaults only for form display.
   const search = useMemo(
+    // Continue the surrounding logic with this statement.
     () => parseSearchFromUrl(urlParams) ?? defaultSearchParams(),
+    // Contribute this line to the enclosing declaration or statement.
     [urlParams],
   );
 
+  // Create the page constant.
   const page = Number(urlParams.get('page') ?? 1);
+  // Create the filters constant.
   const filters = useMemo(() => fleetFiltersFromUrl(urlParams), [urlParams]);
 
+  // Destructure object properties into local variables.
   const { data: categoriesData } = useQuery({
+    // Provide the query key field value.
     queryKey: ['categories'],
+    // Provide the query fn field value.
     queryFn: getCategories,
   });
 
   // Only hit the search API when the URL has a complete trip window.
   const { data, isLoading, isError, error, refetch } = useQuery({
+    // Provide the query key field value.
     queryKey: ['cars', 'search', search, page, filters],
+    // Provide the query fn field value.
     queryFn: () => searchCars(search, { ...filters, page }),
+    // Provide the enabled field value.
     enabled: !!parseSearchFromUrl(urlParams),
   });
 
   /** Patch individual URL keys (null deletes). */
   const updateUrlParams = (updates: Record<string, string | null>) => {
+    // Create the params constant.
     const params = new URLSearchParams(urlParams);
+    // Call Object.entries to perform this step.
     Object.entries(updates).forEach(([key, value]) => {
+      // Evaluate the condition and enter the branch when it is true.
       if (value === null) {
+        // Call params.delete to perform this step.
         params.delete(key);
+      // Contribute this line to the enclosing declaration or statement.
       } else {
+        // Call params.set to perform this step.
         params.set(key, value);
       }
     });
+    // Call setUrlParams to perform this step.
     setUrlParams(params);
   };
 
   /** Replace trip criteria in the URL while preserving current filters. */
   const handleSearch = (newSearch: SearchParams) => {
+    // Create the params constant.
     const params = new URLSearchParams(searchParamsToQuery(newSearch));
+    // Call applyFleetFiltersToParams to perform this step.
     applyFleetFiltersToParams(params, filters);
+    // Call setUrlParams to perform this step.
     setUrlParams(params);
   };
 
   /** Re-apply the controlled form values to the URL (submit button). */
   const handleSubmit = () => {
+    // Create the params constant.
     const params = new URLSearchParams(searchParamsToQuery(search));
+    // Call applyFleetFiltersToParams to perform this step.
     applyFleetFiltersToParams(params, filters);
+    // Call setUrlParams to perform this step.
     setUrlParams(params);
   };
 
   /** Write fleet filters to the URL and reset to page 1. */
   const handleFiltersChange = (next: FleetFilterValue) => {
+    // Create the params constant.
     const params = new URLSearchParams(urlParams);
+    // Call applyFleetFiltersToParams to perform this step.
     applyFleetFiltersToParams(params, next);
+    // Call params.set to perform this step.
     params.set('page', '1');
+    // Call setUrlParams to perform this step.
     setUrlParams(params);
   };
 
   // Incomplete deep-links should not invent a search — send the user home.
   if (!parseSearchFromUrl(urlParams)) {
+    // Return control to the caller with the following value.
     return (
       <div>
         <section className="bg-navy text-white">
@@ -107,6 +153,7 @@ export function SearchResultsPage() {
     );
   }
 
+  // Return control to the caller with the following value.
   return (
     <div className="min-w-0 overflow-x-clip">
       <section className="relative overflow-x-clip bg-navy text-white">

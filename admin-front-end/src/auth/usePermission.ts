@@ -2,6 +2,7 @@
  * React hooks for RBAC UI gating (buttons, nav items, page sections).
  */
 import { useAuth } from './useAuth';
+// Import named exports from './permissions'.
 import { hasAnyPermission, hasPermission, isStaffUser } from './permissions';
 
 /**
@@ -9,7 +10,9 @@ import { hasAnyPermission, hasPermission, isStaffUser } from './permissions';
  * @param key - Permission key to check
  */
 export function usePermission(key: string): boolean {
+  // Destructure object properties into local variables.
   const { user } = useAuth();
+  // Return the resulting value to the caller.
   return hasPermission(user, key);
 }
 
@@ -18,7 +21,9 @@ export function usePermission(key: string): boolean {
  * @param keys - Permission keys (OR semantics)
  */
 export function useAnyPermission(keys: string[]): boolean {
+  // Destructure object properties into local variables.
   const { user } = useAuth();
+  // Return the resulting value to the caller.
   return hasAnyPermission(user, keys);
 }
 
@@ -26,6 +31,8 @@ export function useAnyPermission(keys: string[]): boolean {
  * Whether the current user is staff (has roles or permissions).
  */
 export function useIsStaff(): boolean {
+  // Destructure object properties into local variables.
   const { user } = useAuth();
+  // Return the resulting value to the caller.
   return isStaffUser(user);
 }

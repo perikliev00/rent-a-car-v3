@@ -2,15 +2,25 @@
  * Per-location delivery fee editor.
  */
 import { useMemo, useState } from 'react';
+// Import named exports from '@tanstack/react-query'.
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+// Import named exports from the referenced module.
 import {
+  // Contribute this line to the enclosing declaration or statement.
   updateDeliveryFees,
+  // Declare the PricingDeliveryFee TypeScript type alias.
   type PricingDeliveryFee,
+// Contribute this line to the enclosing declaration or statement.
 } from '../../../api/admin/pricing';
+// Import named exports from '../../../components/ui/Button'.
 import { Button } from '../../../components/ui/Button';
+// Import named exports from '../../../components/ui/Input'.
 import { Input } from '../../../components/ui/Input';
+// Import named exports from '../../../components/ui/toastStore'.
 import { toast } from '../../../components/ui/toastStore';
+// Import named exports from './pricingConstants'.
 import { LOCATION_LABELS } from './pricingConstants';
+// Import named exports from './PricingSection'.
 import { PricingSection } from './PricingSection';
 
 /**
@@ -18,26 +28,38 @@ import { PricingSection } from './PricingSection';
  * @param fees - Delivery fee rows from the pricing bundle
  */
 export function DeliveryFeesSection({ fees }: { fees: PricingDeliveryFee[] }) {
+  // Create the query client constant.
   const queryClient = useQueryClient();
   // Local edit buffer; null means “show server values”.
   const [feeDraft, setFeeDraft] = useState<Record<string, string> | null>(null);
 
+  // Create the fees mutation constant.
   const feesMutation = useMutation({
+    // Provide the mutation fn field value.
     mutationFn: updateDeliveryFees,
+    // Provide the on success field value.
     onSuccess: () => {
+      // Call queryClient.invalidateQueries to perform this step.
       queryClient.invalidateQueries({ queryKey: ['admin', 'pricing'] });
+      // Call toast to perform this step.
       toast('Delivery fees saved', 'success');
+      // Call setFeeDraft to perform this step.
       setFeeDraft(null);
     },
+    // Provide the on error field value.
     onError: (e) => toast((e as Error).message, 'error'),
   });
 
   // Prefer draft strings while editing; otherwise mirror server fees.
   const feeValues = useMemo(() => {
+    // Evaluate the condition and enter the branch when it is true.
     if (feeDraft) return feeDraft;
+    // Return the resulting value to the caller.
     return Object.fromEntries(fees.map((f) => [f.locationId, String(f.fee)]));
+  // Continue the surrounding logic with this statement.
   }, [fees, feeDraft]);
 
+  // Return control to the caller with the following value.
   return (
     <PricingSection
       title="Delivery fees"

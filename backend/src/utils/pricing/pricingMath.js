@@ -32,13 +32,18 @@ function round2(n) {
 function applyAdj(base, adjType, adjValue, days = 1) {
   // Coerce missing/invalid config values to 0 so callers never get NaN lines.
   const value = Number(adjValue) || 0;
+  // Evaluate the condition and enter the branch when it is true.
   if (adjType === 'fixed_per_day') return round2(value * days);
+  // Evaluate the condition and enter the branch when it is true.
   if (adjType === 'fixed') return round2(value);
   // Default: percent of base (seasonal, weekend, discount rules).
   return round2((base * value) / 100);
 }
 
+// Assign the CommonJS module exports.
 module.exports = {
+  // Contribute this line to the enclosing declaration or statement.
   round2,
+  // Contribute this line to the enclosing declaration or statement.
   applyAdj,
 };

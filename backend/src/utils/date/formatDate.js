@@ -17,22 +17,32 @@ function formatDateForDisplay(dateString) {
 
   // Parse with the Date constructor; invalid → echo the original input unchanged.
   const date = new Date(dateString);
+  // Evaluate the condition and enter the branch when it is true.
   if (Number.isNaN(date.getTime())) return dateString;
 
+  // Create the months constant.
   const months = [
+    // Supply the literal value used by the enclosing expression.
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    // Supply the literal value used by the enclosing expression.
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
   ];
 
   // Use local calendar components (not UTC) for customer-facing labels.
   const day = date.getDate();
+  // Create the month constant.
   const month = months[date.getMonth()];
+  // Create the year constant.
   const year = date.getFullYear();
 
+  // Return the resulting value to the caller.
   return `${day} ${month} ${year}`;
 }
 
+// Assign the CommonJS module exports.
 module.exports = {
+  // Contribute this line to the enclosing declaration or statement.
   formatDateForDisplay,
+  // Contribute this line to the enclosing declaration or statement.
   formatLocationName,
 };

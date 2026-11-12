@@ -1,9 +1,13 @@
 /** Full-bleed hero banner shared by static and utility pages. */
 import { staticHeroImage } from '../../data/marketingAssets';
 
+// Declare the StaticPageHeroProps TypeScript interface.
 interface StaticPageHeroProps {
+  // Provide the title field value.
   title: string;
+  // Contribute this line to the enclosing declaration or statement.
   description?: string;
+  // Contribute this line to the enclosing declaration or statement.
   eyebrow?: string;
 }
 
@@ -16,6 +20,7 @@ interface StaticPageHeroProps {
  * @returns A full-width hero section with overlayed typography.
  */
 export function StaticPageHero({ title, description, eyebrow = 'LuxRide' }: StaticPageHeroProps) {
+  // Return control to the caller with the following value.
   return (
     <section className="relative overflow-hidden text-white">
       <div className="absolute inset-0">

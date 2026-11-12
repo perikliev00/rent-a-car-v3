@@ -3,9 +3,13 @@
  */
 import type { SelectHTMLAttributes } from 'react';
 
+// Declare the SelectProps TypeScript interface.
 interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
+  // Contribute this line to the enclosing declaration or statement.
   label?: string;
+  // Contribute this line to the enclosing declaration or statement.
   error?: string;
+  // Provide the options field value.
   options: Array<{ value: string; label: string }>;
 }
 
@@ -20,7 +24,9 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
  * @param className - Extra classes on the `<select>`
  */
 export function Select({ label, error, options, id, className = '', ...props }: SelectProps) {
+  // Create the select id constant.
   const selectId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
+  // Return control to the caller with the following value.
   return (
     <div className="min-w-0 space-y-1.5">
       {label && (

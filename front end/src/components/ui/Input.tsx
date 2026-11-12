@@ -1,8 +1,11 @@
 /** Labeled text input with shared field styling and optional error text. */
 import type { InputHTMLAttributes } from 'react';
 
+// Declare the InputProps TypeScript interface.
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+  // Contribute this line to the enclosing declaration or statement.
   label?: string;
+  // Contribute this line to the enclosing declaration or statement.
   error?: string;
 }
 
@@ -18,6 +21,7 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 export function Input({ label, error, id, className = '', ...props }: InputProps) {
   // Derive a stable id from the label when the caller does not supply one.
   const inputId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
+  // Return control to the caller with the following value.
   return (
     <div className="min-w-0 space-y-1.5">
       {label && (

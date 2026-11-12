@@ -4,7 +4,9 @@
  */
 const sharp = require('sharp');
 
+// Create the car image max width constant.
 const CAR_IMAGE_MAX_WIDTH = 1200;
+// Create the car image jpeg quality constant.
 const CAR_IMAGE_JPEG_QUALITY = 82;
 
 /**
@@ -13,9 +15,13 @@ const CAR_IMAGE_JPEG_QUALITY = 82;
  * @returns {*}
  */
 function createCarImagePipeline(input) {
+  // Return the resulting value to the caller.
   return sharp(input)
+    // Call .rotate to perform this step.
     .rotate()
+    // Call .resize to perform this step.
     .resize({ width: CAR_IMAGE_MAX_WIDTH, withoutEnlargement: true })
+    // Call .jpeg to perform this step.
     .jpeg({ quality: CAR_IMAGE_JPEG_QUALITY });
 }
 
@@ -25,6 +31,7 @@ function createCarImagePipeline(input) {
  * @returns {Promise<*>}
  */
 async function reencodeCarImageToBuffer(inputPath) {
+  // Return the resulting value to the caller.
   return createCarImagePipeline(inputPath).toBuffer();
 }
 
@@ -35,12 +42,18 @@ async function reencodeCarImageToBuffer(inputPath) {
  * @returns {Promise<*>}
  */
 async function reencodeCarImageToFile(inputPath, outputPath) {
+  // Wait until the asynchronous operation resolves.
   await createCarImagePipeline(inputPath).toFile(outputPath);
 }
 
+// Assign the CommonJS module exports.
 module.exports = {
+  // Contribute this line to the enclosing declaration or statement.
   CAR_IMAGE_MAX_WIDTH,
+  // Contribute this line to the enclosing declaration or statement.
   CAR_IMAGE_JPEG_QUALITY,
+  // Contribute this line to the enclosing declaration or statement.
   reencodeCarImageToBuffer,
+  // Contribute this line to the enclosing declaration or statement.
   reencodeCarImageToFile,
 };

@@ -4,6 +4,7 @@
 
 /** Five placeholder car rows shown while calendar events load. */
 export function TimelineSkeleton() {
+  // Return control to the caller with the following value.
   return (
     <div className="overflow-hidden rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)]">
       {Array.from({ length: 5 }).map((_, i) => (

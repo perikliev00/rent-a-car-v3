@@ -30,10 +30,15 @@ export function imageUrl(path: string | undefined | null): string {
 export function formatPrice(amount: number | string): string {
   // Coerce string amounts from JSON/API payloads to a number first.
   const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+  // Return the resulting value to the caller.
   return new Intl.NumberFormat('en-EU', {
+    // Provide the style field value.
     style: 'currency',
+    // Provide the currency field value.
     currency: 'EUR',
+    // Provide the minimum fraction digits field value.
     minimumFractionDigits: 2,
+  // Continue the surrounding logic with this statement.
   }).format(num);
 }
 
@@ -53,9 +58,11 @@ export function todayISO(): string {
  * @returns Date one calendar day after today, as an ISO date string.
  */
 export function tomorrowISO(): string {
+  // Create the d constant.
   const d = new Date();
   // Advance by one local calendar day before formatting.
   d.setDate(d.getDate() + 1);
+  // Return the resulting value to the caller.
   return d.toISOString().split('T')[0];
 }
 
@@ -70,6 +77,8 @@ export function tomorrowISO(): string {
 export function addDaysISO(dateStr: string, days: number): string {
   // Anchor at noon so DST transitions do not push the calendar day backward/forward.
   const d = new Date(dateStr + 'T12:00:00');
+  // Call d.setDate to perform this step.
   d.setDate(d.getDate() + days);
+  // Return the resulting value to the caller.
   return d.toISOString().split('T')[0];
 }

@@ -14,6 +14,7 @@ const reservationSql = require('../services/sql/reservationSqlService');
  * @throws {Error} Propagates SQL / driver errors from the SQL service
  */
 async function findActiveBySessionId(sessionId, client = null) {
+  // Return the resulting value to the caller.
   return reservationSql.findActiveBySessionId(sessionId, client);
 }
 
@@ -26,6 +27,7 @@ async function findActiveBySessionId(sessionId, client = null) {
  * @throws {Error} Propagates SQL / driver errors from the SQL service
  */
 async function findByStripeSessionId(stripeSessionId, client = null) {
+  // Return the resulting value to the caller.
   return reservationSql.findByStripeSessionId(stripeSessionId, client);
 }
 
@@ -38,6 +40,7 @@ async function findByStripeSessionId(stripeSessionId, client = null) {
  * @throws {Error} Propagates SQL / driver errors from the SQL service
  */
 async function findById(id, client = null) {
+  // Return the resulting value to the caller.
   return reservationSql.findById(id, client);
 }
 
@@ -50,6 +53,7 @@ async function findById(id, client = null) {
  * @throws {Error} Propagates SQL / driver errors from the SQL service
  */
 async function findOverlappingHold(criteria, client = null) {
+  // Return the resulting value to the caller.
   return reservationSql.findOverlappingHold(criteria, client);
 }
 
@@ -64,6 +68,7 @@ async function findOverlappingHold(criteria, client = null) {
  * @throws {Error} Propagates SQL / driver errors from the SQL service
  */
 async function findBookedDateOverlap(carId, startDate, endDate, client = null) {
+  // Return the resulting value to the caller.
   return reservationSql.findBookedDateOverlap(carId, startDate, endDate, client);
 }
 
@@ -77,6 +82,7 @@ async function findBookedDateOverlap(carId, startDate, endDate, client = null) {
  * @throws {Error} Propagates SQL / driver errors from the SQL service
  */
 async function findOpenPhysicalRental(carId, client = null, options = {}) {
+  // Return the resulting value to the caller.
   return reservationSql.findOpenPhysicalRental(carId, client, options);
 }
 
@@ -89,6 +95,7 @@ async function findOpenPhysicalRental(carId, client = null, options = {}) {
  * @throws {Error} Propagates SQL / constraint errors from the SQL service
  */
 async function create(payload, client = null) {
+  // Return the resulting value to the caller.
   return reservationSql.createPendingReservation(payload, client);
 }
 
@@ -101,6 +108,7 @@ async function create(payload, client = null) {
  * @throws {Error} Propagates conflict / SQL errors from the SQL service
  */
 async function createWithAvailabilityCheck(payload) {
+  // Return the resulting value to the caller.
   return reservationSql.createPendingReservationWithAvailabilityCheck(payload);
 }
 
@@ -112,6 +120,7 @@ async function createWithAvailabilityCheck(payload) {
  * @throws {Error} Propagates conflict / SQL errors from the SQL service
  */
 async function reholdWithAvailabilityCheck(payload) {
+  // Return the resulting value to the caller.
   return reservationSql.reholdPendingReservationWithAvailabilityCheck(payload);
 }
 
@@ -124,6 +133,7 @@ async function reholdWithAvailabilityCheck(payload) {
  * @throws {Error} Propagates SQL / constraint errors from the SQL service
  */
 async function createConfirmed(payload, client = null) {
+  // Return the resulting value to the caller.
   return reservationSql.createConfirmedReservation(payload, client);
 }
 
@@ -136,6 +146,7 @@ async function createConfirmed(payload, client = null) {
  * @throws {Error} Propagates SQL / constraint errors from the SQL service
  */
 async function update(reservation, client = null) {
+  // Return the resulting value to the caller.
   return reservationSql.update(reservation, client);
 }
 
@@ -148,6 +159,7 @@ async function update(reservation, client = null) {
  * @throws {Error} Propagates SQL / driver errors from the SQL service
  */
 async function findProcessingWithStripeSession(client = null) {
+  // Return the resulting value to the caller.
   return reservationSql.findProcessingWithStripeSession(client);
 }
 
@@ -160,6 +172,7 @@ async function findProcessingWithStripeSession(client = null) {
  * @throws {Error} Propagates SQL / driver errors from the SQL service
  */
 async function findProcessingWithExpiredHold(now = new Date(), client = null) {
+  // Return the resulting value to the caller.
   return reservationSql.findProcessingWithExpiredHold(now, client);
 }
 
@@ -173,6 +186,7 @@ async function findProcessingWithExpiredHold(now = new Date(), client = null) {
  * @throws {Error} Propagates SQL / status-transition errors from the SQL service
  */
 async function markExpired(reservationId, now = new Date(), client = null) {
+  // Return the resulting value to the caller.
   return reservationSql.markReservationExpired(reservationId, now, client);
 }
 
@@ -186,23 +200,40 @@ async function markExpired(reservationId, now = new Date(), client = null) {
  * @throws {Error} Propagates SQL / driver errors from the SQL service
  */
 async function markAbandoned(activeSessionIds, now = new Date(), client = null) {
+  // Return the resulting value to the caller.
   return reservationSql.markAbandonedReservations(activeSessionIds, now, client);
 }
 
+// Assign the CommonJS module exports.
 module.exports = {
+  // Contribute this line to the enclosing declaration or statement.
   findActiveBySessionId,
+  // Contribute this line to the enclosing declaration or statement.
   findById,
+  // Contribute this line to the enclosing declaration or statement.
   findByStripeSessionId,
+  // Contribute this line to the enclosing declaration or statement.
   findProcessingWithStripeSession,
+  // Contribute this line to the enclosing declaration or statement.
   findProcessingWithExpiredHold,
+  // Contribute this line to the enclosing declaration or statement.
   markExpired,
+  // Contribute this line to the enclosing declaration or statement.
   findOverlappingHold,
+  // Contribute this line to the enclosing declaration or statement.
   findBookedDateOverlap,
+  // Contribute this line to the enclosing declaration or statement.
   findOpenPhysicalRental,
+  // Contribute this line to the enclosing declaration or statement.
   create,
+  // Contribute this line to the enclosing declaration or statement.
   createWithAvailabilityCheck,
+  // Contribute this line to the enclosing declaration or statement.
   reholdWithAvailabilityCheck,
+  // Contribute this line to the enclosing declaration or statement.
   createConfirmed,
+  // Contribute this line to the enclosing declaration or statement.
   update,
+  // Contribute this line to the enclosing declaration or statement.
   markAbandoned,
 };

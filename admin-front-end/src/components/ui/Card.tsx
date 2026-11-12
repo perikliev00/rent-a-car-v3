@@ -9,6 +9,7 @@ import type { ReactNode } from 'react';
  * @param className - Optional extra classes on the outer shell
  */
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
+  // Return control to the caller with the following value.
   return (
     <div
       className={`min-w-0 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] text-[var(--color-ink)] shadow-[var(--shadow-soft)] ${className}`}
@@ -24,6 +25,7 @@ export function Card({ children, className = '' }: { children: ReactNode; classN
  * @param className - Optional extra classes
  */
 export function CardHeader({ children, className = '' }: { children: ReactNode; className?: string }) {
+  // Return control to the caller with the following value.
   return (
     <div className={`border-b border-[var(--color-line)] px-4 py-4 sm:px-6 ${className}`}>{children}</div>
   );

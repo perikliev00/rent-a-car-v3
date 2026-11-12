@@ -1,9 +1,14 @@
 /** Home-page split section highlighting product advantages with marketing copy/image. */
 import {
+  // Contribute this line to the enclosing declaration or statement.
   advantageHeadline,
+  // Contribute this line to the enclosing declaration or statement.
   advantageImage,
+  // Contribute this line to the enclosing declaration or statement.
   advantageImageAlt,
+  // Contribute this line to the enclosing declaration or statement.
   advantagePoints,
+// Contribute this line to the enclosing declaration or statement.
 } from '../../data/marketingAssets';
 
 /**
@@ -12,6 +17,7 @@ import {
  * @returns Marketing section driven by {@link advantageHeadline} / {@link advantagePoints}.
  */
 export function AdvantageSplit() {
+  // Return control to the caller with the following value.
   return (
     <section className="bg-[var(--color-surface-elevated)]">
       <div className="mx-auto grid max-w-7xl lg:grid-cols-[1.65fr_1fr]">

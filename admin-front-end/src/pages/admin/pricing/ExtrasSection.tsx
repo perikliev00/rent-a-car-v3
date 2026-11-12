@@ -2,12 +2,19 @@
  * Optional extras catalog CRUD for quotes.
  */
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+// Import named exports from the referenced module.
 import {
+  // Contribute this line to the enclosing declaration or statement.
   updateExtra,
+  // Declare the PricingExtra TypeScript type alias.
   type PricingExtra,
+// Contribute this line to the enclosing declaration or statement.
 } from '../../../api/admin/pricing';
+// Import named exports from '../../../components/ui/Input'.
 import { Input } from '../../../components/ui/Input';
+// Import named exports from '../../../components/ui/toastStore'.
 import { toast } from '../../../components/ui/toastStore';
+// Import named exports from './PricingSection'.
 import { PricingSection } from './PricingSection';
 
 /**
@@ -15,17 +22,25 @@ import { PricingSection } from './PricingSection';
  * @param extras - Extra rows from the pricing bundle
  */
 export function ExtrasSection({ extras }: { extras: PricingExtra[] }) {
+  // Create the query client constant.
   const queryClient = useQueryClient();
 
+  // Create the extra mutation constant.
   const extraMutation = useMutation({
+    // Provide the mutation fn field value.
     mutationFn: ({ id, ...data }: { id: number } & Partial<PricingExtra>) => updateExtra(id, data),
+    // Provide the on success field value.
     onSuccess: () => {
+      // Call queryClient.invalidateQueries to perform this step.
       queryClient.invalidateQueries({ queryKey: ['admin', 'pricing'] });
+      // Call toast to perform this step.
       toast('Extra saved', 'success');
     },
+    // Provide the on error field value.
     onError: (e) => toast((e as Error).message, 'error'),
   });
 
+  // Return control to the caller with the following value.
   return (
     <PricingSection title="Extras catalog">
       <div className="space-y-3">

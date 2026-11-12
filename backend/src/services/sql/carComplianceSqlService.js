@@ -2,6 +2,7 @@
  * SQL for car_compliance_items and denormalized car expiry cache sync.
  */
 const { clientQuery } = require('../../db/transaction');
+// Destructure object properties into local variables.
 const { COMPLIANCE_TYPE_LABELS } = require('../../constants/carEnums');
 
 /**
@@ -12,8 +13,11 @@ const { COMPLIANCE_TYPE_LABELS } = require('../../constants/carEnums');
 function toDateOnly(value) {
   // Guard: early-return or throw when required input is missing/invalid.
   if (!value) return null;
+  // Evaluate the condition and enter the branch when it is true.
   if (value instanceof Date) return value.toISOString().slice(0, 10);
+  // Create the str constant.
   const str = String(value);
+  // Return the resulting value to the caller.
   return str.length >= 10 ? str.slice(0, 10) : str;
 }
 
@@ -25,12 +29,15 @@ function toDateOnly(value) {
 function deriveComplianceStatus({ expiresAt, statusHint = null, todayStr = null }) {
   // Status / lifecycle guard before mutating domain state.
   if (statusHint === 'missing') return 'missing';
+  // Create the today constant.
   const today = todayStr || new Date().toISOString().slice(0, 10);
+  // Create the expires constant.
   const expires = toDateOnly(expiresAt);
   // Hold-expiry / timing branch.
   if (expires && expires < today) return 'expired';
   // Status / lifecycle guard before mutating domain state.
   if (statusHint === 'expired' && !expires) return 'expired';
+  // Return the resulting value to the caller.
   return 'valid';
 }
 
@@ -42,25 +49,45 @@ function deriveComplianceStatus({ expiresAt, statusHint = null, todayStr = null 
 function mapComplianceItem(row) {
   // Guard: early-return or throw when required input is missing/invalid.
   if (!row) return null;
+  // Create the item type constant.
   const itemType = row.item_type;
+  // Create the document storage key constant.
   const documentStorageKey = row.document_storage_key || null;
+  // Create the document url constant.
   const documentUrl = row.document_url || null;
+  // Return the resulting value to the caller.
   return {
+    // Provide the id field value.
     id: Number(row.id),
+    // Provide the car id field value.
     carId: String(row.car_id),
+    // Contribute this line to the enclosing declaration or statement.
     itemType,
+    // Provide the label field value.
     label: row.title || COMPLIANCE_TYPE_LABELS[itemType] || itemType,
+    // Provide the title field value.
     title: row.title || null,
+    // Provide the reference number field value.
     referenceNumber: row.reference_number || null,
+    // Provide the issued at field value.
     issuedAt: toDateOnly(row.issued_at),
+    // Provide the expires at field value.
     expiresAt: toDateOnly(row.expires_at),
+    // Provide the notes field value.
     notes: row.notes || null,
+    // Contribute this line to the enclosing declaration or statement.
     documentStorageKey,
+    // Contribute this line to the enclosing declaration or statement.
     documentUrl,
+    // Provide the has document field value.
     hasDocument: Boolean(documentStorageKey || documentUrl),
+    // Provide the status field value.
     status: row.status,
+    // Provide the created by user id field value.
     createdByUserId: row.created_by_user_id != null ? Number(row.created_by_user_id) : null,
+    // Provide the created at field value.
     createdAt: row.created_at,
+    // Provide the updated at field value.
     updatedAt: row.updated_at,
   };
 }
@@ -73,20 +100,35 @@ function mapComplianceItem(row) {
 function toPublicComplianceItem(item) {
   // Guard: early-return or throw when required input is missing/invalid.
   if (!item) return null;
+  // Return the resulting value to the caller.
   return {
+    // Provide the id field value.
     id: item.id,
+    // Provide the car id field value.
     carId: item.carId,
+    // Provide the item type field value.
     itemType: item.itemType,
+    // Provide the label field value.
     label: item.label,
+    // Provide the title field value.
     title: item.title,
+    // Provide the reference number field value.
     referenceNumber: item.referenceNumber,
+    // Provide the issued at field value.
     issuedAt: item.issuedAt,
+    // Provide the expires at field value.
     expiresAt: item.expiresAt,
+    // Provide the notes field value.
     notes: item.notes,
+    // Provide the has document field value.
     hasDocument: item.hasDocument,
+    // Provide the status field value.
     status: item.status,
+    // Provide the created by user id field value.
     createdByUserId: item.createdByUserId,
+    // Provide the created at field value.
     createdAt: item.createdAt,
+    // Provide the updated at field value.
     updatedAt: item.updatedAt,
   };
 }
@@ -98,8 +140,11 @@ function toPublicComplianceItem(item) {
  * @returns {Promise<*>}
  */
 async function listByCarId(carId, client = null) {
+  // Create the result constant.
   const result = await clientQuery(
+    // Contribute this line to the enclosing declaration or statement.
     client,
+    // Continue the surrounding logic with this statement.
     `
     SELECT *
     FROM car_compliance_items
@@ -113,8 +158,10 @@ async function listByCarId(carId, client = null) {
       expires_at ASC NULLS LAST,
       id DESC
     `,
+    // Continue the surrounding logic with this statement.
     [Number(carId)]
   );
+  // Return the resulting value to the caller.
   return result.rows.map(mapComplianceItem);
 }
 
@@ -126,16 +173,21 @@ async function listByCarId(carId, client = null) {
  * @returns {Promise<*>}
  */
 async function findById(carId, itemId, client = null) {
+  // Create the result constant.
   const result = await clientQuery(
+    // Contribute this line to the enclosing declaration or statement.
     client,
+    // Continue the surrounding logic with this statement.
     `
     SELECT *
     FROM car_compliance_items
     WHERE id = $1 AND car_id = $2
     LIMIT 1
     `,
+    // Continue the surrounding logic with this statement.
     [Number(itemId), Number(carId)]
   );
+  // Return the resulting value to the caller.
   return mapComplianceItem(result.rows[0]);
 }
 
@@ -147,8 +199,11 @@ async function findById(carId, itemId, client = null) {
  * @returns {Promise<*>}
  */
 async function findLatestByType(carId, itemType, client = null) {
+  // Create the result constant.
   const result = await clientQuery(
+    // Contribute this line to the enclosing declaration or statement.
     client,
+    // Continue the surrounding logic with this statement.
     `
     SELECT *
     FROM car_compliance_items
@@ -156,8 +211,10 @@ async function findLatestByType(carId, itemType, client = null) {
     ORDER BY expires_at DESC NULLS LAST, id DESC
     LIMIT 1
     `,
+    // Continue the surrounding logic with this statement.
     [Number(carId), itemType]
   );
+  // Return the resulting value to the caller.
   return mapComplianceItem(result.rows[0]);
 }
 
@@ -169,13 +226,19 @@ async function findLatestByType(carId, itemType, client = null) {
  * @returns {Promise<*>}
  */
 async function create(carId, payload, client = null) {
+  // Create the status constant.
   const status = deriveComplianceStatus({
+    // Provide the expires at field value.
     expiresAt: payload.expiresAt,
+    // Provide the status hint field value.
     statusHint: payload.status,
   });
 
+  // Create the result constant.
   const result = await clientQuery(
+    // Contribute this line to the enclosing declaration or statement.
     client,
+    // Continue the surrounding logic with this statement.
     `
     INSERT INTO car_compliance_items (
       car_id,
@@ -194,19 +257,31 @@ async function create(carId, payload, client = null) {
     RETURNING *
     `,
     [
+      // Call Number to perform this step.
       Number(carId),
+      // Contribute this line to the enclosing declaration or statement.
       payload.itemType,
+      // Contribute this line to the enclosing declaration or statement.
       payload.title || null,
+      // Contribute this line to the enclosing declaration or statement.
       payload.referenceNumber || null,
+      // Contribute this line to the enclosing declaration or statement.
       payload.issuedAt || null,
+      // Contribute this line to the enclosing declaration or statement.
       payload.expiresAt || null,
+      // Contribute this line to the enclosing declaration or statement.
       payload.notes || null,
+      // Contribute this line to the enclosing declaration or statement.
       payload.documentUrl || null,
+      // Contribute this line to the enclosing declaration or statement.
       payload.documentStorageKey || null,
+      // Contribute this line to the enclosing declaration or statement.
       status,
+      // Contribute this line to the enclosing declaration or statement.
       payload.createdByUserId ?? null,
     ]
   );
+  // Return the resulting value to the caller.
   return mapComplianceItem(result.rows[0]);
 }
 
@@ -219,13 +294,19 @@ async function create(carId, payload, client = null) {
  * @returns {Promise<*>}
  */
 async function update(carId, itemId, payload, client = null) {
+  // Create the status constant.
   const status = deriveComplianceStatus({
+    // Provide the expires at field value.
     expiresAt: payload.expiresAt,
+    // Provide the status hint field value.
     statusHint: payload.status,
   });
 
+  // Create the result constant.
   const result = await clientQuery(
+    // Contribute this line to the enclosing declaration or statement.
     client,
+    // Continue the surrounding logic with this statement.
     `
     UPDATE car_compliance_items
     SET
@@ -246,19 +327,31 @@ async function update(carId, itemId, payload, client = null) {
     RETURNING *
     `,
     [
+      // Call Number to perform this step.
       Number(itemId),
+      // Call Number to perform this step.
       Number(carId),
+      // Contribute this line to the enclosing declaration or statement.
       payload.itemType,
+      // Contribute this line to the enclosing declaration or statement.
       payload.title || null,
+      // Contribute this line to the enclosing declaration or statement.
       payload.referenceNumber || null,
+      // Contribute this line to the enclosing declaration or statement.
       payload.issuedAt || null,
+      // Contribute this line to the enclosing declaration or statement.
       payload.expiresAt || null,
+      // Contribute this line to the enclosing declaration or statement.
       payload.notes || null,
+      // Contribute this line to the enclosing declaration or statement.
       payload.documentUrl || null,
+      // Contribute this line to the enclosing declaration or statement.
       payload.documentStorageKey || null,
+      // Contribute this line to the enclosing declaration or statement.
       status,
     ]
   );
+  // Return the resulting value to the caller.
   return mapComplianceItem(result.rows[0]);
 }
 
@@ -271,43 +364,73 @@ async function update(carId, itemId, payload, client = null) {
  * @returns {Promise<*>}
  */
 async function upsertByType(carId, itemType, payload, client = null) {
+  // Create the existing constant.
   const existing = await findLatestByType(carId, itemType, client);
   // Idempotency guard: return early when work was already applied.
   if (existing) {
+    // Return the resulting value to the caller.
     return update(
+      // Contribute this line to the enclosing declaration or statement.
       carId,
+      // Contribute this line to the enclosing declaration or statement.
       existing.id,
       {
+        // Contribute this line to the enclosing declaration or statement.
         itemType,
+        // Provide the title field value.
         title: payload.title !== undefined ? payload.title : existing.title,
+        // Provide the reference number field value.
         referenceNumber:
+          // Continue the surrounding logic with this statement.
           payload.referenceNumber !== undefined
+            // Contribute this line to the enclosing declaration or statement.
             ? payload.referenceNumber
+            // Contribute this line to the enclosing declaration or statement.
             : existing.referenceNumber,
+        // Provide the issued at field value.
         issuedAt: payload.issuedAt !== undefined ? payload.issuedAt : existing.issuedAt,
+        // Provide the expires at field value.
         expiresAt: payload.expiresAt !== undefined ? payload.expiresAt : existing.expiresAt,
+        // Provide the notes field value.
         notes: payload.notes !== undefined ? payload.notes : existing.notes,
+        // Provide the document url field value.
         documentUrl: payload.documentUrl,
+        // Provide the document storage key field value.
         documentStorageKey: payload.documentStorageKey,
+        // Provide the status field value.
         status: payload.status,
       },
+      // Reference the identifier used by the enclosing expression.
       client
     );
   }
+  // Return the resulting value to the caller.
   return create(
+    // Contribute this line to the enclosing declaration or statement.
     carId,
     {
+      // Contribute this line to the enclosing declaration or statement.
       itemType,
+      // Provide the title field value.
       title: payload.title || null,
+      // Provide the reference number field value.
       referenceNumber: payload.referenceNumber || null,
+      // Provide the issued at field value.
       issuedAt: payload.issuedAt || null,
+      // Provide the expires at field value.
       expiresAt: payload.expiresAt || null,
+      // Provide the notes field value.
       notes: payload.notes || null,
+      // Provide the document url field value.
       documentUrl: payload.documentUrl || null,
+      // Provide the document storage key field value.
       documentStorageKey: payload.documentStorageKey || null,
+      // Provide the status field value.
       status: payload.status,
+      // Provide the created by user id field value.
       createdByUserId: payload.createdByUserId ?? null,
     },
+    // Reference the identifier used by the enclosing expression.
     client
   );
 }
@@ -320,15 +443,20 @@ async function upsertByType(carId, itemType, payload, client = null) {
  * @returns {Promise<*>}
  */
 async function remove(carId, itemId, client = null) {
+  // Create the result constant.
   const result = await clientQuery(
+    // Contribute this line to the enclosing declaration or statement.
     client,
+    // Continue the surrounding logic with this statement.
     `
     DELETE FROM car_compliance_items
     WHERE id = $1 AND car_id = $2
     RETURNING *
     `,
+    // Continue the surrounding logic with this statement.
     [Number(itemId), Number(carId)]
   );
+  // Return the resulting value to the caller.
   return mapComplianceItem(result.rows[0]);
 }
 
@@ -339,11 +467,16 @@ async function remove(carId, itemId, client = null) {
  * @returns {Promise<*>}
  */
 async function syncCarExpiryCache(carId, client = null) {
+  // Create the insurance constant.
   const insurance = await findLatestByType(carId, 'civil_insurance', client);
+  // Create the inspection constant.
   const inspection = await findLatestByType(carId, 'technical_inspection', client);
 
+  // Wait until the asynchronous operation resolves.
   await clientQuery(
+    // Contribute this line to the enclosing declaration or statement.
     client,
+    // Continue the surrounding logic with this statement.
     `
     UPDATE cars
     SET
@@ -352,6 +485,7 @@ async function syncCarExpiryCache(carId, client = null) {
       updated_at = NOW()
     WHERE id = $1
     `,
+    // Continue the surrounding logic with this statement.
     [Number(carId), insurance?.expiresAt || null, inspection?.expiresAt || null]
   );
 }
@@ -362,8 +496,11 @@ async function syncCarExpiryCache(carId, client = null) {
  * @returns {Promise<*>}
  */
 async function listOpenComplianceForAlerts(client = null) {
+  // Create the result constant.
   const result = await clientQuery(
+    // Contribute this line to the enclosing declaration or statement.
     client,
+    // Continue the surrounding logic with this statement.
     `
     SELECT
       i.id,
@@ -386,21 +523,36 @@ async function listOpenComplianceForAlerts(client = null) {
     ORDER BY c.name ASC, i.expires_at ASC NULLS LAST
     `
   );
+  // Return the resulting value to the caller.
   return result.rows;
 }
 
+// Assign the CommonJS module exports.
 module.exports = {
+  // Contribute this line to the enclosing declaration or statement.
   deriveComplianceStatus,
+  // Contribute this line to the enclosing declaration or statement.
   mapComplianceItem,
+  // Contribute this line to the enclosing declaration or statement.
   toPublicComplianceItem,
+  // Contribute this line to the enclosing declaration or statement.
   listByCarId,
+  // Contribute this line to the enclosing declaration or statement.
   findById,
+  // Contribute this line to the enclosing declaration or statement.
   findLatestByType,
+  // Contribute this line to the enclosing declaration or statement.
   create,
+  // Contribute this line to the enclosing declaration or statement.
   update,
+  // Contribute this line to the enclosing declaration or statement.
   upsertByType,
+  // Contribute this line to the enclosing declaration or statement.
   remove,
+  // Contribute this line to the enclosing declaration or statement.
   syncCarExpiryCache,
+  // Contribute this line to the enclosing declaration or statement.
   listOpenComplianceForAlerts,
+  // Contribute this line to the enclosing declaration or statement.
   COMPLIANCE_TYPE_LABELS,
 };

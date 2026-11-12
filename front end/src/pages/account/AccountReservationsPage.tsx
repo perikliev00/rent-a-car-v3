@@ -2,10 +2,15 @@
  * Full list of the signed-in customer's reservations.
  */
 import { useQuery } from '@tanstack/react-query';
+// Import named exports from 'react-router-dom'.
 import { Link } from 'react-router-dom';
+// Import named exports from '../../api/account'.
 import { listAccountReservations } from '../../api/account';
+// Import named exports from '../../components/ui/Button'.
 import { Button } from '../../components/ui/Button';
+// Import named exports from '../../components/ui/Loading'.
 import { PageLoader } from '../../components/ui/Loading';
+// Import named exports from './EmailUnverifiedBanner'.
 import { EmailUnverifiedBanner } from './EmailUnverifiedBanner';
 
 /**
@@ -16,11 +21,17 @@ import { EmailUnverifiedBanner } from './EmailUnverifiedBanner';
  * @returns Locale date string, optionally with time; `—` when missing.
  */
 function formatWhen(value?: string | null, time?: string | null) {
+  // Evaluate the condition and enter the branch when it is true.
   if (!value) return '—';
+  // Start a try block for operations that may fail.
   try {
+    // Create the d constant.
     const d = new Date(value);
+    // Return the resulting value to the caller.
     return time ? `${d.toLocaleDateString()} ${time}` : d.toLocaleDateString();
+  // Contribute this line to the enclosing declaration or statement.
   } catch {
+    // Return the resulting value to the caller.
     return value;
   }
 }
@@ -31,15 +42,20 @@ function formatWhen(value?: string | null, time?: string | null) {
  * @returns Loading spinner, empty state, or a list of reservation rows with detail links.
  */
 export function AccountReservationsPage() {
+  // Create the query constant.
   const query = useQuery({
+    // Provide the query key field value.
     queryKey: ['account', 'reservations'],
+    // Provide the query fn field value.
     queryFn: listAccountReservations,
   });
 
   if (query.isLoading) return <PageLoader />;
 
+  // Create the reservations constant.
   const reservations = query.data?.reservations ?? [];
 
+  // Return control to the caller with the following value.
   return (
     <div className="mx-auto min-w-0 max-w-5xl overflow-x-clip px-4 py-10 sm:px-6">
       <div className="flex min-w-0 flex-wrap items-end justify-between gap-4">

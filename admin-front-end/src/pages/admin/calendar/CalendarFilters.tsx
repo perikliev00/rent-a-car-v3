@@ -2,21 +2,36 @@
  * Filter controls for fleet calendar event queries.
  */
 import { useState } from 'react';
+// Import named exports from 'date-fns'.
 import { formatISO } from 'date-fns';
+// Import named exports from '../../../components/ui/Input'.
 import { Input } from '../../../components/ui/Input';
+// Import named exports from '../../../components/ui/Select'.
 import { Select } from '../../../components/ui/Select';
+// Import named exports from '../../../components/ui/Button'.
 import { Button } from '../../../components/ui/Button';
+// Contribute this line to the enclosing declaration or statement.
 import type { CalendarFiltersState, CalendarViewMode } from './calendar.types';
+// Import named exports from './eventStyles'.
 import { PROBLEM_EVENT_TYPES } from './eventStyles';
 
+// Continue the surrounding logic with this statement.
 const FILTER_LABELS: Partial<Record<keyof CalendarFiltersState, string>> = {
+  // Provide the location field value.
   location: 'Location',
+  // Provide the car status field value.
   carStatus: 'Car status',
+  // Provide the transmission field value.
   transmission: 'Transmission',
+  // Provide the fuel type field value.
   fuelType: 'Fuel',
+  // Provide the reservation status field value.
   reservationStatus: 'Reservation',
+  // Provide the event type field value.
   eventType: 'Event type',
+  // Provide the category id field value.
   categoryId: 'Category',
+  // Provide the staff user id field value.
   staffUserId: 'Staff',
 };
 
@@ -31,30 +46,50 @@ const FILTER_LABELS: Partial<Record<keyof CalendarFiltersState, string>> = {
  * @param compact - Tighter layout for narrow toolbars
  */
 export function CalendarFilters({
+  // Contribute this line to the enclosing declaration or statement.
   filters,
+  // Contribute this line to the enclosing declaration or statement.
   onChange,
+  // Contribute this line to the enclosing declaration or statement.
   onClear,
+  // Contribute this line to the enclosing declaration or statement.
   view,
+  // Contribute this line to the enclosing declaration or statement.
   onApplyPreset,
+  // Update compact with the right-hand side value.
   compact = false,
+// Contribute this line to the enclosing declaration or statement.
 }: {
+  // Provide the filters field value.
   filters: CalendarFiltersState;
+  // Provide the on change field value.
   onChange: <K extends keyof CalendarFiltersState>(key: K, value: CalendarFiltersState[K]) => void;
+  // Provide the on clear field value.
   onClear: () => void;
+  // Provide the view field value.
   view: CalendarViewMode;
+  // Provide the on apply preset field value.
   onApplyPreset: (preset: CalendarPreset) => void;
+  // Contribute this line to the enclosing declaration or statement.
   compact?: boolean;
+// Continue the surrounding logic with this statement.
 }) {
+  // Destructure array values into local variables.
   const [expanded, setExpanded] = useState(false);
 
   // Chips for non-empty filter values (shown even when the panel is collapsed).
   const activeChips = (Object.keys(filters) as (keyof CalendarFiltersState)[])
+    // Call .filter to perform this step.
     .filter((k) => Boolean(filters[k]))
+    // Call .map to perform this step.
     .map((k) => ({
+      // Provide the key field value.
       key: k,
+      // Provide the label field value.
       label: `${FILTER_LABELS[k] || k}: ${filters[k]}`,
     }));
 
+  // Return control to the caller with the following value.
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -203,11 +238,18 @@ export function CalendarFilters({
   );
 }
 
+// Export the calendar preset type.
 export type CalendarPreset = {
+  // Provide the kind field value.
   kind: string;
+  // Contribute this line to the enclosing declaration or statement.
   view?: CalendarViewMode;
+  // Contribute this line to the enclosing declaration or statement.
   date?: string;
+  // Contribute this line to the enclosing declaration or statement.
   carStatus?: string;
+  // Contribute this line to the enclosing declaration or statement.
   reservationStatus?: string;
+  // Contribute this line to the enclosing declaration or statement.
   eventType?: string;
 };

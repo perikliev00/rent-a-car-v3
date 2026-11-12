@@ -2,35 +2,52 @@
  * Outbound notification delivery log browser.
  */
 import { useState } from 'react';
+// Import named exports from '@tanstack/react-query'.
 import { useQuery } from '@tanstack/react-query';
+// Import named exports from '../../api/admin/notifications'.
 import { getNotifications } from '../../api/admin/notifications';
+// Import named exports from '../../components/ui/Card'.
 import { Card, CardBody } from '../../components/ui/Card';
+// Import named exports from '../../components/ui/Loading'.
 import { PageLoader } from '../../components/ui/Loading';
+// Import named exports from '../../components/ui/Select'.
 import { Select } from '../../components/ui/Select';
 
 /** Status Class. */
 function statusClass(status: string) {
+  // Evaluate the condition and enter the branch when it is true.
   if (status === 'sent') return 'text-[var(--color-success)]';
+  // Evaluate the condition and enter the branch when it is true.
   if (status === 'failed') return 'text-[var(--color-danger)]';
+  // Evaluate the condition and enter the branch when it is true.
   if (status === 'pending' || status === 'processing') return 'text-[var(--color-ink)]';
+  // Return the resulting value to the caller.
   return 'text-[var(--color-muted)]';
 }
 
 /** Outbound notification delivery log browser. */
 export function AdminNotificationsPage() {
+  // Destructure array values into local variables.
   const [status, setStatus] = useState('');
 
+  // Destructure object properties into local variables.
   const { data, isLoading, isError, error } = useQuery({
+    // Provide the query key field value.
     queryKey: ['admin', 'notifications', status],
+    // Provide the query fn field value.
     queryFn: () =>
+      // Call getNotifications to perform this step.
       getNotifications({
+        // Provide the limit field value.
         limit: 50,
+        // Provide the status field value.
         status: status || undefined,
       }),
   });
 
   if (isLoading) return <PageLoader />;
 
+  // Return control to the caller with the following value.
   return (
     <div>
       <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">

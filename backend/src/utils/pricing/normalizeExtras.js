@@ -18,11 +18,15 @@ function normalizeSelectedExtras(extras) {
   const unique = [...new Set(list)];
   // Full insurance supersedes basic when both were selected.
   if (unique.includes('insurance_full') && unique.includes('insurance_basic')) {
+    // Return the resulting value to the caller.
     return unique.filter((code) => code !== 'insurance_basic');
   }
+  // Return the resulting value to the caller.
   return unique;
 }
 
+// Assign the CommonJS module exports.
 module.exports = {
+  // Contribute this line to the enclosing declaration or statement.
   normalizeSelectedExtras,
 };

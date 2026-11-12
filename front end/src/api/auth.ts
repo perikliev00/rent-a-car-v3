@@ -4,6 +4,7 @@
  * so bootstrap can finish without surfacing an error toast.
  */
 import type { User } from '../types/api';
+// Import named exports from './client'.
 import { ApiError, api, setCsrfToken } from './client';
 
 /**
@@ -15,8 +16,11 @@ import { ApiError, api, setCsrfToken } from './client';
  * @remarks Side effect: server sets the session cookie; CSRF may be embedded in the response.
  */
 export async function login(email: string, password: string): Promise<{ user: User }> {
+  // Return the resulting value to the caller.
   return api<{ user: User }>('/api/auth/login', {
+    // Provide the method field value.
     method: 'POST',
+    // Provide the body field value.
     body: JSON.stringify({ email, password }),
   });
 }
@@ -30,8 +34,11 @@ export async function login(email: string, password: string): Promise<{ user: Us
  * @remarks Side effect: server creates the account and sets the session cookie.
  */
 export async function signup(email: string, password: string): Promise<{ user: User }> {
+  // Return the resulting value to the caller.
   return api<{ user: User }>('/api/auth/signup', {
+    // Provide the method field value.
     method: 'POST',
+    // Provide the body field value.
     body: JSON.stringify({ email, password }),
   });
 }
@@ -43,8 +50,11 @@ export async function signup(email: string, password: string): Promise<{ user: U
  * @returns Updated user (typically with `emailVerified` set).
  */
 export async function verifyEmail(token: string): Promise<{ user: User }> {
+  // Return the resulting value to the caller.
   return api<{ user: User }>('/api/auth/verify-email', {
+    // Provide the method field value.
     method: 'POST',
+    // Provide the body field value.
     body: JSON.stringify({ token }),
   });
 }
@@ -56,7 +66,9 @@ export async function verifyEmail(token: string): Promise<{ user: User }> {
  * @remarks Side effect: triggers an outbound email when rate limits allow.
  */
 export async function resendVerification(): Promise<{ sent: boolean }> {
+  // Return the resulting value to the caller.
   return api<{ sent: boolean }>('/api/auth/resend-verification', {
+    // Provide the method field value.
     method: 'POST',
   });
 }
@@ -68,9 +80,11 @@ export async function resendVerification(): Promise<{ sent: boolean }> {
  * @remarks Side effect: clears the in-memory CSRF token so the next login cannot reuse a prior-session token.
  */
 export async function logout(): Promise<{ loggedOut: boolean }> {
+  // Create the result constant.
   const result = await api<{ loggedOut: boolean }>('/api/auth/logout', { method: 'POST' });
   // Drop any CSRF bound to the session we just ended.
   setCsrfToken(null);
+  // Return the resulting value to the caller.
   return result;
 }
 
@@ -81,13 +95,18 @@ export async function logout(): Promise<{ loggedOut: boolean }> {
  * @throws Re-throws non-401 {@link ApiError}s and unexpected failures for callers to handle.
  */
 export async function getMe(): Promise<{ user: User } | null> {
+  // Start a try block for operations that may fail.
   try {
+    // Return the resulting value to the caller.
     return await api<{ user: User }>('/api/auth/me');
+  // Continue the surrounding logic with this statement.
   } catch (err) {
     // 401 means “anonymous” during bootstrap — not an actionable failure.
     if (err instanceof ApiError && err.status === 401) {
+      // Return the resulting value to the caller.
       return null;
     }
+    // Throw an error to stop the current control flow.
     throw err;
   }
 }
