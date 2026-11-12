@@ -2,15 +2,10 @@
  * Low-level car admin CRUD SQL (create/update/soft-delete) used by carSqlService.
  */
 const { clientQuery } = require('../../../db/transaction');
-// Destructure object properties into local variables.
 const {
-  // Contribute this line to the enclosing declaration or statement.
   fetchCarRowById,
-  // Contribute this line to the enclosing declaration or statement.
   mapSqlCar,
-  // Contribute this line to the enclosing declaration or statement.
   normalizeCarId,
-// Continue the surrounding logic with this statement.
 } = require('./carMapper');
 
 /**
@@ -20,16 +15,11 @@ const {
  * @returns {Promise<*>}
  */
 async function createAdminCar(payload, client = null) {
-  // Create the status constant.
   const status = payload.status || (payload.availability === false ? 'inactive' : 'available');
-  // Create the availability constant.
   const availability = status === 'available';
 
-  // Create the result constant.
   const result = await clientQuery(
-    // Contribute this line to the enclosing declaration or statement.
     client,
-    // Continue the surrounding logic with this statement.
     `
     INSERT INTO cars (
       name,
@@ -56,50 +46,29 @@ async function createAdminCar(payload, client = null) {
     RETURNING id
     `,
     [
-      // Contribute this line to the enclosing declaration or statement.
       payload.name,
-      // Contribute this line to the enclosing declaration or statement.
       payload.image,
-      // Contribute this line to the enclosing declaration or statement.
       payload.transmission,
-      // Contribute this line to the enclosing declaration or statement.
       payload.price,
-      // Contribute this line to the enclosing declaration or statement.
       payload.priceTier_1_3 ?? null,
-      // Contribute this line to the enclosing declaration or statement.
       payload.priceTier_7_31 ?? null,
-      // Contribute this line to the enclosing declaration or statement.
       payload.priceTier_31_plus ?? null,
-      // Contribute this line to the enclosing declaration or statement.
       payload.seats,
-      // Contribute this line to the enclosing declaration or statement.
       payload.fuelType,
-      // Contribute this line to the enclosing declaration or statement.
       availability,
-      // Contribute this line to the enclosing declaration or statement.
       status,
-      // Contribute this line to the enclosing declaration or statement.
       payload.registrationNumber || null,
-      // Contribute this line to the enclosing declaration or statement.
       payload.vin || null,
-      // Contribute this line to the enclosing declaration or statement.
       payload.mileage ?? null,
-      // Contribute this line to the enclosing declaration or statement.
       payload.fuelLevel || null,
-      // Contribute this line to the enclosing declaration or statement.
       payload.currentLocation || null,
-      // Contribute this line to the enclosing declaration or statement.
       payload.insuranceExpiry || null,
-      // Contribute this line to the enclosing declaration or statement.
       payload.technicalInspectionExpiry || null,
-      // Contribute this line to the enclosing declaration or statement.
       payload.categoryId ?? null,
     ]
   );
 
-  // Create the row constant.
   const row = await fetchCarRowById(result.rows[0].id, client);
-  // Return the resulting value to the caller.
   return mapSqlCar(row);
 }
 
@@ -111,28 +80,18 @@ async function createAdminCar(payload, client = null) {
  * @returns {Promise<*>}
  */
 async function updateAdminCar(id, payload, client = null) {
-  // Create the car id constant.
   const carId = normalizeCarId(id);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!carId) {
-    // Throw an error to stop the current control flow.
     throw new Error('Invalid car id');
   }
 
-  // Create the status constant.
   const status =
-    // Contribute this line to the enclosing declaration or statement.
     payload.status ||
-    // Continue the surrounding logic with this statement.
     (payload.availability === false ? 'inactive' : 'available');
-  // Create the availability constant.
   const availability = status === 'available';
 
-  // Create the result constant.
   const result = await clientQuery(
-    // Contribute this line to the enclosing declaration or statement.
     client,
-    // Continue the surrounding logic with this statement.
     `
     UPDATE cars
     SET
@@ -160,58 +119,34 @@ async function updateAdminCar(id, payload, client = null) {
     RETURNING id
     `,
     [
-      // Contribute this line to the enclosing declaration or statement.
       carId,
-      // Contribute this line to the enclosing declaration or statement.
       payload.name,
-      // Contribute this line to the enclosing declaration or statement.
       payload.transmission,
-      // Contribute this line to the enclosing declaration or statement.
       payload.price,
-      // Contribute this line to the enclosing declaration or statement.
       payload.priceTier_1_3 ?? null,
-      // Contribute this line to the enclosing declaration or statement.
       payload.priceTier_7_31 ?? null,
-      // Contribute this line to the enclosing declaration or statement.
       payload.priceTier_31_plus ?? null,
-      // Contribute this line to the enclosing declaration or statement.
       payload.seats,
-      // Contribute this line to the enclosing declaration or statement.
       payload.fuelType,
-      // Contribute this line to the enclosing declaration or statement.
       availability,
-      // Contribute this line to the enclosing declaration or statement.
       payload.image || null,
-      // Contribute this line to the enclosing declaration or statement.
       payload.categoryId ?? null,
-      // Contribute this line to the enclosing declaration or statement.
       status,
-      // Contribute this line to the enclosing declaration or statement.
       payload.registrationNumber || null,
-      // Contribute this line to the enclosing declaration or statement.
       payload.vin || null,
-      // Contribute this line to the enclosing declaration or statement.
       payload.mileage ?? null,
-      // Contribute this line to the enclosing declaration or statement.
       payload.fuelLevel || null,
-      // Contribute this line to the enclosing declaration or statement.
       payload.currentLocation || null,
-      // Contribute this line to the enclosing declaration or statement.
       payload.insuranceExpiry || null,
-      // Contribute this line to the enclosing declaration or statement.
       payload.technicalInspectionExpiry || null,
     ]
   );
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!result.rowCount) {
-    // Return the resulting value to the caller.
     return null;
   }
 
-  // Create the row constant.
   const row = await fetchCarRowById(carId, client);
-  // Return the resulting value to the caller.
   return mapSqlCar(row);
 }
 
@@ -222,19 +157,13 @@ async function updateAdminCar(id, payload, client = null) {
  * @returns {Promise<*>}
  */
 async function deleteCarById(id, client = null) {
-  // Create the car id constant.
   const carId = normalizeCarId(id);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!carId) {
-    // Throw an error to stop the current control flow.
     throw new Error('Invalid car id');
   }
 
-  // Create the result constant.
   const result = await clientQuery(
-    // Contribute this line to the enclosing declaration or statement.
     client,
-    // Continue the surrounding logic with this statement.
     `
     UPDATE cars
     SET
@@ -247,20 +176,14 @@ async function deleteCarById(id, client = null) {
       AND is_deleted = FALSE
     RETURNING id
     `,
-    // Contribute this line to the enclosing declaration or statement.
     [carId]
   );
 
-  // Return the resulting value to the caller.
   return result.rowCount > 0;
 }
 
-// Assign the CommonJS module exports.
 module.exports = {
-  // Contribute this line to the enclosing declaration or statement.
   createAdminCar,
-  // Contribute this line to the enclosing declaration or statement.
   updateAdminCar,
-  // Contribute this line to the enclosing declaration or statement.
   deleteCarById,
 };

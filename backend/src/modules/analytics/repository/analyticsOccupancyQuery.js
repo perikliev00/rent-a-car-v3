@@ -6,7 +6,6 @@
  */
 
 const { clientQuery } = require('../../../db/transaction');
-// Destructure object properties into local variables.
 const { OCCUPANCY_STATUSES, overlapDaysSql } = require('../analytics.domain');
 
 /**
@@ -20,9 +19,7 @@ async function getOccupancyStats({ from, to }, client = null) {
 
   // Step 1: sum overlapping rental days for occupancy-eligible statuses.
   const rented = await clientQuery(
-    // Contribute this line to the enclosing declaration or statement.
     client,
-    // Continue the surrounding logic with this statement.
     `
     SELECT COALESCE(SUM(${overlap}), 0)::float AS rented_days
     FROM reservations r
@@ -30,15 +27,12 @@ async function getOccupancyStats({ from, to }, client = null) {
       AND (r.pickup_date AT TIME ZONE 'Europe/Sofia')::date < ($2::date + 1)
       AND (r.return_date AT TIME ZONE 'Europe/Sofia')::date > $1::date
     `,
-    // Contribute this line to the enclosing declaration or statement.
     [from, to, OCCUPANCY_STATUSES]
   );
 
   // Step 2: denominator — active (non-deleted, non-inactive) fleet size.
   const fleet = await clientQuery(
-    // Contribute this line to the enclosing declaration or statement.
     client,
-    // Continue the surrounding logic with this statement.
     `
     SELECT COUNT(*)::int AS active_cars
     FROM cars c
@@ -49,9 +43,7 @@ async function getOccupancyStats({ from, to }, client = null) {
 
   // Step 3: maintenance block overlap days on the same active fleet.
   const maintenance = await clientQuery(
-    // Contribute this line to the enclosing declaration or statement.
     client,
-    // Continue the surrounding logic with this statement.
     `
     SELECT COALESCE(SUM(
       GREATEST(
@@ -70,17 +62,12 @@ async function getOccupancyStats({ from, to }, client = null) {
       AND (b.start_date AT TIME ZONE 'Europe/Sofia')::date < ($2::date + 1)
       AND (b.end_date AT TIME ZONE 'Europe/Sofia')::date > $1::date
     `,
-    // Contribute this line to the enclosing declaration or statement.
     [from, to]
   );
 
-  // Return the resulting value to the caller.
   return {
-    // Provide the rented days field value.
     rentedDays: Number(rented.rows[0]?.rented_days || 0),
-    // Provide the active cars field value.
     activeCars: Number(fleet.rows[0]?.active_cars || 0),
-    // Provide the maintenance days field value.
     maintenanceDays: Number(maintenance.rows[0]?.maintenance_days || 0),
   };
 }
@@ -91,13 +78,10 @@ async function getOccupancyStats({ from, to }, client = null) {
  * @param {import('pg').PoolClient|null} [client]
  */
 async function getMostRentedCars({ from, to, limit = 10 }, client = null) {
-  // Create the overlap constant.
   const overlap = overlapDaysSql('r.pickup_date', 'r.return_date', 1, 2);
   // Rank by booking count first, then rented overlap days as tie-breaker.
   const result = await clientQuery(
-    // Contribute this line to the enclosing declaration or statement.
     client,
-    // Continue the surrounding logic with this statement.
     `
     SELECT
       c.id AS car_id,
@@ -114,10 +98,8 @@ async function getMostRentedCars({ from, to, limit = 10 }, client = null) {
     ORDER BY bookings_count DESC, rented_days DESC
     LIMIT $4
     `,
-    // Contribute this line to the enclosing declaration or statement.
     [from, to, OCCUPANCY_STATUSES, limit]
   );
-  // Return the resulting value to the caller.
   return result.rows;
 }
 
@@ -127,7 +109,6 @@ async function getMostRentedCars({ from, to, limit = 10 }, client = null) {
  * @param {import('pg').PoolClient|null} [client]
  */
 async function getUtilizationByCar({ from, to }, client = null) {
-  // Create the overlap constant.
   const overlap = overlapDaysSql('r.pickup_date', 'r.return_date', 1, 2);
   // Inline Sofia-date overlap for maintenance blocks (same bounds as rented).
   const maintOverlap = `
@@ -142,9 +123,7 @@ async function getUtilizationByCar({ from, to }, client = null) {
 
   // CTE: active fleet LEFT JOIN rented days + maintenance days per car.
   const result = await clientQuery(
-    // Contribute this line to the enclosing declaration or statement.
     client,
-    // Continue the surrounding logic with this statement.
     `
     WITH active_cars AS (
       SELECT c.id, c.name, c.registration_number
@@ -183,19 +162,13 @@ async function getUtilizationByCar({ from, to }, client = null) {
     LEFT JOIN maint m ON m.car_id = ac.id
     ORDER BY booked_days DESC
     `,
-    // Contribute this line to the enclosing declaration or statement.
     [from, to, OCCUPANCY_STATUSES]
   );
-  // Return the resulting value to the caller.
   return result.rows;
 }
 
-// Assign the CommonJS module exports.
 module.exports = {
-  // Contribute this line to the enclosing declaration or statement.
   getOccupancyStats,
-  // Contribute this line to the enclosing declaration or statement.
   getMostRentedCars,
-  // Contribute this line to the enclosing declaration or statement.
   getUtilizationByCar,
 };

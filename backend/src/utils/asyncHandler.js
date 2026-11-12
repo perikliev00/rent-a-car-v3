@@ -10,12 +10,10 @@
  * @throws {never} Errors from `handler` are forwarded to `next`, not thrown synchronously
  */
 function asyncHandler(handler) {
-  // Return the resulting value to the caller.
   return function wrappedAsyncHandler(req, res, next) {
     // Promise.resolve ensures the result is a Promise; .catch(next) forwards failures to Express.
     Promise.resolve(handler(req, res, next)).catch(next);
   };
 }
 
-// Assign the CommonJS module exports.
 module.exports = asyncHandler;

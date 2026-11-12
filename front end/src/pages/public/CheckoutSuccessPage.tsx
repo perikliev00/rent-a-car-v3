@@ -3,17 +3,11 @@
  * payment is recorded but the booking is not yet marked confirmed (webhook lag).
  */
 import { useEffect } from 'react';
-// Import named exports from 'react-router-dom'.
 import { useSearchParams, Link } from 'react-router-dom';
-// Import named exports from '@tanstack/react-query'.
 import { useQuery } from '@tanstack/react-query';
-// Import named exports from '../../api/checkout'.
 import { checkoutSuccess } from '../../api/checkout';
-// Import named exports from '../../components/static/StaticPageHero'.
 import { StaticPageHero } from '../../components/static/StaticPageHero';
-// Import named exports from '../../components/ui/Button'.
 import { Button } from '../../components/ui/Button';
-// Import named exports from '../../components/ui/Loading'.
 import { PageLoader } from '../../components/ui/Loading';
 
 /**
@@ -23,40 +17,27 @@ import { PageLoader } from '../../components/ui/Loading';
  * @remarks Side effect: polls {@link checkoutSuccess} every 2s until `confirmed` is true.
  */
 export function CheckoutSuccessPage() {
-  // Destructure array values into local variables.
   const [params] = useSearchParams();
-  // Create the session id constant.
   const sessionId = params.get('session_id');
 
-  // Destructure object properties into local variables.
   const { data, isLoading, isError, error } = useQuery({
-    // Provide the query key field value.
     queryKey: ['checkout-success', sessionId],
-    // Provide the query fn field value.
     queryFn: () => checkoutSuccess(sessionId!),
-    // Provide the enabled field value.
     enabled: !!sessionId,
     // Keep polling while payment is received but booking is not yet confirmed.
     refetchInterval: (query) => {
-      // Create the current constant.
       const current = query.state.data;
-      // Evaluate the condition and enter the branch when it is true.
       if (!current || current.confirmed) return false;
-      // Return the resulting value to the caller.
       return 2_000;
     },
   });
 
-  // Call useEffect to perform this step.
   useEffect(() => {
-    // Evaluate the condition and enter the branch when it is true.
     if (!sessionId) return;
-  // Continue the surrounding logic with this statement.
   }, [sessionId]);
 
   // Deep-link without a session id cannot confirm anything.
   if (!sessionId) {
-    // Return control to the caller with the following value.
     return (
       <div>
         <StaticPageHero
@@ -74,9 +55,7 @@ export function CheckoutSuccessPage() {
 
   if (isLoading) return <PageLoader />;
 
-  // Evaluate the condition and enter the branch when it is true.
   if (isError) {
-    // Return control to the caller with the following value.
     return (
       <div>
         <StaticPageHero
@@ -95,7 +74,6 @@ export function CheckoutSuccessPage() {
     );
   }
 
-  // Return control to the caller with the following value.
   return (
     <div>
       <StaticPageHero

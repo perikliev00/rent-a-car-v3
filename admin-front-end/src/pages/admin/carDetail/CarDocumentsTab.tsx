@@ -2,66 +2,38 @@
  * Car document upload/download/delete UI.
  */
 import { Button } from '../../../components/ui/Button';
-// Import named exports from '../../../components/ui/Card'.
 import { Card, CardBody } from '../../../components/ui/Card';
-// Import named exports from '../../../components/ui/Input'.
 import { Input } from '../../../components/ui/Input';
 
-// Declare the DocItem TypeScript type alias.
 type DocItem = {
-  // Provide the id field value.
   id: number;
-  // Provide the name field value.
   name: string;
-  // Contribute this line to the enclosing declaration or statement.
   originalFilename?: string;
-  // Contribute this line to the enclosing declaration or statement.
   hasFile?: boolean;
 };
 
 /** Car document upload/download/delete UI. */
 export function CarDocumentsTab({
-  // Contribute this line to the enclosing declaration or statement.
   docName,
-  // Contribute this line to the enclosing declaration or statement.
   setDocName,
-  // Contribute this line to the enclosing declaration or statement.
   setDocFile,
-  // Contribute this line to the enclosing declaration or statement.
   docMutationPending,
-  // Contribute this line to the enclosing declaration or statement.
   onUpload,
-  // Contribute this line to the enclosing declaration or statement.
   docsLoading,
-  // Contribute this line to the enclosing declaration or statement.
   documents,
-  // Contribute this line to the enclosing declaration or statement.
   onDownload,
-  // Contribute this line to the enclosing declaration or statement.
   onDelete,
-// Contribute this line to the enclosing declaration or statement.
 }: {
-  // Provide the doc name field value.
   docName: string;
-  // Provide the set doc name field value.
   setDocName: (v: string) => void;
-  // Provide the set doc file field value.
   setDocFile: (f: File | null) => void;
-  // Provide the doc mutation pending field value.
   docMutationPending: boolean;
-  // Provide the on upload field value.
   onUpload: () => void;
-  // Provide the docs loading field value.
   docsLoading: boolean;
-  // Provide the documents field value.
   documents: DocItem[] | undefined;
-  // Provide the on download field value.
   onDownload: (id: number, filename: string) => void;
-  // Provide the on delete field value.
   onDelete: (id: number) => void;
-// Continue the surrounding logic with this statement.
 }) {
-  // Return control to the caller with the following value.
   return (
     <div className="mt-6 space-y-4">
       <Card className="shadow-none">

@@ -6,6 +6,8 @@ This directory contains operational documentation, production runbooks, and impl
 
 - [`../README.md`](../README.md) — system overview, architecture, local setup, CI/CD, production topology, and operational guarantees.
 - [`../TESTING.md`](../TESTING.md) — test layers, local setup, concurrency coverage, Playwright, coverage, and CI ownership.
+- [`ci-local.md`](ci-local.md) — local CI gate (`npm run ci:local`), pre-push hook setup, and GitHub parity notes.
+- [`branch-protection.md`](branch-protection.md) — GitHub ruleset for requiring the aggregate `CI` check on `main`.
 
 ## Production runbooks
 

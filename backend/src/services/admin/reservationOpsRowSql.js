@@ -9,59 +9,32 @@ const { clientQuery } = require('../../db/transaction');
  * @param {object|null} row
  */
 function mapOpsRow(row) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!row) return null;
-  // Return the resulting value to the caller.
   return {
-    // Provide the id field value.
     id: String(row.id),
-    // Provide the status field value.
     status: row.status,
-    // Provide the pickup date field value.
     pickupDate: row.pickup_date,
-    // Provide the pickup time field value.
     pickupTime: row.pickup_time,
-    // Provide the return date field value.
     returnDate: row.return_date,
-    // Provide the return time field value.
     returnTime: row.return_time,
-    // Provide the full name field value.
     fullName: row.full_name,
-    // Provide the email field value.
     email: row.email,
-    // Provide the phone number field value.
     phoneNumber: row.phone_number,
-    // Provide the car name field value.
     carName: row.car_name,
-    // Provide the order id field value.
     orderId: row.order_id != null ? String(row.order_id) : null,
-    // Provide the total price field value.
     totalPrice: row.total_price != null ? Number(row.total_price) : null,
-    // Provide the cancel reason field value.
     cancelReason: row.cancel_reason || null,
-    // Provide the updated at field value.
     updatedAt: row.updated_at,
-    // Provide the refund operation field value.
     refundOperation:
-      // Update row.refund_op_id with the right-hand side value.
       row.refund_op_id == null
-        // Contribute this line to the enclosing declaration or statement.
         ? null
-        // Contribute this line to the enclosing declaration or statement.
         : {
-            // Provide the id field value.
             id: Number(row.refund_op_id),
-            // Provide the status field value.
             status: row.refund_op_status,
-            // Provide the amount cents field value.
             amountCents: Number(row.refund_op_amount_cents),
-            // Provide the currency field value.
             currency: row.refund_op_currency,
-            // Provide the failure code field value.
             failureCode: row.refund_op_failure_code || null,
-            // Provide the failure message field value.
             failureMessage: row.refund_op_failure_message || null,
-            // Provide the updated at field value.
             updatedAt: row.refund_op_updated_at || null,
           },
   };
@@ -114,20 +87,13 @@ const BASE_FROM = `
  * @param {unknown[]} [params]
  */
 async function querySection(sql, params = []) {
-  // Create the result constant.
   const result = await clientQuery(null, sql, params);
-  // Return the resulting value to the caller.
   return result.rows.map(mapOpsRow).filter(Boolean);
 }
 
-// Assign the CommonJS module exports.
 module.exports = {
-  // Contribute this line to the enclosing declaration or statement.
   mapOpsRow,
-  // Contribute this line to the enclosing declaration or statement.
   BASE_SELECT,
-  // Contribute this line to the enclosing declaration or statement.
   BASE_FROM,
-  // Contribute this line to the enclosing declaration or statement.
   querySection,
 };

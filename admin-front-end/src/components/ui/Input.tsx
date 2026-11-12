@@ -3,11 +3,8 @@
  */
 import type { InputHTMLAttributes } from 'react';
 
-// Declare the InputProps TypeScript interface.
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
-  // Contribute this line to the enclosing declaration or statement.
   label?: string;
-  // Contribute this line to the enclosing declaration or statement.
   error?: string;
 }
 
@@ -23,7 +20,6 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 export function Input({ label, error, id, className = '', ...props }: InputProps) {
   // Stable htmlFor/id pairing when callers only pass a label.
   const inputId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
-  // Return control to the caller with the following value.
   return (
     <div className="min-w-0 space-y-1.5">
       {label && (

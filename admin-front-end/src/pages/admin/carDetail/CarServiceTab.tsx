@@ -2,68 +2,39 @@
  * Service history list/create UI for a car.
  */
 import { SERVICE_TYPE_OPTIONS } from '../../../api/admin/cars';
-// Import named exports from '../../../components/ui/Button'.
 import { Button } from '../../../components/ui/Button';
-// Import named exports from '../../../components/ui/Card'.
 import { Card, CardBody } from '../../../components/ui/Card';
-// Import named exports from '../../../components/ui/Input'.
 import { Input } from '../../../components/ui/Input';
-// Import named exports from '../../../components/ui/Select'.
 import { Select } from '../../../components/ui/Select';
-// Contribute this line to the enclosing declaration or statement.
 import type { ServiceForm } from './carDetailTypes';
 
-// Declare the ServiceRecord TypeScript type alias.
 type ServiceRecord = {
-  // Provide the id field value.
   id: number;
-  // Provide the service date field value.
   serviceDate: string;
-  // Provide the service type field value.
   serviceType: string;
-  // Contribute this line to the enclosing declaration or statement.
   cost?: number | null;
-  // Contribute this line to the enclosing declaration or statement.
   mileage?: number | null;
-  // Contribute this line to the enclosing declaration or statement.
   nextServiceDate?: string | null;
 };
 
 /** Service history list/create UI for a car. */
 export function CarServiceTab({
-  // Contribute this line to the enclosing declaration or statement.
   serviceForm,
-  // Contribute this line to the enclosing declaration or statement.
   setServiceForm,
-  // Contribute this line to the enclosing declaration or statement.
   serviceMutationPending,
-  // Contribute this line to the enclosing declaration or statement.
   onAddService,
-  // Contribute this line to the enclosing declaration or statement.
   serviceLoading,
-  // Contribute this line to the enclosing declaration or statement.
   records,
-  // Contribute this line to the enclosing declaration or statement.
   onDeleteRecord,
-// Contribute this line to the enclosing declaration or statement.
 }: {
-  // Provide the service form field value.
   serviceForm: ServiceForm;
-  // Provide the set service form field value.
   setServiceForm: (v: ServiceForm | ((prev: ServiceForm) => ServiceForm)) => void;
-  // Provide the service mutation pending field value.
   serviceMutationPending: boolean;
-  // Provide the on add service field value.
   onAddService: () => void;
-  // Provide the service loading field value.
   serviceLoading: boolean;
-  // Provide the records field value.
   records: ServiceRecord[] | undefined;
-  // Provide the on delete record field value.
   onDeleteRecord: (recordId: number) => void;
-// Continue the surrounding logic with this statement.
 }) {
-  // Return control to the caller with the following value.
   return (
     <div className="mt-6 space-y-4">
       <Card className="shadow-none">

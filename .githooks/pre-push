@@ -1,0 +1,10 @@
+#!/usr/bin/env sh
+# Block git push when the local CI gate fails.
+# Install once per clone: npm run hooks:install  (also runs via npm prepare)
+set -eu
+
+ROOT="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+echo "pre-push: running npm run ci:local (blocks push on failure)…"
+npm run ci:local

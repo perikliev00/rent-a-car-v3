@@ -4,7 +4,6 @@
  * finalize or abandon the pending payment after the customer returns from Stripe.
  */
 import type { CheckoutBody, CheckoutSuccessData } from '../types/api';
-// Import named exports from './client'.
 import { api } from './client';
 
 /**
@@ -15,11 +14,8 @@ import { api } from './client';
  * @remarks Side effect: creates a pending Stripe session on the server.
  */
 export async function startCheckout(body: CheckoutBody): Promise<{ checkoutUrl: string }> {
-  // Return the resulting value to the caller.
   return api<{ checkoutUrl: string }>('/api/checkout', {
-    // Provide the method field value.
     method: 'POST',
-    // Provide the body field value.
     body: JSON.stringify(body),
   });
 }
@@ -32,7 +28,6 @@ export async function startCheckout(body: CheckoutBody): Promise<{ checkoutUrl: 
  * @remarks The session id is query-encoded because it may contain URL-sensitive characters.
  */
 export async function checkoutSuccess(sessionId: string): Promise<CheckoutSuccessData> {
-  // Return the resulting value to the caller.
   return api<CheckoutSuccessData>(`/api/checkout/success?session_id=${encodeURIComponent(sessionId)}`);
 }
 
@@ -43,14 +38,9 @@ export async function checkoutSuccess(sessionId: string): Promise<CheckoutSucces
  * @remarks Side effect: may release holds / mark the pending payment as cancelled server-side.
  */
 export async function checkoutCancel(): Promise<{
-  // Provide the cancelled field value.
   cancelled: boolean;
-  // Provide the message field value.
   message: string;
-  // Provide the support email field value.
   supportEmail: string;
-// Continue the surrounding logic with this statement.
 }> {
-  // Return the resulting value to the caller.
   return api('/api/checkout/cancel', { method: 'POST' });
 }

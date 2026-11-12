@@ -6,13 +6,9 @@
  * @returns {string}
  */
 function escapeHtml(value) {
-  // Return the resulting value to the caller.
   return String(value ?? '')
-    // Call .replace to perform this step.
     .replace(/&/g, '&amp;')
-    // Call .replace to perform this step.
     .replace(/</g, '&lt;')
-    // Call .replace to perform this step.
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');

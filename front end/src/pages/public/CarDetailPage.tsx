@@ -3,22 +3,14 @@
  * present in the URL; otherwise prompts the customer to start a search.
  */
 import { useEffect, useMemo, useState } from 'react';
-// Import named exports from 'react-router-dom'.
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom';
-// Import named exports from '@tanstack/react-query'.
 import { useQuery } from '@tanstack/react-query';
-// Import named exports from '../../api/cars'.
 import { getCar } from '../../api/cars';
-// Import named exports from '../../components/ui/Button'.
 import { Button } from '../../components/ui/Button';
-// Import named exports from '../../components/ui/Loading'.
 import { PageLoader } from '../../components/ui/Loading';
-// Import named exports from '../../utils/format'.
 import { formatPrice, imageUrl } from '../../utils/format';
-// Import named exports from '../../utils/searchParams'.
 import { parseSearchFromUrl } from '../../utils/searchParams';
 
-// Create the placeholder image constant.
 const PLACEHOLDER_IMAGE = '/placeholder-car.svg';
 
 /**
@@ -28,11 +20,8 @@ const PLACEHOLDER_IMAGE = '/placeholder-car.svg';
  * @returns An aria-hidden SVG matching the requested kind.
  */
 function SpecIcon({ kind }: { kind: 'gear' | 'fuel' | 'seats' | 'category' }) {
-  // Create the common constant.
   const common = 'h-5 w-5 text-[var(--color-accent-ink)]';
-  // Evaluate the condition and enter the branch when it is true.
   if (kind === 'gear') {
-    // Return control to the caller with the following value.
     return (
       <svg className={common} viewBox="0 0 24 24" fill="none" aria-hidden="true">
         <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" />
@@ -45,9 +34,7 @@ function SpecIcon({ kind }: { kind: 'gear' | 'fuel' | 'seats' | 'category' }) {
       </svg>
     );
   }
-  // Evaluate the condition and enter the branch when it is true.
   if (kind === 'fuel') {
-    // Return control to the caller with the following value.
     return (
       <svg className={common} viewBox="0 0 24 24" fill="none" aria-hidden="true">
         <path
@@ -66,9 +53,7 @@ function SpecIcon({ kind }: { kind: 'gear' | 'fuel' | 'seats' | 'category' }) {
       </svg>
     );
   }
-  // Evaluate the condition and enter the branch when it is true.
   if (kind === 'seats') {
-    // Return control to the caller with the following value.
     return (
       <svg className={common} viewBox="0 0 24 24" fill="none" aria-hidden="true">
         <path
@@ -105,17 +90,11 @@ function SpecIcon({ kind }: { kind: 'gear' | 'fuel' | 'seats' | 'category' }) {
  * @returns en-GB short date, or the raw string when parsing fails.
  */
 function formatTripDate(iso: string): string {
-  // Destructure array values into local variables.
   const [y, m, d] = iso.split('-').map(Number);
-  // Evaluate the condition and enter the branch when it is true.
   if (!y || !m || !d) return iso;
-  // Return the resulting value to the caller.
   return new Date(y, m - 1, d).toLocaleDateString('en-GB', {
-    // Provide the day field value.
     day: 'numeric',
-    // Provide the month field value.
     month: 'short',
-    // Provide the year field value.
     year: 'numeric',
   });
 }
@@ -127,50 +106,34 @@ function formatTripDate(iso: string): string {
  * @remarks Side effect: `handleBook` navigates to `/order/:carId` with the current query string.
  */
 export function CarDetailPage() {
-  // Destructure object properties into local variables.
   const { carId } = useParams<{ carId: string }>();
-  // Destructure array values into local variables.
   const [searchParams] = useSearchParams();
-  // Create the navigate constant.
   const navigate = useNavigate();
-  // Destructure array values into local variables.
   const [imgFailed, setImgFailed] = useState(false);
 
-  // Create the search constant.
   const search = useMemo(() => parseSearchFromUrl(searchParams), [searchParams]);
 
-  // Destructure object properties into local variables.
   const { data, isLoading, isError, error } = useQuery({
-    // Provide the query key field value.
     queryKey: ['car', carId],
-    // Provide the query fn field value.
     queryFn: () => getCar(carId!),
-    // Provide the enabled field value.
     enabled: !!carId,
   });
 
   // Reset the placeholder flag when the car image URL changes.
   useEffect(() => {
-    // Call setImgFailed to perform this step.
     setImgFailed(false);
-  // Continue the surrounding logic with this statement.
   }, [data?.car.image]);
 
   /** Continue to the order/hold step with the current trip query intact. */
   const handleBook = () => {
-    // Evaluate the condition and enter the branch when it is true.
     if (!search || !carId) return;
-    // Create the qs constant.
     const qs = searchParams.toString();
-    // Call navigate to perform this step.
     navigate(`/order/${carId}${qs ? `?${qs}` : ''}`);
   };
 
   if (isLoading) return <PageLoader />;
 
-  // Evaluate the condition and enter the branch when it is true.
   if (isError || !data) {
-    // Return control to the caller with the following value.
     return (
       <div className="mx-auto max-w-lg px-4 py-20 text-center">
         <p className="text-[var(--color-danger)]">
@@ -186,40 +149,27 @@ export function CarDetailPage() {
     );
   }
 
-  // Create the car constant.
   const car = data.car;
-  // Create the car image src constant.
   const carImageSrc = imgFailed ? PLACEHOLDER_IMAGE : imageUrl(car.image);
 
-  // Create the specs constant.
   const specs = [
-    // Apply the TypeScript type assertion for this value.
     { kind: 'gear' as const, label: 'Transmission', value: car.transmission },
-    // Apply the TypeScript type assertion for this value.
     { kind: 'fuel' as const, label: 'Fuel', value: car.fuelType },
-    // Continue the surrounding logic with this statement.
     { kind: 'seats' as const, label: 'Seats', value: String(car.seats) },
-    // Apply the TypeScript type assertion for this value.
     { kind: 'category' as const, label: 'Category', value: car.category || 'Standard' },
   ];
 
   // Only show tiers the API actually priced.
   const tiers = [
-    // Contribute this line to the enclosing declaration or statement.
     { label: '1–3 days', price: car.priceTier_1_3, hint: 'Short trips' },
-    // Contribute this line to the enclosing declaration or statement.
     { label: '7–31 days', price: car.priceTier_7_31, hint: 'Best for holidays' },
-    // Contribute this line to the enclosing declaration or statement.
     { label: '31+ days', price: car.priceTier_31_plus, hint: 'Long-term rate' },
-  // Continue the surrounding logic with this statement.
   ].filter((tier) => tier.price != null);
 
   // Prefer longer-term rates for the “from” teaser when available.
   const fromPrice =
-    // Contribute this line to the enclosing declaration or statement.
     car.priceTier_31_plus ?? car.priceTier_7_31 ?? car.priceTier_1_3 ?? car.pricePerDay ?? car.price;
 
-  // Return control to the caller with the following value.
   return (
     <div className="min-w-0 overflow-x-clip">
       <section className="border-b border-[var(--color-line)] bg-[var(--color-surface-elevated)]">

@@ -3,7 +3,6 @@
  * optional deposit collected at pickup (not charged at checkout).
  */
 import type { PriceBreakdown } from '../../types/api';
-// Import named exports from '../../utils/format'.
 import { formatPrice } from '../../utils/format';
 
 /**
@@ -13,7 +12,6 @@ import { formatPrice } from '../../utils/format';
  * @returns Stacked price rows with a bold total and optional deposit note.
  */
 export function PriceBreakdownView({ breakdown }: { breakdown: PriceBreakdown }) {
-  // Return control to the caller with the following value.
   return (
     <div className="min-w-0 space-y-2 border-t border-[var(--color-line)] pt-4 text-sm">
       {breakdown.lines.map((line, index) => (

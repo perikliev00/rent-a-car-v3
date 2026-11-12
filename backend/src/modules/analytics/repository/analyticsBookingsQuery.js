@@ -15,9 +15,7 @@ const { clientQuery } = require('../../../db/transaction');
 async function getConfirmedBookingsCount({ from, to }, client = null) {
   // Count by history event day, not current reservation.status.
   const result = await clientQuery(
-    // Contribute this line to the enclosing declaration or statement.
     client,
-    // Continue the surrounding logic with this statement.
     `
     SELECT COUNT(DISTINCT h.reservation_id)::int AS count
     FROM reservation_status_history h
@@ -25,10 +23,8 @@ async function getConfirmedBookingsCount({ from, to }, client = null) {
       AND (h.created_at AT TIME ZONE 'Europe/Sofia')::date >= $1::date
       AND (h.created_at AT TIME ZONE 'Europe/Sofia')::date <= $2::date
     `,
-    // Contribute this line to the enclosing declaration or statement.
     [from, to]
   );
-  // Return the resulting value to the caller.
   return result.rows[0]?.count || 0;
 }
 
@@ -40,9 +36,7 @@ async function getConfirmedBookingsCount({ from, to }, client = null) {
 async function getBookingsSeries({ from, to }, client = null) {
   // One series point per Sofia day with at least one confirm event.
   const result = await clientQuery(
-    // Contribute this line to the enclosing declaration or statement.
     client,
-    // Continue the surrounding logic with this statement.
     `
     SELECT
       (h.created_at AT TIME ZONE 'Europe/Sofia')::date::text AS day,
@@ -54,10 +48,8 @@ async function getBookingsSeries({ from, to }, client = null) {
     GROUP BY 1
     ORDER BY 1
     `,
-    // Contribute this line to the enclosing declaration or statement.
     [from, to]
   );
-  // Return the resulting value to the caller.
   return result.rows;
 }
 
@@ -69,9 +61,7 @@ async function getBookingsSeries({ from, to }, client = null) {
 async function getCancelledBookingsCount({ from, to }, client = null) {
   // Same history-based approach as confirmed so cancels after the window still count.
   const result = await clientQuery(
-    // Contribute this line to the enclosing declaration or statement.
     client,
-    // Continue the surrounding logic with this statement.
     `
     SELECT COUNT(DISTINCT h.reservation_id)::int AS count
     FROM reservation_status_history h
@@ -79,10 +69,8 @@ async function getCancelledBookingsCount({ from, to }, client = null) {
       AND (h.created_at AT TIME ZONE 'Europe/Sofia')::date >= $1::date
       AND (h.created_at AT TIME ZONE 'Europe/Sofia')::date <= $2::date
     `,
-    // Contribute this line to the enclosing declaration or statement.
     [from, to]
   );
-  // Return the resulting value to the caller.
   return result.rows[0]?.count || 0;
 }
 
@@ -94,9 +82,7 @@ async function getCancelledBookingsCount({ from, to }, client = null) {
 async function getFailedPaymentsStats({ from, to }, client = null) {
   // Unresolved filter uses payment_failures.resolved boolean.
   const result = await clientQuery(
-    // Contribute this line to the enclosing declaration or statement.
     client,
-    // Continue the surrounding logic with this statement.
     `
     SELECT
       COUNT(*)::int AS total,
@@ -105,10 +91,8 @@ async function getFailedPaymentsStats({ from, to }, client = null) {
     WHERE (created_at AT TIME ZONE 'Europe/Sofia')::date >= $1::date
       AND (created_at AT TIME ZONE 'Europe/Sofia')::date <= $2::date
     `,
-    // Contribute this line to the enclosing declaration or statement.
     [from, to]
   );
-  // Return the resulting value to the caller.
   return result.rows[0];
 }
 
@@ -120,9 +104,7 @@ async function getFailedPaymentsStats({ from, to }, client = null) {
 async function getConversionStats({ from, to }, client = null) {
   // CTE funnel: starts ∪ stripe sessions → confirmed → abandoned_hold expiries.
   const result = await clientQuery(
-    // Contribute this line to the enclosing declaration or statement.
     client,
-    // Continue the surrounding logic with this statement.
     `
     WITH checkout_starts AS (
       SELECT DISTINCT r.id
@@ -161,23 +143,15 @@ async function getConversionStats({ from, to }, client = null) {
       (SELECT count FROM abandoned) AS abandoned_holds
     `
   ,
-    // Contribute this line to the enclosing declaration or statement.
     [from, to]
   );
-  // Return the resulting value to the caller.
   return result.rows[0];
 }
 
-// Assign the CommonJS module exports.
 module.exports = {
-  // Contribute this line to the enclosing declaration or statement.
   getConfirmedBookingsCount,
-  // Contribute this line to the enclosing declaration or statement.
   getBookingsSeries,
-  // Contribute this line to the enclosing declaration or statement.
   getCancelledBookingsCount,
-  // Contribute this line to the enclosing declaration or statement.
   getFailedPaymentsStats,
-  // Contribute this line to the enclosing declaration or statement.
   getConversionStats,
 };

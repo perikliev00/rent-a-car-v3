@@ -4,10 +4,7 @@
  */
 const { requestIdMiddleware, requestContext } = require('./requestIdMiddleware');
 
-// Assign the CommonJS module exports.
 module.exports = {
-  // Provide the request context field value.
   requestContext: requestIdMiddleware,
-  // Contribute this line to the enclosing declaration or statement.
   requestIdMiddleware,
 };

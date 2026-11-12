@@ -3,7 +3,6 @@
  * Throws if used outside {@link AuthProvider} so missing providers fail fast in development.
  */
 import { useContext } from 'react';
-// Import named exports from './auth-context'.
 import { AuthContext } from './auth-context';
 
 /**
@@ -13,10 +12,8 @@ import { AuthContext } from './auth-context';
  * @throws When called outside {@link AuthProvider}.
  */
 export function useAuth() {
-  // Create the ctx constant.
   const ctx = useContext(AuthContext);
   // Fail fast so pages do not silently treat a missing provider as “logged out”.
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');
-  // Return the resulting value to the caller.
   return ctx;
 }

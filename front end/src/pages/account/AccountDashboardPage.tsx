@@ -3,17 +3,11 @@
  * Shows {@link EmailUnverifiedBanner} until the customer confirms their email.
  */
 import { useQuery } from '@tanstack/react-query';
-// Import named exports from 'react-router-dom'.
 import { Link } from 'react-router-dom';
-// Import named exports from '../../api/account'.
 import { getAccountDashboard } from '../../api/account';
-// Import named exports from '../../components/ui/Button'.
 import { Button } from '../../components/ui/Button';
-// Import named exports from '../../components/ui/Card'.
 import { Card, CardBody } from '../../components/ui/Card';
-// Import named exports from '../../components/ui/Loading'.
 import { PageLoader } from '../../components/ui/Loading';
-// Import named exports from './EmailUnverifiedBanner'.
 import { EmailUnverifiedBanner } from './EmailUnverifiedBanner';
 
 /**
@@ -24,19 +18,12 @@ import { EmailUnverifiedBanner } from './EmailUnverifiedBanner';
  * @returns Locale date string, optionally with time; `—` when missing.
  */
 function formatWhen(value?: string | null, time?: string | null) {
-  // Evaluate the condition and enter the branch when it is true.
   if (!value) return '—';
-  // Start a try block for operations that may fail.
   try {
-    // Create the d constant.
     const d = new Date(value);
-    // Create the date part constant.
     const datePart = d.toLocaleDateString();
-    // Return the resulting value to the caller.
     return time ? `${datePart} ${time}` : datePart;
-  // Contribute this line to the enclosing declaration or statement.
   } catch {
-    // Return the resulting value to the caller.
     return value;
   }
 }
@@ -47,18 +34,13 @@ function formatWhen(value?: string | null, time?: string | null) {
  * @returns Loading/error states, or counts + upcoming + recent reservations.
  */
 export function AccountDashboardPage() {
-  // Create the query constant.
   const query = useQuery({
-    // Provide the query key field value.
     queryKey: ['account', 'dashboard'],
-    // Provide the query fn field value.
     queryFn: getAccountDashboard,
   });
 
   if (query.isLoading) return <PageLoader />;
-  // Evaluate the condition and enter the branch when it is true.
   if (query.isError || !query.data) {
-    // Return control to the caller with the following value.
     return (
       <div className="mx-auto max-w-5xl px-4 py-10">
         <p className="text-[var(--color-danger)]">Unable to load your account.</p>
@@ -66,10 +48,8 @@ export function AccountDashboardPage() {
     );
   }
 
-  // Destructure object properties into local variables.
   const { counts, upcoming, recent } = query.data;
 
-  // Return control to the caller with the following value.
   return (
     <div className="mx-auto min-w-0 max-w-5xl overflow-x-clip px-4 py-10 sm:px-6">
       <div className="flex min-w-0 flex-wrap items-end justify-between gap-4">

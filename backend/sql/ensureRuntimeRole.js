@@ -6,9 +6,7 @@
  */
 const { Client } = require('pg');
 
-// Create the runtime role name constant.
 const RUNTIME_ROLE_NAME = 'luxride_app';
-// Create the runtime role attributes constant.
 const RUNTIME_ROLE_ATTRIBUTES = 'LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT';
 
 /**
@@ -19,23 +17,14 @@ const RUNTIME_ROLE_ATTRIBUTES = 'LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINH
  * @returns {string[]}
  */
 function runtimePrivilegeStatements(databaseName) {
-  // Return the resulting value to the caller.
   return [
-    // Continue the surrounding logic with this statement.
     `GRANT CONNECT ON DATABASE ${databaseName} TO ${RUNTIME_ROLE_NAME}`,
-    // Continue the surrounding logic with this statement.
     `GRANT USAGE ON SCHEMA public TO ${RUNTIME_ROLE_NAME}`,
-    // Continue the surrounding logic with this statement.
     `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ${RUNTIME_ROLE_NAME}`,
-    // Continue the surrounding logic with this statement.
     `REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON TABLE public.schema_migrations FROM ${RUNTIME_ROLE_NAME}`,
-    // Continue the surrounding logic with this statement.
     `GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${RUNTIME_ROLE_NAME}`,
-    // Continue the surrounding logic with this statement.
     `ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO ${RUNTIME_ROLE_NAME}`,
-    // Continue the surrounding logic with this statement.
     `ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO ${RUNTIME_ROLE_NAME}`,
-    // Continue the surrounding logic with this statement.
     `REVOKE CREATE ON SCHEMA public FROM ${RUNTIME_ROLE_NAME}`,
   ];
 }
@@ -45,7 +34,6 @@ function runtimePrivilegeStatements(databaseName) {
  * @returns {boolean}
  */
 function isSafeIdentifier(databaseName) {
-  // Return the resulting value to the caller.
   return typeof databaseName === 'string' && /^[A-Za-z_][A-Za-z0-9_]*$/.test(databaseName);
 }
 
@@ -55,15 +43,11 @@ function isSafeIdentifier(databaseName) {
  * @returns {Promise<void>}
  */
 async function ensureRuntimeRole(client, password) {
-  // Evaluate the condition and enter the branch when it is true.
   if (typeof password !== 'string' || password.length < 16) {
-    // Throw an error to stop the current control flow.
     throw new Error('APP_DB_PASSWORD must be at least 16 characters');
   }
 
-  // Create the quoted constant.
   const quoted = await client.query('SELECT quote_literal($1) AS literal', [password]);
-  // Create the password literal constant.
   const passwordLiteral = quoted.rows[0] && quoted.rows[0].literal;
   if (typeof passwordLiteral !== 'string' || !/^'(?:''|[^'])*'$/.test(passwordLiteral)) {
     throw new Error('Could not quote the runtime role password');

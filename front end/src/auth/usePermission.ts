@@ -2,7 +2,6 @@
  * React hooks that bind {@link permissions} helpers to the current auth user.
  */
 import { useAuth } from './useAuth';
-// Import named exports from './permissions'.
 import { hasAnyPermission, hasPermission, isStaffUser } from './permissions';
 
 /**
@@ -12,9 +11,7 @@ import { hasAnyPermission, hasPermission, isStaffUser } from './permissions';
  * @returns `true` when the current auth user is granted the key (or is owner).
  */
 export function usePermission(key: string): boolean {
-  // Destructure object properties into local variables.
   const { user } = useAuth();
-  // Return the resulting value to the caller.
   return hasPermission(user, key);
 }
 
@@ -25,9 +22,7 @@ export function usePermission(key: string): boolean {
  * @returns `true` when the current auth user matches any key (or is owner).
  */
 export function useAnyPermission(keys: string[]): boolean {
-  // Destructure object properties into local variables.
   const { user } = useAuth();
-  // Return the resulting value to the caller.
   return hasAnyPermission(user, keys);
 }
 
@@ -37,8 +32,6 @@ export function useAnyPermission(keys: string[]): boolean {
  * @returns `true` for staff users; `false` for customers and anonymous sessions.
  */
 export function useIsStaff(): boolean {
-  // Destructure object properties into local variables.
   const { user } = useAuth();
-  // Return the resulting value to the caller.
   return isStaffUser(user);
 }

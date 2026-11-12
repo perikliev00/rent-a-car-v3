@@ -5,13 +5,9 @@
  */
 type ToastType = 'success' | 'error' | 'info';
 
-// Declare the Toast TypeScript interface.
 interface Toast {
-  // Provide the id field value.
   id: number;
-  // Provide the message field value.
   message: string;
-  // Provide the type field value.
   type: ToastType;
 }
 
@@ -24,7 +20,6 @@ let toasts: Toast[] = [];
 
 /** Push a shallow copy of the toast list to every subscriber. */
 function notify() {
-  // Call listeners.forEach to perform this step.
   listeners.forEach((listener) => listener([...toasts]));
 }
 
@@ -36,19 +31,13 @@ function notify() {
  * @remarks Side effect: mutates module state, notifies subscribers, and schedules auto-dismiss.
  */
 export function toast(message: string, type: ToastType = 'info') {
-  // Create the id constant.
   const id = ++toastId;
-  // Update toasts with the right-hand side value.
   toasts = [...toasts, { id, message, type }];
-  // Call notify to perform this step.
   notify();
   // Auto-dismiss so callers do not need to manage timers.
   setTimeout(() => {
-    // Update toasts with the right-hand side value.
     toasts = toasts.filter((item) => item.id !== id);
-    // Call notify to perform this step.
     notify();
-  // Continue the surrounding logic with this statement.
   }, 4000);
 }
 
@@ -60,14 +49,10 @@ export function toast(message: string, type: ToastType = 'info') {
  * @remarks Side effect: adds/removes the listener from the module-level set.
  */
 export function subscribeToasts(listener: (items: Toast[]) => void) {
-  // Call listeners.add to perform this step.
   listeners.add(listener);
-  // Return the resulting value to the caller.
   return () => {
-    // Call listeners.delete to perform this step.
     listeners.delete(listener);
   };
 }
 
-// Contribute this line to the enclosing declaration or statement.
 export type { Toast, ToastType };

@@ -1,13 +1,9 @@
 /** Native `<select>` with the shared labeled field chrome. */
 import type { SelectHTMLAttributes } from 'react';
 
-// Declare the SelectProps TypeScript interface.
 interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
-  // Contribute this line to the enclosing declaration or statement.
   label?: string;
-  // Contribute this line to the enclosing declaration or statement.
   error?: string;
-  // Provide the options field value.
   options: Array<{ value: string; label: string }>;
 }
 
@@ -24,7 +20,6 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 export function Select({ label, error, options, id, className = '', ...props }: SelectProps) {
   // Derive a stable id from the label when the caller does not supply one.
   const selectId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
-  // Return control to the caller with the following value.
   return (
     <div className="min-w-0 space-y-1.5">
       {label && (

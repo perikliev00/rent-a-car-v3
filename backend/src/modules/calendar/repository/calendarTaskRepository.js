@@ -6,7 +6,6 @@
  */
 
 const { clientQuery } = require('../../../db/transaction');
-// Destructure object properties into local variables.
 const { mapTask } = require('./calendarTaskMapper');
 
 /**
@@ -14,13 +13,9 @@ const { mapTask } = require('./calendarTaskMapper');
  * @param {{ from: Date|string, to: Date|string, carIds?: Array|null, assignedToUserId?: number|null, includeUnassigned?: boolean }} opts
  */
 async function listTasksInRange(
-  // Continue the surrounding logic with this statement.
   { from, to, carIds = null, assignedToUserId = null, includeUnassigned = true },
-  // Update client with the right-hand side value.
   client = null
-// Continue the surrounding logic with this statement.
 ) {
-  // Create the params constant.
   const params = [from, to];
   // Overlap: dated tasks use starts/due; undated-with-due use due-only window.
   const where = [
@@ -28,45 +23,33 @@ async function listTasksInRange(
       (t.starts_at IS NOT NULL AND t.starts_at < $2 AND COALESCE(t.due_at, t.starts_at) > $1)
       OR (t.starts_at IS NULL AND t.due_at IS NOT NULL AND t.due_at >= $1 AND t.due_at < $2)
     )`,
-    // Continue the surrounding logic with this statement.
     `t.status <> 'cancelled'`,
   ];
 
   // Optional assignee filter (VIEW_OWN / staff filter).
   if (assignedToUserId != null) {
-    // Call params.push to perform this step.
     params.push(Number(assignedToUserId));
-    // Call where.push to perform this step.
     where.push(`t.assigned_to_user_id = $${params.length}`);
   }
   // Car-scoped timeline: include fleet-wide tasks (null car_id) plus matching cars.
   if (Array.isArray(carIds) && carIds.length > 0) {
-    // Call params.push to perform this step.
     params.push(carIds.map(Number).filter((n) => Number.isInteger(n) && n > 0));
-    // Call where.push to perform this step.
     where.push(`(t.car_id IS NULL OR t.car_id = ANY($${params.length}::bigint[]))`);
   }
-  // Evaluate the condition and enter the branch when it is true.
   if (!includeUnassigned && assignedToUserId == null) {
-    // Call where.push to perform this step.
     where.push(`t.assigned_to_user_id IS NOT NULL`);
   }
 
-  // Create the result constant.
   const result = await clientQuery(
-    // Contribute this line to the enclosing declaration or statement.
     client,
-    // Continue the surrounding logic with this statement.
     `
     SELECT *
     FROM calendar_tasks t
     WHERE ${where.join(' AND ')}
     ORDER BY COALESCE(t.starts_at, t.due_at) ASC NULLS LAST
     `,
-    // Reference the identifier used by the enclosing expression.
     params
   );
-  // Return the resulting value to the caller.
   return result.rows;
 }
 
@@ -75,108 +58,64 @@ async function listTasksInRange(
  */
 async function listTasks(
   {
-    // Update from with the right-hand side value.
     from = null,
-    // Update to with the right-hand side value.
     to = null,
-    // Update assignedToUserId with the right-hand side value.
     assignedToUserId = null,
-    // Update unassigned with the right-hand side value.
     unassigned = false,
-    // Update taskType with the right-hand side value.
     taskType = null,
-    // Update taskTypes with the right-hand side value.
     taskTypes = null,
-    // Update status with the right-hand side value.
     status = null,
-    // Update carId with the right-hand side value.
     carId = null,
-    // Update includeCancelled with the right-hand side value.
     includeCancelled = false,
-  // Continue the surrounding logic with this statement.
   } = {},
-  // Update client with the right-hand side value.
   client = null
-// Continue the surrounding logic with this statement.
 ) {
-  // Create the params constant.
   const params = [];
-  // Create the where constant.
   const where = ['TRUE'];
 
-  // Evaluate the condition and enter the branch when it is true.
   if (from && to) {
-    // Call params.push to perform this step.
     params.push(from, to);
     where.push(`(
       (t.starts_at IS NOT NULL AND t.starts_at < $${params.length} AND COALESCE(t.due_at, t.starts_at) > $${params.length - 1})
       OR (t.starts_at IS NULL AND t.due_at IS NOT NULL AND t.due_at >= $${params.length - 1} AND t.due_at < $${params.length})
       OR (t.starts_at IS NULL AND t.due_at IS NULL AND t.created_at >= $${params.length - 1} AND t.created_at < $${params.length})
     )`);
-  // Continue the surrounding logic with this statement.
   } else if (from) {
-    // Call params.push to perform this step.
     params.push(from);
-    // Call where.push to perform this step.
     where.push(`COALESCE(t.due_at, t.starts_at, t.created_at) >= $${params.length}`);
-  // Continue the surrounding logic with this statement.
   } else if (to) {
-    // Call params.push to perform this step.
     params.push(to);
-    // Call where.push to perform this step.
     where.push(`COALESCE(t.starts_at, t.due_at, t.created_at) < $${params.length}`);
   }
 
-  // Evaluate the condition and enter the branch when it is true.
   if (assignedToUserId != null) {
-    // Call params.push to perform this step.
     params.push(Number(assignedToUserId));
-    // Call where.push to perform this step.
     where.push(`t.assigned_to_user_id = $${params.length}`);
   }
-  // Evaluate the condition and enter the branch when it is true.
   if (unassigned) {
-    // Call where.push to perform this step.
     where.push(`t.assigned_to_user_id IS NULL`);
   }
-  // Evaluate the condition and enter the branch when it is true.
   if (taskType) {
-    // Call params.push to perform this step.
     params.push(taskType);
-    // Call where.push to perform this step.
     where.push(`t.task_type = $${params.length}`);
   }
-  // Evaluate the condition and enter the branch when it is true.
   if (Array.isArray(taskTypes) && taskTypes.length > 0) {
-    // Call params.push to perform this step.
     params.push(taskTypes);
-    // Call where.push to perform this step.
     where.push(`t.task_type = ANY($${params.length}::text[])`);
   }
-  // Evaluate the condition and enter the branch when it is true.
   if (status) {
-    // Call params.push to perform this step.
     params.push(status);
-    // Call where.push to perform this step.
     where.push(`t.status = $${params.length}`);
-  // Continue the surrounding logic with this statement.
   } else if (!includeCancelled) {
-    // Call where.push to perform this step.
     where.push(`t.status <> 'cancelled'`);
   }
-  // Evaluate the condition and enter the branch when it is true.
   if (carId != null) {
-    // Call params.push to perform this step.
     params.push(Number(carId));
-    // Call where.push to perform this step.
     where.push(`t.car_id = $${params.length}`);
   }
 
-  // Create the result constant.
   const result = await clientQuery(
-    // Contribute this line to the enclosing declaration or statement.
     client,
-    // Continue the surrounding logic with this statement.
     `
     SELECT
       t.*,
@@ -187,35 +126,24 @@ async function listTasks(
     ORDER BY COALESCE(t.due_at, t.starts_at, t.created_at) ASC NULLS LAST
     LIMIT 500
     `,
-    // Reference the identifier used by the enclosing expression.
     params
   );
 
-  // Return the resulting value to the caller.
   return result.rows.map((row) => ({
-    // Call ...mapTask to perform this step.
     ...mapTask(row),
-    // Provide the car name field value.
     carName: row.car_name || null,
   }));
 }
 
 /** @param {string|number} taskId */
 async function findTaskById(taskId, client = null) {
-  // Create the id constant.
   const id = Number(taskId);
-  // Evaluate the condition and enter the branch when it is true.
   if (!Number.isInteger(id) || id <= 0) return null;
-  // Create the result constant.
   const result = await clientQuery(
-    // Contribute this line to the enclosing declaration or statement.
     client,
-    // Continue the surrounding logic with this statement.
     `SELECT * FROM calendar_tasks WHERE id = $1 LIMIT 1`,
-    // Contribute this line to the enclosing declaration or statement.
     [id]
   );
-  // Return the resulting value to the caller.
   return result.rows[0] || null;
 }
 
@@ -223,20 +151,13 @@ async function findTaskById(taskId, client = null) {
  * Whether the user has any task on this reservation (VIEW_OWN detail gate).
  */
 async function hasAssignedTask(userId, reservationId, client = null) {
-  // Create the uid constant.
   const uid = Number(userId);
-  // Create the rid constant.
   const rid = Number(reservationId);
-  // Evaluate the condition and enter the branch when it is true.
   if (!Number.isInteger(uid) || uid <= 0 || !Number.isInteger(rid) || rid <= 0) {
-    // Return the resulting value to the caller.
     return false;
   }
-  // Create the result constant.
   const result = await clientQuery(
-    // Contribute this line to the enclosing declaration or statement.
     client,
-    // Continue the surrounding logic with this statement.
     `
     SELECT 1
     FROM calendar_tasks
@@ -244,20 +165,15 @@ async function hasAssignedTask(userId, reservationId, client = null) {
       AND assigned_to_user_id = $2
     LIMIT 1
     `,
-    // Contribute this line to the enclosing declaration or statement.
     [rid, uid]
   );
-  // Return the resulting value to the caller.
   return result.rows.length > 0;
 }
 
 /** Insert and return mapped task DTO. */
 async function createTask(payload, client = null) {
-  // Create the result constant.
   const result = await clientQuery(
-    // Contribute this line to the enclosing declaration or statement.
     client,
-    // Continue the surrounding logic with this statement.
     `
     INSERT INTO calendar_tasks (
       car_id, reservation_id, task_type, title, notes, location_text,
@@ -267,31 +183,19 @@ async function createTask(payload, client = null) {
     RETURNING *
     `,
     [
-      // Continue the surrounding logic with this statement.
       payload.carId != null ? Number(payload.carId) : null,
-      // Continue the surrounding logic with this statement.
       payload.reservationId != null ? Number(payload.reservationId) : null,
-      // Contribute this line to the enclosing declaration or statement.
       payload.taskType,
-      // Contribute this line to the enclosing declaration or statement.
       payload.title,
-      // Contribute this line to the enclosing declaration or statement.
       payload.notes || null,
-      // Contribute this line to the enclosing declaration or statement.
       payload.locationText || null,
-      // Contribute this line to the enclosing declaration or statement.
       payload.startsAt || null,
-      // Contribute this line to the enclosing declaration or statement.
       payload.dueAt || null,
-      // Contribute this line to the enclosing declaration or statement.
       payload.status || 'pending',
-      // Continue the surrounding logic with this statement.
       payload.assignedToUserId != null ? Number(payload.assignedToUserId) : null,
-      // Continue the surrounding logic with this statement.
       payload.createdByUserId != null ? Number(payload.createdByUserId) : null,
     ]
   );
-  // Return the resulting value to the caller.
   return mapTask(result.rows[0]);
 }
 
@@ -299,15 +203,10 @@ async function createTask(payload, client = null) {
  * Set status; stamps completed_at on completed, clears it otherwise.
  */
 async function updateTaskStatus(taskId, status, client = null) {
-  // Create the id constant.
   const id = Number(taskId);
-  // Create the next constant.
   const next = String(status);
-  // Create the result constant.
   const result = await clientQuery(
-    // Contribute this line to the enclosing declaration or statement.
     client,
-    // Continue the surrounding logic with this statement.
     `
     UPDATE calendar_tasks
     SET status = $2::text,
@@ -316,22 +215,16 @@ async function updateTaskStatus(taskId, status, client = null) {
     WHERE id = $1
     RETURNING *
     `,
-    // Contribute this line to the enclosing declaration or statement.
     [id, next]
   );
-  // Return the resulting value to the caller.
   return mapTask(result.rows[0]);
 }
 
 /** Drag-move schedule fields only. */
 async function updateTaskSchedule(taskId, { startsAt, dueAt, carId }, client = null) {
-  // Create the id constant.
   const id = Number(taskId);
-  // Create the result constant.
   const result = await clientQuery(
-    // Contribute this line to the enclosing declaration or statement.
     client,
-    // Continue the surrounding logic with this statement.
     `
     UPDATE calendar_tasks
     SET starts_at = COALESCE($2, starts_at),
@@ -342,17 +235,12 @@ async function updateTaskSchedule(taskId, { startsAt, dueAt, carId }, client = n
     RETURNING *
     `,
     [
-      // Contribute this line to the enclosing declaration or statement.
       id,
-      // Contribute this line to the enclosing declaration or statement.
       startsAt || null,
-      // Contribute this line to the enclosing declaration or statement.
       dueAt || null,
-      // Continue the surrounding logic with this statement.
       carId != null ? Number(carId) : null,
     ]
   );
-  // Return the resulting value to the caller.
   return mapTask(result.rows[0]);
 }
 
@@ -360,13 +248,9 @@ async function updateTaskSchedule(taskId, { startsAt, dueAt, carId }, client = n
  * Partial update using boolean flags so null clears nullable columns intentionally.
  */
 async function updateTask(taskId, fields, client = null) {
-  // Create the id constant.
   const id = Number(taskId);
-  // Create the result constant.
   const result = await clientQuery(
-    // Contribute this line to the enclosing declaration or statement.
     client,
-    // Continue the surrounding logic with this statement.
     `
     UPDATE calendar_tasks
     SET title = COALESCE($2, title),
@@ -389,64 +273,38 @@ async function updateTask(taskId, fields, client = null) {
     RETURNING *
     `,
     [
-      // Contribute this line to the enclosing declaration or statement.
       id,
-      // Continue the surrounding logic with this statement.
       fields.title != null ? fields.title : null,
-      // Continue the surrounding logic with this statement.
       fields.taskType != null ? fields.taskType : null,
-      // Continue the surrounding logic with this statement.
       fields.carId !== undefined,
-      // Continue the surrounding logic with this statement.
       fields.carId != null ? Number(fields.carId) : null,
-      // Continue the surrounding logic with this statement.
       fields.startsAt !== undefined,
-      // Continue the surrounding logic with this statement.
       fields.startsAt != null ? fields.startsAt : null,
-      // Continue the surrounding logic with this statement.
       fields.dueAt !== undefined,
-      // Continue the surrounding logic with this statement.
       fields.dueAt != null ? fields.dueAt : null,
-      // Continue the surrounding logic with this statement.
       fields.locationText !== undefined,
-      // Continue the surrounding logic with this statement.
       fields.locationText != null ? fields.locationText : null,
-      // Continue the surrounding logic with this statement.
       fields.notes !== undefined,
-      // Continue the surrounding logic with this statement.
       fields.notes != null ? fields.notes : null,
-      // Continue the surrounding logic with this statement.
       fields.assignedToUserId !== undefined,
-      // Continue the surrounding logic with this statement.
       fields.assignedToUserId != null ? Number(fields.assignedToUserId) : null,
-      // Continue the surrounding logic with this statement.
       fields.reservationId !== undefined,
-      // Continue the surrounding logic with this statement.
       fields.reservationId != null ? Number(fields.reservationId) : null,
-      // Continue the surrounding logic with this statement.
       fields.status !== undefined,
-      // Continue the surrounding logic with this statement.
       fields.status != null ? fields.status : null,
     ]
   );
-  // Return the resulting value to the caller.
   return result.rows[0] ? mapTask(result.rows[0]) : null;
 }
 
 /** Hard-delete task row. */
 async function deleteTask(taskId, client = null) {
-  // Create the id constant.
   const id = Number(taskId);
-  // Create the result constant.
   const result = await clientQuery(
-    // Contribute this line to the enclosing declaration or statement.
     client,
-    // Continue the surrounding logic with this statement.
     `DELETE FROM calendar_tasks WHERE id = $1 RETURNING *`,
-    // Contribute this line to the enclosing declaration or statement.
     [id]
   );
-  // Return the resulting value to the caller.
   return result.rows[0] ? mapTask(result.rows[0]) : null;
 }
 
@@ -454,15 +312,10 @@ async function deleteTask(taskId, client = null) {
  * Distinct car ids with assigned tasks in range — scopes VIEW_OWN calendars.
  */
 async function listAssignedCarIdsForUser(userId, from, to, client = null) {
-  // Create the uid constant.
   const uid = Number(userId);
-  // Evaluate the condition and enter the branch when it is true.
   if (!Number.isInteger(uid) || uid <= 0) return [];
-  // Create the result constant.
   const result = await clientQuery(
-    // Contribute this line to the enclosing declaration or statement.
     client,
-    // Continue the surrounding logic with this statement.
     `
     SELECT DISTINCT car_id
     FROM calendar_tasks
@@ -474,33 +327,20 @@ async function listAssignedCarIdsForUser(userId, from, to, client = null) {
         OR (starts_at IS NULL AND due_at IS NOT NULL AND due_at >= $2 AND due_at < $3)
       )
     `,
-    // Contribute this line to the enclosing declaration or statement.
     [uid, from, to]
   );
-  // Return the resulting value to the caller.
   return result.rows.map((r) => String(r.car_id));
 }
 
-// Assign the CommonJS module exports.
 module.exports = {
-  // Contribute this line to the enclosing declaration or statement.
   listTasksInRange,
-  // Contribute this line to the enclosing declaration or statement.
   listTasks,
-  // Contribute this line to the enclosing declaration or statement.
   findTaskById,
-  // Contribute this line to the enclosing declaration or statement.
   hasAssignedTask,
-  // Contribute this line to the enclosing declaration or statement.
   createTask,
-  // Contribute this line to the enclosing declaration or statement.
   updateTaskStatus,
-  // Contribute this line to the enclosing declaration or statement.
   updateTaskSchedule,
-  // Contribute this line to the enclosing declaration or statement.
   updateTask,
-  // Contribute this line to the enclosing declaration or statement.
   deleteTask,
-  // Contribute this line to the enclosing declaration or statement.
   listAssignedCarIdsForUser,
 };

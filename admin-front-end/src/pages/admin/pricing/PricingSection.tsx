@@ -10,23 +10,14 @@ import { Card, CardBody } from '../../../components/ui/Card';
  * @param hint - Optional muted helper text under the title
  */
 export function PricingSection({
-  // Contribute this line to the enclosing declaration or statement.
   title,
-  // Contribute this line to the enclosing declaration or statement.
   children,
-  // Contribute this line to the enclosing declaration or statement.
   hint,
-// Contribute this line to the enclosing declaration or statement.
 }: {
-  // Provide the title field value.
   title: string;
-  // Provide the children field value.
   children: React.ReactNode;
-  // Contribute this line to the enclosing declaration or statement.
   hint?: string;
-// Continue the surrounding logic with this statement.
 }) {
-  // Return control to the caller with the following value.
   return (
     <Card className="mt-6">
       <CardBody>

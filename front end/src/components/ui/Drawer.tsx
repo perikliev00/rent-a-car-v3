@@ -2,9 +2,7 @@
  * Side drawer overlay (mobile nav). Shares scroll-lock/focus behavior with Modal.
  */
 import type { ReactNode } from 'react';
-// Import named exports from 'react'.
 import { useEffect, useId, useRef } from 'react';
-// Import named exports from './useOverlayLock'.
 import { useOverlayLock } from './useOverlayLock';
 
 /**
@@ -19,66 +17,39 @@ import { useOverlayLock } from './useOverlayLock';
  * @remarks Side effects: scroll lock + focus trap via {@link useOverlayLock}; Escape listener while open.
  */
 export function Drawer({
-  // Contribute this line to the enclosing declaration or statement.
   open,
-  // Contribute this line to the enclosing declaration or statement.
   onClose,
-  // Contribute this line to the enclosing declaration or statement.
   title,
-  // Contribute this line to the enclosing declaration or statement.
   children,
-  // Update side with the right-hand side value.
   side = 'right',
-// Contribute this line to the enclosing declaration or statement.
 }: {
-  // Provide the open field value.
   open: boolean;
-  // Provide the on close field value.
   onClose: () => void;
-  // Contribute this line to the enclosing declaration or statement.
   title?: string;
-  // Provide the children field value.
   children: ReactNode;
-  // Contribute this line to the enclosing declaration or statement.
   side?: 'left' | 'right';
-// Continue the surrounding logic with this statement.
 }) {
-  // Create the title id constant.
   const titleId = useId();
-  // Create the panel ref constant.
   const panelRef = useRef<HTMLElement>(null);
-  // Call useOverlayLock to perform this step.
   useOverlayLock(open, panelRef);
 
-  // Call useEffect to perform this step.
   useEffect(() => {
-    // Evaluate the condition and enter the branch when it is true.
     if (!open) return;
-    // Create the on key constant.
     const onKey = (e: KeyboardEvent) => {
-      // Evaluate the condition and enter the branch when it is true.
       if (e.key === 'Escape') onClose();
     };
-    // Call window.addEventListener to perform this step.
     window.addEventListener('keydown', onKey);
-    // Return the resulting value to the caller.
     return () => window.removeEventListener('keydown', onKey);
-  // Continue the surrounding logic with this statement.
   }, [open, onClose]);
 
-  // Evaluate the condition and enter the branch when it is true.
   if (!open) return null;
 
   // Border + slide-in animation differ by anchor edge.
   const sideClass =
-    // Update side with the right-hand side value.
     side === 'left'
-      // Continue the surrounding logic with this statement.
       ? 'justify-start border-r animate-[lux-drawer_0.35s_var(--ease-out)_both]'
-      // Continue the surrounding logic with this statement.
       : 'justify-end border-l animate-[lux-drawer_0.35s_var(--ease-out)_both]';
 
-  // Return control to the caller with the following value.
   return (
     <div className={`fixed inset-0 z-50 flex ${side === 'left' ? 'justify-start' : 'justify-end'}`}>
       <button

@@ -3,5 +3,4 @@
  */
 const { toUtc } = require('./date/timezone');
 
-// Assign the CommonJS module exports.
 module.exports = { toUtc };

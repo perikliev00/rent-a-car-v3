@@ -1,3 +1,6 @@
+# Required checks for main are aggregated by the "CI" job below.
+# Local equivalent (same commands/env where practical): npm run ci:local
+# See docs/ci-local.md and docs/branch-protection.md.
 name: CI
 
 on:

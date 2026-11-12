@@ -2,90 +2,53 @@
  * Revenue/utilization analytics for a selected date range.
  */
 import { useMemo, useState } from 'react';
-// Import named exports from 'react-router-dom'.
 import { Link } from 'react-router-dom';
-// Import named exports from '@tanstack/react-query'.
 import { useQuery } from '@tanstack/react-query';
-// Import named exports from the referenced module.
 import {
-  // Contribute this line to the enclosing declaration or statement.
   CartesianGrid,
-  // Contribute this line to the enclosing declaration or statement.
   Line,
-  // Contribute this line to the enclosing declaration or statement.
   LineChart,
-  // Contribute this line to the enclosing declaration or statement.
   ResponsiveContainer,
-  // Contribute this line to the enclosing declaration or statement.
   Tooltip,
-  // Contribute this line to the enclosing declaration or statement.
   XAxis,
-  // Contribute this line to the enclosing declaration or statement.
   YAxis,
-// Contribute this line to the enclosing declaration or statement.
 } from 'recharts';
-// Import named exports from the referenced module.
 import {
-  // Contribute this line to the enclosing declaration or statement.
   getAnalyticsOverview,
-  // Contribute this line to the enclosing declaration or statement.
   getCarsPerformance,
-  // Contribute this line to the enclosing declaration or statement.
   getRevenueByCar,
-  // Contribute this line to the enclosing declaration or statement.
   getRevenueByLocation,
-  // Contribute this line to the enclosing declaration or statement.
   getUtilization,
-// Contribute this line to the enclosing declaration or statement.
 } from '../../api/admin/analytics';
-// Import named exports from '../../components/ui/Card'.
 import { Card, CardBody } from '../../components/ui/Card';
-// Import named exports from '../../components/ui/Input'.
 import { Input } from '../../components/ui/Input';
-// Import named exports from '../../components/ui/Loading'.
 import { PageLoader } from '../../components/ui/Loading';
-// Import named exports from '../../utils/format'.
 import { formatPrice } from '../../utils/format';
-// Import named exports from '../../auth/useAuth'.
 import { useAuth } from '../../auth/useAuth';
-// Import named exports from '../../auth/permissions'.
 import { hasPermission } from '../../auth/permissions';
 
 /** Default Range. */
 function defaultRange() {
-  // Create the to constant.
   const to = new Date();
-  // Create the from constant.
   const from = new Date();
-  // Call from.setDate to perform this step.
   from.setDate(to.getDate() - 29);
-  // Create the fmt constant.
   const fmt = (d: Date) => d.toISOString().slice(0, 10);
-  // Return the resulting value to the caller.
   return { from: fmt(from), to: fmt(to) };
 }
 
 /** Pct. */
 function pct(rate: number) {
-  // Return the resulting value to the caller.
   return `${(rate * 100).toFixed(1)}%`;
 }
 
 /** Kpi. */
 function Kpi({
-  // Contribute this line to the enclosing declaration or statement.
   label,
-  // Contribute this line to the enclosing declaration or statement.
   value,
-// Contribute this line to the enclosing declaration or statement.
 }: {
-  // Provide the label field value.
   label: string;
-  // Provide the value field value.
   value: string;
-// Continue the surrounding logic with this statement.
 }) {
-  // Return control to the caller with the following value.
   return (
     <div className="min-w-0 rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] p-5 shadow-[var(--shadow-soft)]">
       <p className="text-xs font-medium tracking-wide text-[var(--color-muted)] uppercase">{label}</p>
@@ -98,70 +61,43 @@ function Kpi({
 
 /** Revenue/utilization analytics for a selected date range. */
 export function AdminAnalyticsPage() {
-  // Destructure object properties into local variables.
   const { user } = useAuth();
-  // Create the can money constant.
   const canMoney = hasPermission(user, 'can_view_revenue');
-  // Create the initial constant.
   const initial = useMemo(() => defaultRange(), []);
-  // Destructure array values into local variables.
   const [from, setFrom] = useState(initial.from);
-  // Destructure array values into local variables.
   const [to, setTo] = useState(initial.to);
 
-  // Create the overview query constant.
   const overviewQuery = useQuery({
-    // Provide the query key field value.
     queryKey: ['admin', 'analytics', 'overview', from, to],
-    // Provide the query fn field value.
     queryFn: () => getAnalyticsOverview(from, to),
   });
-  // Create the by car query constant.
   const byCarQuery = useQuery({
-    // Provide the query key field value.
     queryKey: ['admin', 'analytics', 'by-car', from, to],
-    // Provide the query fn field value.
     queryFn: () => getRevenueByCar(from, to),
   });
-  // Create the by loc query constant.
   const byLocQuery = useQuery({
-    // Provide the query key field value.
     queryKey: ['admin', 'analytics', 'by-loc', from, to],
-    // Provide the query fn field value.
     queryFn: () => getRevenueByLocation(from, to),
   });
-  // Create the util query constant.
   const utilQuery = useQuery({
-    // Provide the query key field value.
     queryKey: ['admin', 'analytics', 'util', from, to],
-    // Provide the query fn field value.
     queryFn: () => getUtilization(from, to),
   });
-  // Create the perf query constant.
   const perfQuery = useQuery({
-    // Provide the query key field value.
     queryKey: ['admin', 'analytics', 'perf', from, to],
-    // Provide the query fn field value.
     queryFn: () => getCarsPerformance(from, to),
   });
 
   if (overviewQuery.isLoading) return <PageLoader />;
 
-  // Create the kpis constant.
   const kpis = overviewQuery.data?.kpis;
-  // Create the chart data constant.
   const chartData = (overviewQuery.data?.revenueSeries || []).map((r) => ({
-    // Provide the day field value.
     day: r.day.slice(5),
-    // Provide the revenue field value.
     revenue: r.revenue,
-    // Provide the bookings field value.
     bookings:
-      // Continue the surrounding logic with this statement.
       overviewQuery.data?.bookingsSeries.find((b) => b.day === r.day)?.bookings ?? 0,
   }));
 
-  // Return control to the caller with the following value.
   return (
     <div>
       <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">

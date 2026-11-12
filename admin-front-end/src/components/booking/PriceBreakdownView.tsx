@@ -2,7 +2,6 @@
  * Renders a priced quote line-item breakdown for admin order/pricing UIs.
  */
 import type { PriceBreakdown } from '../../types/api';
-// Import named exports from '../../utils/format'.
 import { formatPrice } from '../../utils/format';
 
 /**
@@ -12,7 +11,6 @@ import { formatPrice } from '../../utils/format';
  * @param breakdown - Quote breakdown from pricing/order APIs
  */
 export function PriceBreakdownView({ breakdown }: { breakdown: PriceBreakdown }) {
-  // Return control to the caller with the following value.
   return (
     <div className="space-y-2 border-t border-[var(--color-line)] pt-4 text-sm">
       {breakdown.lines.map((line, index) => (

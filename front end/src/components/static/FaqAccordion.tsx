@@ -5,15 +5,11 @@ import { useId, useState } from 'react';
 
 /** One question/answer pair rendered by {@link FaqAccordion}. */
 export type FaqItem = {
-  // Provide the q field value.
   q: string;
-  // Provide the a field value.
   a: string;
 };
 
-// Declare the FaqAccordionProps TypeScript interface.
 interface FaqAccordionProps {
-  // Provide the items field value.
   items: FaqItem[];
 }
 
@@ -25,12 +21,10 @@ interface FaqAccordionProps {
  * @remarks Initial state opens the first item (`index 0`); clicking an open item collapses it.
  */
 export function FaqAccordion({ items }: FaqAccordionProps) {
-  // Create the base id constant.
   const baseId = useId();
   // Start with the first question expanded for scannability.
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
-  // Return control to the caller with the following value.
   return (
     <div className="divide-y divide-[var(--color-line)] overflow-hidden rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface-elevated)] shadow-[var(--shadow-soft)]">
       {items.map((item, index) => {

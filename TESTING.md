@@ -2,12 +2,24 @@
 
 This document defines the test layers, local commands, CI ownership, and concurrency expectations for LuxRide.
 
+## Local CI gate
+
+Reproduce all required GitHub CI checks before pushing:
+
+```bash
+npm run hooks:install   # once per clone (also via npm prepare)
+npm run ci:local
+```
+
+The Git `pre-push` hook runs `ci:local` and blocks the push on failure. Details: [`docs/ci-local.md`](docs/ci-local.md). Branch protection for `main`: [`docs/branch-protection.md`](docs/branch-protection.md).
+
 ## Commands
 
 Run from the repository root unless noted otherwise.
 
 | Command | Scope | PostgreSQL required |
 | --- | --- | --- |
+| `npm run ci:local` | Full local CI gate (lint, coverage, audits, migrations, DB, integration, E2E, Docker builds) | Yes (ephemeral Docker) |
 | `npm test` | Backend Jest + customer Vitest + admin Vitest | No |
 | `npm run test:unit` | Backend Jest | No |
 | `npm run test:frontend` | Customer frontend Vitest | No |
@@ -114,5 +126,7 @@ Coverage thresholds are a regression floor, not a target to game. Raise threshol
 - `e2e-playwright`
 - `docker-build`
 - aggregate `CI` gate
+
+`npm run ci:local` runs the same command set (sequentially) with an isolated Postgres container. See [`docs/ci-local.md`](docs/ci-local.md).
 
 A production deployment is only triggered automatically after the `CI` workflow succeeds on `main`.

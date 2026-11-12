@@ -27,14 +27,10 @@ function activeDeposit(config) {
 function resolveDeposit(cfg) {
   // Look up the active rule, then round defaultAmount to cents.
   const depositRule = activeDeposit(cfg);
-  // Return the resulting value to the caller.
   return depositRule ? round2(depositRule.defaultAmount) : 0;
 }
 
-// Assign the CommonJS module exports.
 module.exports = {
-  // Contribute this line to the enclosing declaration or statement.
   activeDeposit,
-  // Contribute this line to the enclosing declaration or statement.
   resolveDeposit,
 };

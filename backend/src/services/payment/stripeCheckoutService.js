@@ -4,13 +4,9 @@
  * Idempotency keys prevent duplicate Checkout sessions on retries.
  */
 const stripe = require('../../config/stripe');
-// Destructure object properties into local variables.
 const { config } = require('../../config/env');
-// Require the '../../utils/logger' module as logger.
 const logger = require('../../utils/logger');
-// Destructure object properties into local variables.
 const { getStripeCheckoutExpiresAt } = require('../../config/reservationTiming');
-// Require the './stripeTestStub' module as stripeTestStub.
 const stripeTestStub = require('./stripeTestStub');
 
 /**
@@ -18,14 +14,10 @@ const stripeTestStub = require('./stripeTestStub');
  * @returns {{ success_url: string, cancel_url: string }}
  */
 function buildStripeCheckoutRedirectUrls() {
-  // Create the base constant.
   const base = config.frontendBaseUrl;
 
-  // Return the resulting value to the caller.
   return {
-    // Provide the success url field value.
     success_url: `${base}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-    // Provide the cancel url field value.
     cancel_url: `${base}/checkout/cancel?session_id={CHECKOUT_SESSION_ID}`,
   };
 }
@@ -39,7 +31,6 @@ function buildStripeCheckoutRedirectUrls() {
  * @returns {string}
  */
 function buildCheckoutIdempotencyKey(reservationId, attempt) {
-  // Return the resulting value to the caller.
   return `checkout:reservation:${reservationId}:attempt${attempt}`;
 }
 
@@ -57,88 +48,56 @@ function buildCheckoutIdempotencyKey(reservationId, attempt) {
  * @returns {Promise<object>} Stripe Checkout Session (or stub equivalent)
  */
 async function createStripeCheckoutSession({
-  // Contribute this line to the enclosing declaration or statement.
   car,
-  // Contribute this line to the enclosing declaration or statement.
   pricing,
-  // Contribute this line to the enclosing declaration or statement.
   reservationId,
-  // Contribute this line to the enclosing declaration or statement.
   carId,
-  // Contribute this line to the enclosing declaration or statement.
   sessionId,
-  // Contribute this line to the enclosing declaration or statement.
   idempotencyKey,
-// Continue the surrounding logic with this statement.
 }) {
   // Idempotency guard: return early when work was already applied.
   if (!idempotencyKey) {
-    // Throw an error to stop the current control flow.
     throw new Error('idempotencyKey is required');
   }
 
   // Stripe / payment-related branch.
   if (stripeTestStub.isStubEnabled()) {
-    // Return the resulting value to the caller.
     return stripeTestStub.createSession({
-      // Contribute this line to the enclosing declaration or statement.
       car,
-      // Contribute this line to the enclosing declaration or statement.
       pricing,
-      // Contribute this line to the enclosing declaration or statement.
       reservationId,
-      // Contribute this line to the enclosing declaration or statement.
       carId,
-      // Contribute this line to the enclosing declaration or statement.
       sessionId,
-      // Contribute this line to the enclosing declaration or statement.
       idempotencyKey,
     });
   }
 
-  // Create the expires at constant.
   const expiresAt = getStripeCheckoutExpiresAt();
 
-  // Return the resulting value to the caller.
   return stripe.checkout.sessions.create(
     {
-      // Provide the payment method types field value.
       payment_method_types: ['card'],
-      // Provide the line items field value.
       line_items: [
         {
-          // Provide the price data field value.
           price_data: {
-            // Provide the currency field value.
             currency: 'eur',
-            // Provide the product data field value.
             product_data: { name: `Car Rental – ${car.name}` },
             // Stripe expects integer minor units (cents).
             unit_amount: Math.round(Number(pricing.totalPrice) * 100),
           },
-          // Provide the quantity field value.
           quantity: 1,
         },
       ],
-      // Provide the mode field value.
       mode: 'payment',
-      // Provide the expires at field value.
       expires_at: expiresAt,
-      // Call ...buildStripeCheckoutRedirectUrls to perform this step.
       ...buildStripeCheckoutRedirectUrls(),
-      // Provide the client reference id field value.
       client_reference_id: String(reservationId),
-      // Provide the metadata field value.
       metadata: {
-        // Provide the reservation id field value.
         reservationId: String(reservationId),
-        // Provide the car id field value.
         carId: String(carId),
-        // Provide the session id field value.
         sessionId: String(sessionId),
       },
     },
-    // Contribute this line to the enclosing declaration or statement.
     { idempotencyKey }
   );
 }
@@ -151,13 +110,10 @@ async function createStripeCheckoutSession({
 async function expireStripeCheckoutSession(sessionId) {
   // Stripe / payment-related branch.
   if (stripeTestStub.isStubEnabled()) {
-    // Call stripeTestStub.expireSession to perform this step.
     stripeTestStub.expireSession(sessionId);
-    // Return the resulting value to the caller.
     return { id: sessionId, status: 'expired' };
   }
 
-  // Return the resulting value to the caller.
   return stripe.checkout.sessions.expire(sessionId);
 }
 
@@ -169,11 +125,9 @@ async function expireStripeCheckoutSession(sessionId) {
 async function retrieveStripeCheckoutSession(sessionId) {
   // Stripe / payment-related branch.
   if (stripeTestStub.isStubEnabled()) {
-    // Return the resulting value to the caller.
     return stripeTestStub.retrieveSession(sessionId);
   }
 
-  // Return the resulting value to the caller.
   return stripe.checkout.sessions.retrieve(sessionId);
 }
 
@@ -183,24 +137,18 @@ async function retrieveStripeCheckoutSession(sessionId) {
  * @returns {Promise<object>}
  */
 async function retrieveStripePaymentIntent(paymentIntentId) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!paymentIntentId) {
-    // Throw an error to stop the current control flow.
     throw new Error('paymentIntentId is required');
   }
 
   // Stripe / payment-related branch.
   if (stripeTestStub.isStubEnabled()) {
-    // Return the resulting value to the caller.
     return stripeTestStub.retrievePaymentIntent(paymentIntentId, {
-      // Provide the expand field value.
       expand: ['latest_charge'],
     });
   }
 
-  // Return the resulting value to the caller.
   return stripe.paymentIntents.retrieve(paymentIntentId, {
-    // Provide the expand field value.
     expand: ['latest_charge'],
   });
 }
@@ -211,13 +159,9 @@ async function retrieveStripePaymentIntent(paymentIntentId) {
  * @returns {boolean}
  */
 function isStripeExpireAlreadyTerminalError(err) {
-  // Create the message constant.
   const message = String(err?.message || '').toLowerCase();
-  // Return control to the caller with the following value.
   return (
-    // Call message.includes to perform this step.
     message.includes('already') &&
-    // Continue the surrounding logic with this statement.
     (message.includes('expired') || message.includes('complete'))
   );
 }
@@ -231,72 +175,48 @@ function isStripeExpireAlreadyTerminalError(err) {
  * @returns {Promise<{ ok: boolean, skipped?: boolean, paid?: boolean, alreadyExpired?: boolean, expired?: boolean, session?: object, error?: Error }>}
  */
 async function safeExpireSupersededCheckoutSession(sessionId, context = {}) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!sessionId) {
-    // Return the resulting value to the caller.
     return { ok: true, skipped: true };
   }
 
-  // Protected block: isolate failure modes.
   try {
-    // Create the session constant.
     const session = await retrieveStripeCheckoutSession(sessionId);
 
     // Do not expire paid sessions — payment may still need finalization.
     if (session.payment_status === 'paid' || session.status === 'complete') {
-      // Return the resulting value to the caller.
       return { ok: false, paid: true, session };
     }
 
     // Status / lifecycle guard before mutating domain state.
     if (session.status === 'expired') {
-      // Return the resulting value to the caller.
       return { ok: true, alreadyExpired: true, session };
     }
 
-    // Wait until the asynchronous operation resolves.
     await expireStripeCheckoutSession(sessionId);
-    // Return the resulting value to the caller.
     return { ok: true, expired: true, session };
-  // Continue the surrounding logic with this statement.
   } catch (err) {
     // Idempotency guard: return early when work was already applied.
     if (isStripeExpireAlreadyTerminalError(err)) {
-      // Call logger.warn to perform this step.
       logger.warn(
-        // Contribute this line to the enclosing declaration or statement.
         { err, sessionId, ...context },
-        // Supply the literal value used by the enclosing expression.
         'Superseded Stripe checkout session was already expired or completed'
       );
-      // Return the resulting value to the caller.
       return { ok: true, alreadyExpired: true, error: err };
     }
 
-    // Call logger.warn to perform this step.
     logger.warn(
-      // Contribute this line to the enclosing declaration or statement.
       { err, sessionId, ...context },
-      // Supply the literal value used by the enclosing expression.
       'Failed to expire superseded Stripe checkout session'
     );
-    // Return the resulting value to the caller.
     return { ok: false, error: err };
   }
 }
 
-// Assign the CommonJS module exports.
 module.exports = {
-  // Contribute this line to the enclosing declaration or statement.
   buildCheckoutIdempotencyKey,
-  // Contribute this line to the enclosing declaration or statement.
   createStripeCheckoutSession,
-  // Contribute this line to the enclosing declaration or statement.
   expireStripeCheckoutSession,
-  // Contribute this line to the enclosing declaration or statement.
   retrieveStripeCheckoutSession,
-  // Contribute this line to the enclosing declaration or statement.
   retrieveStripePaymentIntent,
-  // Contribute this line to the enclosing declaration or statement.
   safeExpireSupersededCheckoutSession,
 };

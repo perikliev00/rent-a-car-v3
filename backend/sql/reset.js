@@ -7,25 +7,15 @@
  */
 require('dotenv').config();
 
-// Require the '../src/db/pool' module as pool.
 const pool = require('../src/db/pool');
-// Destructure object properties into local variables.
 const { applySchema } = require('./applySchema');
-// Destructure object properties into local variables.
 const { migrate } = require('./migrate');
-// Destructure object properties into local variables.
 const {
-  // Contribute this line to the enclosing declaration or statement.
   assertDevelopmentOnly,
-  // Contribute this line to the enclosing declaration or statement.
   parseCliArgs,
-  // Contribute this line to the enclosing declaration or statement.
   parseDatabaseUrl,
-  // Contribute this line to the enclosing declaration or statement.
   requireDatabaseUrl,
-  // Contribute this line to the enclosing declaration or statement.
   requireDestructiveConfirmation,
-// Continue the surrounding logic with this statement.
 } = require('./dbCliUtils');
 
 /**
@@ -35,30 +25,18 @@ const {
  * @throws {Error} Propagates unexpected failures from callees / I/O
  */
 async function dropPublicSchema() {
-  // Create the database url constant.
   const databaseUrl = requireDatabaseUrl();
-  // Destructure object properties into local variables.
   const { user } = parseDatabaseUrl(databaseUrl);
-  // Create the client constant.
   const client = await pool.connect();
 
-  // Start a try block for operations that may fail.
   try {
-    // Emit a diagnostic log message.
     console.log('→ dropping public schema');
-    // Wait until the asynchronous operation resolves.
     await client.query('DROP SCHEMA IF EXISTS public CASCADE');
-    // Wait until the asynchronous operation resolves.
     await client.query('CREATE SCHEMA public');
-    // Wait until the asynchronous operation resolves.
     await client.query(`GRANT ALL ON SCHEMA public TO ${quoteIdentifier(user)}`);
-    // Wait until the asynchronous operation resolves.
     await client.query('GRANT ALL ON SCHEMA public TO public');
-    // Emit a diagnostic log message.
     console.log('✓ Public schema recreated');
-  // Contribute this line to the enclosing declaration or statement.
   } finally {
-    // Call client.release to perform this step.
     client.release();
   }
 }

@@ -2,61 +2,38 @@
  * Read-only order detail for staff follow-up.
  */
 import { useParams, Link } from 'react-router-dom';
-// Import named exports from '@tanstack/react-query'.
 import { useQuery } from '@tanstack/react-query';
-// Import named exports from '../../api/admin/orders'.
 import { getAdminOrder } from '../../api/admin/orders';
-// Import named exports from '../../components/ui/Card'.
 import { Card, CardBody } from '../../components/ui/Card';
-// Import named exports from '../../components/ui/Loading'.
 import { PageLoader } from '../../components/ui/Loading';
-// Import named exports from '../../components/ui/Button'.
 import { Button } from '../../components/ui/Button';
-// Import named exports from '../../utils/format'.
 import { formatPrice } from '../../utils/format';
-// Import named exports from '../../types/api'.
 import { getCarFromOrder } from '../../types/api';
-// Import named exports from '../../components/booking/PriceBreakdownView'.
 import { PriceBreakdownView } from '../../components/booking/PriceBreakdownView';
 
 /** Read-only order detail for staff follow-up. */
 export function AdminOrderDetailPage() {
-  // Destructure object properties into local variables.
   const { id } = useParams<{ id: string }>();
-  // Destructure object properties into local variables.
   const { data, isLoading } = useQuery({
-    // Provide the query key field value.
     queryKey: ['admin', 'order', id],
-    // Provide the query fn field value.
     queryFn: () => getAdminOrder(id!),
-    // Provide the enabled field value.
     enabled: !!id,
   });
 
   if (isLoading) return <PageLoader />;
-  // Create the order constant.
   const order = data?.order;
   if (!order) return <p>Order not found</p>;
 
-  // Create the car constant.
   const car = getCarFromOrder(order);
-  // Create the breakdown constant.
   const breakdown = order.priceSnapshot
-    // Contribute this line to the enclosing declaration or statement.
     ? {
-        // Provide the lines field value.
         lines: order.priceSnapshot.lines || [],
-        // Provide the total price field value.
         totalPrice: order.priceSnapshot.totalPrice ?? order.totalPrice,
-        // Provide the deposit field value.
         deposit: order.priceSnapshot.deposit ?? order.deposit ?? 0,
-        // Provide the currency field value.
         currency: 'EUR',
       }
-    // Contribute this line to the enclosing declaration or statement.
     : null;
 
-  // Return control to the caller with the following value.
   return (
     <div className="mx-auto min-w-0 max-w-2xl">
       <Link to="/admin/orders" className="text-sm text-[var(--color-accent-ink)] hover:underline">

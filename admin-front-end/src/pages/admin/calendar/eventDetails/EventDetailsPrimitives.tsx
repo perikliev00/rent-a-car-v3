@@ -5,7 +5,6 @@ import { type ReactNode } from 'react';
 
 /** Shared layout primitives for calendar event detail panels. */
 export function Section({ title, children }: { title: string; children: ReactNode }) {
-  // Return control to the caller with the following value.
   return (
     <section className="space-y-2">
       <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">
@@ -18,7 +17,6 @@ export function Section({ title, children }: { title: string; children: ReactNod
 
 /** Shared layout primitives for calendar event detail panels. */
 export function Field({ label, value }: { label: string; value: string }) {
-  // Return control to the caller with the following value.
   return (
     <div>
       <div className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-muted)]">

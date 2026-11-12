@@ -13,7 +13,6 @@ const carSql = require('../services/sql/carSqlService');
  * @throws {Error} Propagates SQL / driver errors from the SQL service
  */
 async function findById(id) {
-  // Return the resulting value to the caller.
   return carSql.getSqlPublicCarById(id);
 }
 
@@ -25,7 +24,6 @@ async function findById(id) {
  * @throws {Error} Propagates SQL / driver errors from the SQL service
  */
 async function findByIdForAdmin(id) {
-  // Return the resulting value to the caller.
   return carSql.getSqlAdminCarById(id);
 }
 
@@ -38,7 +36,6 @@ async function findByIdForAdmin(id) {
  * @throws {Error} Propagates SQL / driver errors from the SQL service
  */
 async function paginate(criteria = {}, options = {}) {
-  // Return the resulting value to the caller.
   return carSql.paginateSqlCars(criteria, options);
 }
 
@@ -50,7 +47,6 @@ async function paginate(criteria = {}, options = {}) {
  * @throws {Error} Propagates SQL / driver errors from the SQL service
  */
 async function listAll(client = null) {
-  // Return the resulting value to the caller.
   return carSql.listAllCars(client);
 }
 
@@ -62,7 +58,6 @@ async function listAll(client = null) {
  * @throws {Error} Propagates SQL / driver errors from the SQL service
  */
 async function listAllImageUrls(client = null) {
-  // Return the resulting value to the caller.
   return carSql.listAllCarImageUrls(client);
 }
 
@@ -74,7 +69,6 @@ async function listAllImageUrls(client = null) {
  * @throws {Error} Propagates SQL / driver errors from the SQL service
  */
 async function listAvailable(client = null) {
-  // Return the resulting value to the caller.
   return carSql.listAvailableCars(client);
 }
 
@@ -87,7 +81,6 @@ async function listAvailable(client = null) {
  * @throws {Error} Propagates SQL / driver errors from the SQL service
  */
 async function listByFilter(filter = {}, client = null) {
-  // Return the resulting value to the caller.
   return carSql.listCarsByFilter(filter, client);
 }
 
@@ -100,7 +93,6 @@ async function listByFilter(filter = {}, client = null) {
  * @throws {Error} Propagates SQL / validation errors from the SQL service
  */
 async function create(payload, client = null) {
-  // Return the resulting value to the caller.
   return carSql.createAdminCar(payload, client);
 }
 
@@ -114,7 +106,6 @@ async function create(payload, client = null) {
  * @throws {Error} Propagates SQL / validation errors from the SQL service
  */
 async function update(id, payload, client = null) {
-  // Return the resulting value to the caller.
   return carSql.updateAdminCar(id, payload, client);
 }
 
@@ -127,7 +118,6 @@ async function update(id, payload, client = null) {
  * @throws {Error} Propagates SQL / driver errors from the SQL service
  */
 async function deleteById(id, client = null) {
-  // Return the resulting value to the caller.
   return carSql.deleteCarById(id, client);
 }
 
@@ -140,32 +130,19 @@ async function deleteById(id, client = null) {
  * @throws {never} Invalid input is coerced by the SQL helper (does not throw)
  */
 function parsePage(raw, options) {
-  // Return the resulting value to the caller.
   return carSql.parsePage(raw, options);
 }
 
-// Assign the CommonJS module exports.
 module.exports = {
-  // Contribute this line to the enclosing declaration or statement.
   findById,
-  // Contribute this line to the enclosing declaration or statement.
   findByIdForAdmin,
-  // Contribute this line to the enclosing declaration or statement.
   paginate,
-  // Contribute this line to the enclosing declaration or statement.
   listAll,
-  // Contribute this line to the enclosing declaration or statement.
   listAllImageUrls,
-  // Contribute this line to the enclosing declaration or statement.
   listAvailable,
-  // Contribute this line to the enclosing declaration or statement.
   listByFilter,
-  // Contribute this line to the enclosing declaration or statement.
   create,
-  // Contribute this line to the enclosing declaration or statement.
   update,
-  // Contribute this line to the enclosing declaration or statement.
   deleteById,
-  // Contribute this line to the enclosing declaration or statement.
   parsePage,
 };

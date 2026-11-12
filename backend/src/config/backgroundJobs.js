@@ -17,27 +17,19 @@
 function isBackgroundJobsEnabled(raw = process.env.RUN_BACKGROUND_JOBS) {
   // Default on when unset so a lone API process still cleans holds / sends notifications.
   if (raw == null || String(raw).trim() === '') {
-    // Return the resulting value to the caller.
     return true;
   }
-  // Create the value constant.
   const value = String(raw).trim().toLowerCase();
-  // Evaluate the condition and enter the branch when it is true.
   if (['0', 'false', 'no', 'off'].includes(value)) {
-    // Return the resulting value to the caller.
     return false;
   }
-  // Evaluate the condition and enter the branch when it is true.
   if (['1', 'true', 'yes', 'on'].includes(value)) {
-    // Return the resulting value to the caller.
     return true;
   }
   // Unrecognized value: keep jobs on rather than silently disabling them.
   return true;
 }
 
-// Assign the CommonJS module exports.
 module.exports = {
-  // Contribute this line to the enclosing declaration or statement.
   isBackgroundJobsEnabled,
 };

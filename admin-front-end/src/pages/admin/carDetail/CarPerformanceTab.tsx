@@ -2,60 +2,35 @@
  * Per-car analytics performance panel.
  */
 import { Card, CardBody } from '../../../components/ui/Card';
-// Import named exports from '../../../components/ui/Input'.
 import { Input } from '../../../components/ui/Input';
-// Import named exports from '../../../utils/format'.
 import { formatPrice } from '../../../utils/format';
 
-// Declare the PerfCar TypeScript type alias.
 type PerfCar = {
-  // Contribute this line to the enclosing declaration or statement.
   revenue?: number | null;
-  // Provide the bookings count field value.
   bookingsCount: number;
-  // Provide the utilization rate field value.
   utilizationRate: number;
-  // Provide the maintenance days field value.
   maintenanceDays: number;
-  // Contribute this line to the enclosing declaration or statement.
   repairCost?: number | null;
-  // Contribute this line to the enclosing declaration or statement.
   serviceCost?: number | null;
-  // Contribute this line to the enclosing declaration or statement.
   profitability?: number | null;
 };
 
 /** Per-car analytics performance panel. */
 export function CarPerformanceTab({
-  // Contribute this line to the enclosing declaration or statement.
   canMoney,
-  // Contribute this line to the enclosing declaration or statement.
   perfRange,
-  // Contribute this line to the enclosing declaration or statement.
   setPerfRange,
-  // Contribute this line to the enclosing declaration or statement.
   perfLoading,
-  // Contribute this line to the enclosing declaration or statement.
   perfError,
-  // Contribute this line to the enclosing declaration or statement.
   perfCar,
-// Contribute this line to the enclosing declaration or statement.
 }: {
-  // Provide the can money field value.
   canMoney: boolean;
-  // Provide the perf range field value.
   perfRange: { from: string; to: string };
-  // Provide the set perf range field value.
   setPerfRange: (v: { from: string; to: string }) => void;
-  // Provide the perf loading field value.
   perfLoading: boolean;
-  // Provide the perf error field value.
   perfError: Error | null;
-  // Provide the perf car field value.
   perfCar: PerfCar | null | undefined;
-// Continue the surrounding logic with this statement.
 }) {
-  // Return control to the caller with the following value.
   return (
     <div className="mt-6 space-y-4">
       <Card className="shadow-none">

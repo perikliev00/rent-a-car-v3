@@ -1,0 +1,22 @@
+# Ephemeral PostgreSQL for `npm run ci:local`.
+# Each invocation uses a unique Compose project name and a random host port so
+# concurrent local CI runs never share PostgreSQL state.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: luxride
+      POSTGRES_PASSWORD: luxride
+      POSTGRES_DB: luxride_test
+    # Host port is assigned by Docker (no fixed bind) for concurrency safety.
+    ports:
+      - "5432"
+    # tmpfs: no persistent volume; every ci:local starts from a clean cluster.
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U luxride -d luxride_test']
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 5s

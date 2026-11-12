@@ -2,7 +2,6 @@
  * Reservation create/update/status lifecycle SQL (confirmed, cancelled, etc.).
  */
 const { clientQuery } = require('../../../db/transaction');
-// Destructure object properties into local variables.
 const { mapSqlReservation, normalizeCarId } = require('./reservationMapper');
 
 /**
@@ -12,19 +11,13 @@ const { mapSqlReservation, normalizeCarId } = require('./reservationMapper');
  * @returns {Promise<*>}
  */
 async function update(reservation, client = null) {
-  // Create the reservation id constant.
   const reservationId = Number(reservation.id);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(reservationId) || reservationId <= 0) {
-    // Throw an error to stop the current control flow.
     throw new Error('Invalid reservation id');
   }
 
-  // Create the result constant.
   const result = await clientQuery(
-    // Contribute this line to the enclosing declaration or statement.
     client,
-    // Continue the surrounding logic with this statement.
     `
     UPDATE reservations
     SET
@@ -58,69 +51,39 @@ async function update(reservation, client = null) {
     RETURNING *
     `,
     [
-      // Contribute this line to the enclosing declaration or statement.
       reservationId,
-      // Call normalizeCarId to perform this step.
       normalizeCarId(
-        // Contribute this line to the enclosing declaration or statement.
         reservation.carId?.id || reservation.carId
       ),
-      // Contribute this line to the enclosing declaration or statement.
       reservation.sessionId,
-      // Contribute this line to the enclosing declaration or statement.
       reservation.pickupDate,
-      // Contribute this line to the enclosing declaration or statement.
       reservation.pickupTime || null,
-      // Contribute this line to the enclosing declaration or statement.
       reservation.returnDate,
-      // Contribute this line to the enclosing declaration or statement.
       reservation.returnTime || null,
-      // Contribute this line to the enclosing declaration or statement.
       reservation.pickupLocation,
-      // Contribute this line to the enclosing declaration or statement.
       reservation.returnLocation,
-      // Contribute this line to the enclosing declaration or statement.
       reservation.rentalDays,
-      // Contribute this line to the enclosing declaration or statement.
       reservation.deliveryPrice ?? 0,
-      // Contribute this line to the enclosing declaration or statement.
       reservation.returnPrice ?? 0,
-      // Contribute this line to the enclosing declaration or statement.
       reservation.totalPrice,
-      // Continue the surrounding logic with this statement.
       reservation.deposit != null ? reservation.deposit : null,
-      // Continue the surrounding logic with this statement.
       reservation.priceSnapshot ? JSON.stringify(reservation.priceSnapshot) : null,
-      // Continue the surrounding logic with this statement.
       reservation.selectedExtras != null
-        // Continue the surrounding logic with this statement.
         ? JSON.stringify(reservation.selectedExtras)
-        // Contribute this line to the enclosing declaration or statement.
         : null,
-      // Continue the surrounding logic with this statement.
       reservation.hotelDelivery != null ? Boolean(reservation.hotelDelivery) : null,
-      // Contribute this line to the enclosing declaration or statement.
       reservation.fullName || null,
-      // Contribute this line to the enclosing declaration or statement.
       reservation.phoneNumber || null,
-      // Contribute this line to the enclosing declaration or statement.
       reservation.email || null,
-      // Contribute this line to the enclosing declaration or statement.
       reservation.address || null,
-      // Contribute this line to the enclosing declaration or statement.
       reservation.hotelName || null,
-      // Contribute this line to the enclosing declaration or statement.
       reservation.status,
-      // Contribute this line to the enclosing declaration or statement.
       reservation.holdExpiresAt,
-      // Contribute this line to the enclosing declaration or statement.
       reservation.stripeSessionId || null,
-      // Contribute this line to the enclosing declaration or statement.
       reservation.stripePaymentIntentId || null,
     ]
   );
 
-  // Return the resulting value to the caller.
   return mapSqlReservation(result.rows[0]);
 }
 
@@ -131,54 +94,31 @@ async function update(reservation, client = null) {
  * @returns {Promise<*>}
  */
 async function applyStatusChange({ reservationId, newStatus, patch = null }, client = null) {
-  // Create the id constant.
   const id = Number(reservationId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(id) || id <= 0) {
-    // Throw an error to stop the current control flow.
     throw new Error('Invalid reservation id');
   }
 
-  // Create the contact constant.
   const contact = patch?.contact || null;
-  // Create the pricing constant.
   const pricing = patch?.pricing || null;
-  // Create the has hold expires at constant.
   const hasHoldExpiresAt =
-    // Continue the surrounding logic with this statement.
     patch != null && Object.prototype.hasOwnProperty.call(patch, 'holdExpiresAt');
-  // Create the has stripe session id constant.
   const hasStripeSessionId =
-    // Continue the surrounding logic with this statement.
     patch != null && Object.prototype.hasOwnProperty.call(patch, 'stripeSessionId');
-  // Create the has stripe payment intent id constant.
   const hasStripePaymentIntentId =
-    // Continue the surrounding logic with this statement.
     patch != null && Object.prototype.hasOwnProperty.call(patch, 'stripePaymentIntentId');
-  // Create the has paid amount cents constant.
   const hasPaidAmountCents =
-    // Continue the surrounding logic with this statement.
     patch != null && Object.prototype.hasOwnProperty.call(patch, 'paidAmountCents');
-  // Create the has paid currency constant.
   const hasPaidCurrency =
-    // Continue the surrounding logic with this statement.
     patch != null && Object.prototype.hasOwnProperty.call(patch, 'paidCurrency');
-  // Create the paid amount cents value constant.
   const paidAmountCentsValue = hasPaidAmountCents ? Number(patch.paidAmountCents) : null;
-  // Create the paid currency value constant.
   const paidCurrencyValue =
-    // Continue the surrounding logic with this statement.
     hasPaidCurrency && patch.paidCurrency != null
-      // Continue the surrounding logic with this statement.
       ? String(patch.paidCurrency).toLowerCase()
-      // Contribute this line to the enclosing declaration or statement.
       : null;
 
-  // Create the result constant.
   const result = await clientQuery(
-    // Contribute this line to the enclosing declaration or statement.
     client,
-    // Continue the surrounding logic with this statement.
     `
     UPDATE reservations
     SET
@@ -212,72 +152,40 @@ async function applyStatusChange({ reservationId, newStatus, patch = null }, cli
     RETURNING *
     `,
     [
-      // Contribute this line to the enclosing declaration or statement.
       id,
-      // Contribute this line to the enclosing declaration or statement.
       newStatus,
-      // Contribute this line to the enclosing declaration or statement.
       hasHoldExpiresAt,
-      // Contribute this line to the enclosing declaration or statement.
       hasHoldExpiresAt ? patch.holdExpiresAt : null,
-      // Contribute this line to the enclosing declaration or statement.
       hasStripeSessionId,
-      // Contribute this line to the enclosing declaration or statement.
       hasStripeSessionId ? patch.stripeSessionId : null,
-      // Contribute this line to the enclosing declaration or statement.
       hasStripePaymentIntentId,
-      // Contribute this line to the enclosing declaration or statement.
       hasStripePaymentIntentId ? patch.stripePaymentIntentId : null,
-      // Contribute this line to the enclosing declaration or statement.
       contact?.fullName ?? null,
-      // Contribute this line to the enclosing declaration or statement.
       contact?.phoneNumber ?? null,
-      // Contribute this line to the enclosing declaration or statement.
       contact?.email ?? null,
-      // Contribute this line to the enclosing declaration or statement.
       contact?.address ?? null,
-      // Contribute this line to the enclosing declaration or statement.
       contact?.hotelName ?? null,
-      // Contribute this line to the enclosing declaration or statement.
       pricing?.rentalDays ?? null,
-      // Contribute this line to the enclosing declaration or statement.
       pricing?.deliveryPrice ?? null,
-      // Contribute this line to the enclosing declaration or statement.
       pricing?.returnPrice ?? null,
-      // Contribute this line to the enclosing declaration or statement.
       pricing?.totalPrice ?? null,
-      // Contribute this line to the enclosing declaration or statement.
       pricing?.deposit ?? null,
-      // Continue the surrounding logic with this statement.
       pricing?.snapshot ? JSON.stringify(pricing.snapshot) : null,
-      // Continue the surrounding logic with this statement.
       pricing?.snapshot?.selectedExtras != null || pricing?.selectedExtras != null
-        // Continue the surrounding logic with this statement.
         ? JSON.stringify(pricing.snapshot?.selectedExtras || pricing.selectedExtras)
-        // Contribute this line to the enclosing declaration or statement.
         : null,
-      // Continue the surrounding logic with this statement.
       pricing?.snapshot?.hotelDelivery != null || pricing?.hotelDelivery != null
-        // Continue the surrounding logic with this statement.
         ? Boolean(pricing.snapshot?.hotelDelivery ?? pricing.hotelDelivery)
-        // Contribute this line to the enclosing declaration or statement.
         : null,
-      // Continue the surrounding logic with this statement.
       hasPaidAmountCents && Number.isFinite(paidAmountCentsValue) && paidAmountCentsValue > 0,
-      // Continue the surrounding logic with this statement.
       hasPaidAmountCents && Number.isFinite(paidAmountCentsValue) && paidAmountCentsValue > 0
-        // Contribute this line to the enclosing declaration or statement.
         ? paidAmountCentsValue
-        // Contribute this line to the enclosing declaration or statement.
         : null,
-      // Call Boolean to perform this step.
       Boolean(paidCurrencyValue),
-      // Contribute this line to the enclosing declaration or statement.
       paidCurrencyValue,
     ]
   );
 
-  // Return the resulting value to the caller.
   return mapSqlReservation(result.rows[0]);
 }
 
@@ -288,25 +196,16 @@ async function applyStatusChange({ reservationId, newStatus, patch = null }, cli
  * is for link-failure after the orphan session was expired.
  */
 async function reserveCheckoutAttempt(
-  // Contribute this line to the enclosing declaration or statement.
   reservationId,
-  // Continue the surrounding logic with this statement.
   { forceIncrement = false, client = null } = {}
-// Continue the surrounding logic with this statement.
 ) {
-  // Create the id constant.
   const id = Number(reservationId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!Number.isInteger(id) || id <= 0) {
-    // Throw an error to stop the current control flow.
     throw new Error('Invalid reservation id');
   }
 
-  // Create the result constant.
   const result = await clientQuery(
-    // Contribute this line to the enclosing declaration or statement.
     client,
-    // Continue the surrounding logic with this statement.
     `
     UPDATE reservations
     SET
@@ -320,23 +219,16 @@ async function reserveCheckoutAttempt(
     WHERE id = $1
     RETURNING stripe_checkout_attempt
     `,
-    // Continue the surrounding logic with this statement.
     [id, Boolean(forceIncrement)]
   );
 
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!result.rowCount) {
-    // Create the err constant.
     const err = new Error('Reservation not found');
-    // Update err.code with the right-hand side value.
     err.code = 'NOT_FOUND';
-    // Update err.status with the right-hand side value.
     err.status = 404;
-    // Throw an error to stop the current control flow.
     throw err;
   }
 
-  // Return the resulting value to the caller.
   return Number(result.rows[0].stripe_checkout_attempt);
 }
 
@@ -344,28 +236,18 @@ async function reserveCheckoutAttempt(
  * Create a confirmed reservation for admin-created/restored orders (ops coverage).
  */
 async function createConfirmedReservation(payload, client = null) {
-  // Create the normalized car id constant.
   const normalizedCarId = normalizeCarId(payload.carId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId) {
-    // Throw an error to stop the current control flow.
     throw new Error('Invalid car id');
   }
 
-  // Create the contact constant.
   const contact = payload.contact || {};
-  // Create the pricing constant.
   const pricing = payload.pricing || {};
-  // Create the session id constant.
   const sessionId = payload.sessionId || `admin-${Date.now()}-${normalizedCarId}`;
-  // Create the hold expires at constant.
   const holdExpiresAt = payload.holdExpiresAt || new Date();
 
-  // Create the result constant.
   const result = await clientQuery(
-    // Contribute this line to the enclosing declaration or statement.
     client,
-    // Continue the surrounding logic with this statement.
     `
     INSERT INTO reservations (
       car_id,
@@ -401,84 +283,48 @@ async function createConfirmedReservation(payload, client = null) {
     RETURNING *
     `,
     [
-      // Contribute this line to the enclosing declaration or statement.
       normalizedCarId,
-      // Contribute this line to the enclosing declaration or statement.
       sessionId,
-      // Contribute this line to the enclosing declaration or statement.
       payload.startDate || payload.pickupDate,
-      // Contribute this line to the enclosing declaration or statement.
       payload.pickupTime || null,
-      // Contribute this line to the enclosing declaration or statement.
       payload.endDate || payload.returnDate,
-      // Contribute this line to the enclosing declaration or statement.
       payload.returnTime || null,
-      // Contribute this line to the enclosing declaration or statement.
       payload.pickupLocation,
-      // Contribute this line to the enclosing declaration or statement.
       payload.returnLocation,
-      // Contribute this line to the enclosing declaration or statement.
       pricing.rentalDays ?? payload.rentalDays,
-      // Contribute this line to the enclosing declaration or statement.
       pricing.deliveryPrice ?? payload.deliveryPrice ?? 0,
-      // Contribute this line to the enclosing declaration or statement.
       pricing.returnPrice ?? payload.returnPrice ?? 0,
-      // Contribute this line to the enclosing declaration or statement.
       pricing.totalPrice ?? payload.totalPrice,
-      // Contribute this line to the enclosing declaration or statement.
       pricing.deposit ?? payload.deposit ?? 0,
-      // Continue the surrounding logic with this statement.
       (pricing.snapshot || payload.priceSnapshot)
-        // Continue the surrounding logic with this statement.
         ? JSON.stringify(pricing.snapshot || payload.priceSnapshot)
-        // Contribute this line to the enclosing declaration or statement.
         : null,
-      // Call JSON.stringify to perform this step.
       JSON.stringify(
-        // Contribute this line to the enclosing declaration or statement.
         pricing.snapshot?.selectedExtras ||
-          // Contribute this line to the enclosing declaration or statement.
           pricing.selectedExtras ||
-          // Contribute this line to the enclosing declaration or statement.
           payload.selectedExtras ||
           []
       ),
-      // Call Boolean to perform this step.
       Boolean(
-        // Contribute this line to the enclosing declaration or statement.
         pricing.snapshot?.hotelDelivery ??
-          // Contribute this line to the enclosing declaration or statement.
           pricing.hotelDelivery ??
-          // Contribute this line to the enclosing declaration or statement.
           payload.hotelDelivery
       ),
-      // Contribute this line to the enclosing declaration or statement.
       contact.fullName || payload.fullName || null,
-      // Contribute this line to the enclosing declaration or statement.
       contact.phoneNumber || payload.phoneNumber || null,
-      // Contribute this line to the enclosing declaration or statement.
       contact.email || payload.email || null,
-      // Contribute this line to the enclosing declaration or statement.
       contact.address || payload.address || null,
-      // Contribute this line to the enclosing declaration or statement.
       contact.hotelName || payload.hotelName || null,
-      // Contribute this line to the enclosing declaration or statement.
       holdExpiresAt,
     ]
   );
 
-  // Return the resulting value to the caller.
   return mapSqlReservation(result.rows[0]);
 }
 
-// Assign the CommonJS module exports.
 module.exports = {
-  // Contribute this line to the enclosing declaration or statement.
   update,
-  // Contribute this line to the enclosing declaration or statement.
   applyStatusChange,
-  // Contribute this line to the enclosing declaration or statement.
   reserveCheckoutAttempt,
-  // Contribute this line to the enclosing declaration or statement.
   createConfirmedReservation,
 };

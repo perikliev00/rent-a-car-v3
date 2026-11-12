@@ -2,11 +2,8 @@
  * Calendar range navigation, density/view switcher, and quick actions.
  */
 import { Button } from '../../../components/ui/Button';
-// Import named exports from '../../../components/ui/DateSelect'.
 import { DateSelect } from '../../../components/ui/DateSelect';
-// Contribute this line to the enclosing declaration or statement.
 import type { CalendarViewMode } from './calendar.types';
-// Import named exports from './formatCalendarRangeTitle'.
 import { formatCalendarRangeTitle } from './formatCalendarRangeTitle';
 
 /**
@@ -23,58 +20,32 @@ import { formatCalendarRangeTitle } from './formatCalendarRangeTitle';
  * @param onPreferAgendaChange - Persist agenda preference
  */
 export function CalendarToolbar({
-  // Contribute this line to the enclosing declaration or statement.
   view,
-  // Contribute this line to the enclosing declaration or statement.
   anchor,
-  // Contribute this line to the enclosing declaration or statement.
   from,
-  // Contribute this line to the enclosing declaration or statement.
   to,
-  // Contribute this line to the enclosing declaration or statement.
   onViewChange,
-  // Contribute this line to the enclosing declaration or statement.
   onPrev,
-  // Contribute this line to the enclosing declaration or statement.
   onNext,
-  // Contribute this line to the enclosing declaration or statement.
   onToday,
-  // Contribute this line to the enclosing declaration or statement.
   onAnchorChange,
-  // Contribute this line to the enclosing declaration or statement.
   preferAgenda,
-  // Contribute this line to the enclosing declaration or statement.
   onPreferAgendaChange,
-// Contribute this line to the enclosing declaration or statement.
 }: {
-  // Provide the view field value.
   view: CalendarViewMode;
-  // Provide the anchor field value.
   anchor: string;
-  // Provide the from field value.
   from: Date;
-  // Provide the to field value.
   to: Date;
-  // Provide the on view change field value.
   onViewChange: (v: CalendarViewMode) => void;
-  // Provide the on prev field value.
   onPrev: () => void;
-  // Provide the on next field value.
   onNext: () => void;
-  // Provide the on today field value.
   onToday: () => void;
-  // Provide the on anchor change field value.
   onAnchorChange: (date: string) => void;
-  // Contribute this line to the enclosing declaration or statement.
   preferAgenda?: boolean;
-  // Continue the surrounding logic with this statement.
   onPreferAgendaChange?: (value: boolean) => void;
-// Continue the surrounding logic with this statement.
 }) {
-  // Create the title constant.
   const title = formatCalendarRangeTitle(view, from, to);
 
-  // Return control to the caller with the following value.
   return (
     <div className="flex min-w-0 flex-col gap-3">
       <div className="flex min-w-0 flex-wrap items-center gap-2">

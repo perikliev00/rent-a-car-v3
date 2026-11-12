@@ -3,9 +3,7 @@
  * Content is static marketing data — not live inventory pricing.
  */
 import { useState } from 'react';
-// Import named exports from 'react-router-dom'.
 import { Link } from 'react-router-dom';
-// Import named exports from '../../data/marketingAssets'.
 import { dealTabs, dealTiles, type DealTabId } from '../../data/marketingAssets';
 
 /**
@@ -14,12 +12,10 @@ import { dealTabs, dealTiles, type DealTabId } from '../../data/marketingAssets'
  * @returns Marketing section; tab state is local and not synced to the URL.
  */
 export function DealsSection() {
-  // Destructure array values into local variables.
   const [activeTab, setActiveTab] = useState<DealTabId>('cities');
   // Fall back to the first tab if the active id is ever missing from data.
   const active = dealTabs.find((tab) => tab.id === activeTab) ?? dealTabs[0];
 
-  // Return control to the caller with the following value.
   return (
     <section className="bg-[var(--color-surface-elevated)] py-14 sm:py-16">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">

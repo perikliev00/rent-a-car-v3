@@ -3,25 +3,16 @@
  * Search results show trip `totalPrice`; catalog cards fall back to day/tier list price.
  */
 import { useEffect, useState } from 'react';
-// Import named exports from 'react-router-dom'.
 import { Link } from 'react-router-dom';
-// Contribute this line to the enclosing declaration or statement.
 import type { Car, SearchCar } from '../../types/api';
-// Import named exports from '../../utils/format'.
 import { formatPrice, imageUrl } from '../../utils/format';
-// Import named exports from '../ui/Button'.
 import { Button } from '../ui/Button';
 
-// Create the placeholder image constant.
 const PLACEHOLDER_IMAGE = '/placeholder-car.svg';
 
-// Declare the CarCardProps TypeScript interface.
 interface CarCardProps {
-  // Provide the car field value.
   car: Car | SearchCar;
-  // Contribute this line to the enclosing declaration or statement.
   detailUrl?: string;
-  // Contribute this line to the enclosing declaration or statement.
   showPricing?: boolean;
 }
 
@@ -32,7 +23,6 @@ interface CarCardProps {
  * @returns Type predicate for search-priced cars.
  */
 function hasSearchPricing(car: Car | SearchCar): car is SearchCar {
-  // Return the resulting value to the caller.
   return 'totalPrice' in car && typeof car.totalPrice === 'number';
 }
 
@@ -46,24 +36,18 @@ function hasSearchPricing(car: Car | SearchCar): car is SearchCar {
  * @remarks Side effect: swaps to the placeholder image on load error.
  */
 export function CarCard({ car, detailUrl, showPricing = true }: CarCardProps) {
-  // Destructure array values into local variables.
   const [imgSrc, setImgSrc] = useState(() => imageUrl(car.image));
 
   // Keep the resolved src in sync when the car identity/image changes.
   useEffect(() => {
-    // Call setImgSrc to perform this step.
     setImgSrc(imageUrl(car.image));
-  // Continue the surrounding logic with this statement.
   }, [car.image]);
 
   // Prefer trip total from search; otherwise show the best available list day rate.
   const price = hasSearchPricing(car)
-    // Contribute this line to the enclosing declaration or statement.
     ? car.totalPrice
-    // Contribute this line to the enclosing declaration or statement.
     : car.pricePerDay ?? car.priceTier_1_3 ?? car.price ?? 0;
 
-  // Return control to the caller with the following value.
   return (
     <article className="motion-safe-lift group min-w-0 overflow-hidden border border-[var(--color-line)] bg-[var(--color-surface-elevated)] shadow-[var(--shadow-soft)] hover:shadow-[var(--shadow-lift)]">
       <div className="aspect-[16/10] overflow-hidden bg-[var(--color-navy)]">

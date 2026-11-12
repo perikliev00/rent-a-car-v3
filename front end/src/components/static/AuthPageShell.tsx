@@ -2,20 +2,13 @@
  * Two-column layout for login/signup/verify pages: form column + branded aside image.
  */
 import type { ReactNode } from 'react';
-// Import named exports from '../../data/marketingAssets'.
 import { authAsideImage } from '../../data/marketingAssets';
 
-// Declare the AuthPageShellProps TypeScript interface.
 interface AuthPageShellProps {
-  // Provide the title field value.
   title: string;
-  // Provide the subtitle field value.
   subtitle: string;
-  // Provide the children field value.
   children: ReactNode;
-  // Contribute this line to the enclosing declaration or statement.
   sideTitle?: string;
-  // Contribute this line to the enclosing declaration or statement.
   sideDescription?: string;
 }
 
@@ -30,19 +23,12 @@ interface AuthPageShellProps {
  * @returns Responsive auth page shell.
  */
 export function AuthPageShell({
-  // Contribute this line to the enclosing declaration or statement.
   title,
-  // Contribute this line to the enclosing declaration or statement.
   subtitle,
-  // Contribute this line to the enclosing declaration or statement.
   children,
-  // Update sideTitle with the right-hand side value.
   sideTitle = 'Drive Bulgaria in style',
-  // Update sideDescription with the right-hand side value.
   sideDescription = 'Premium car rental with transparent pricing and instant online booking.',
-// Continue the surrounding logic with this statement.
 }: AuthPageShellProps) {
-  // Return control to the caller with the following value.
   return (
     <div className="mx-auto grid min-h-[calc(100vh-8rem)] max-w-6xl min-w-0 items-stretch gap-0 px-4 py-10 sm:px-6 lg:grid-cols-2 lg:py-14">
       <aside className="relative hidden overflow-hidden text-white lg:flex lg:flex-col lg:justify-end">

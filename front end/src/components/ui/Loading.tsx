@@ -6,7 +6,6 @@
  * @param props.className - Extra classes on the centering wrapper.
  */
 export function Spinner({ className = '' }: { className?: string }) {
-  // Return control to the caller with the following value.
   return (
     <div className={`flex items-center justify-center ${className}`}>
       <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--color-line)] border-t-[var(--color-accent)]" />
@@ -29,7 +28,6 @@ export function Skeleton({ className = '' }: { className?: string }) {
  * @returns A viewport-tall flex container with a {@link Spinner}.
  */
 export function PageLoader() {
-  // Return control to the caller with the following value.
   return (
     <div className="flex min-h-[40vh] items-center justify-center">
       <Spinner />

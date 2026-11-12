@@ -3,51 +3,28 @@
  * Submitting search navigates to `/search` with trip criteria in the query string.
  */
 import { useState } from 'react';
-// Import named exports from 'react-router-dom'.
 import { useNavigate } from 'react-router-dom';
-// Import named exports from '@tanstack/react-query'.
 import { useQuery } from '@tanstack/react-query';
-// Import named exports from '../../api/cars'.
 import { getCars } from '../../api/cars';
-// Import named exports from '../../api/locations'.
 import { getCategories } from '../../api/locations';
-// Import named exports from '../../components/booking/SearchForm'.
 import { SearchForm } from '../../components/booking/SearchForm';
-// Import named exports from '../../components/cars/CarCard'.
 import { CarCard } from '../../components/cars/CarCard';
-// Import named exports from the referenced module.
 import {
-  // Contribute this line to the enclosing declaration or statement.
   applyFleetFiltersToParams,
-  // Contribute this line to the enclosing declaration or statement.
   CarFleetFilters,
-  // Declare the FleetFilterValue TypeScript type alias.
   type FleetFilterValue,
-// Contribute this line to the enclosing declaration or statement.
 } from '../../components/cars/CarFleetFilters';
-// Import named exports from '../../components/marketing/AdvantageSplit'.
 import { AdvantageSplit } from '../../components/marketing/AdvantageSplit';
-// Import named exports from '../../components/marketing/DealsSection'.
 import { DealsSection } from '../../components/marketing/DealsSection';
-// Import named exports from '../../components/marketing/ReviewsCarousel'.
 import { ReviewsCarousel } from '../../components/marketing/ReviewsCarousel';
-// Import named exports from '../../components/ui/Button'.
 import { Button } from '../../components/ui/Button';
-// Import named exports from '../../components/ui/Loading'.
 import { Skeleton } from '../../components/ui/Loading';
-// Import named exports from the referenced module.
 import {
-  // Contribute this line to the enclosing declaration or statement.
   heroImage,
-  // Contribute this line to the enclosing declaration or statement.
   heroImageAlt,
-  // Contribute this line to the enclosing declaration or statement.
   partnerMarks,
-// Contribute this line to the enclosing declaration or statement.
 } from '../../data/marketingAssets';
-// Import named exports from '../../utils/searchParams'.
 import { defaultSearchParams, searchParamsToQuery } from '../../utils/searchParams';
-// Contribute this line to the enclosing declaration or statement.
 import type { SearchParams } from '../../types/api';
 
 /**
@@ -57,50 +34,34 @@ import type { SearchParams } from '../../types/api';
  * @remarks Side effect: `handleSearch` navigates to `/search` with trip + filter query params.
  */
 export function HomePage() {
-  // Create the navigate constant.
   const navigate = useNavigate();
-  // Destructure array values into local variables.
   const [search, setSearch] = useState<SearchParams>(defaultSearchParams());
-  // Destructure array values into local variables.
   const [filters, setFilters] = useState<FleetFilterValue>({});
-  // Destructure array values into local variables.
   const [page, setPage] = useState(1);
 
-  // Destructure object properties into local variables.
   const { data: categoriesData } = useQuery({
-    // Provide the query key field value.
     queryKey: ['categories'],
-    // Provide the query fn field value.
     queryFn: getCategories,
   });
 
-  // Destructure object properties into local variables.
   const { data, isLoading } = useQuery({
-    // Provide the query key field value.
     queryKey: ['cars', 'home', filters, page],
-    // Provide the query fn field value.
     queryFn: () => getCars({ ...filters, page }),
   });
 
   /** Apply fleet filters and reset pagination to page 1. */
   const handleFiltersChange = (next: FleetFilterValue) => {
-    // Call setFilters to perform this step.
     setFilters(next);
-    // Call setPage to perform this step.
     setPage(1);
   };
 
   /** Navigate to search results with the current trip criteria and filters. */
   const handleSearch = () => {
-    // Create the params constant.
     const params = new URLSearchParams(searchParamsToQuery(search));
-    // Call applyFleetFiltersToParams to perform this step.
     applyFleetFiltersToParams(params, filters);
-    // Call navigate to perform this step.
     navigate(`/search?${params.toString()}`);
   };
 
-  // Return control to the caller with the following value.
   return (
     <div className="min-w-0 overflow-x-clip">
       <section className="relative overflow-x-clip text-white">

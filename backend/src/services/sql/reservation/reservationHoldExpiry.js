@@ -2,26 +2,18 @@
  * Expire stale reservation holds and release related calendar pressure.
  */
 const { clientQuery } = require('../../../db/transaction');
-// Destructure object properties into local variables.
 const { ACTIVE_RESERVATION_STATUSES } = require('../../../utils/reservationHelpers');
-// Destructure object properties into local variables.
 const { normalizeCarId } = require('./reservationMapper');
 
 /** Marks expired holds for one car so they leave the partial exclusion constraint. */
 async function expireStaleHoldsForCar(carId, now = new Date(), client = null) {
-  // Create the normalized car id constant.
   const normalizedCarId = normalizeCarId(carId);
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!normalizedCarId) {
-    // Return the resulting value to the caller.
     return 0;
   }
 
-  // Create the result constant.
   const result = await clientQuery(
-    // Contribute this line to the enclosing declaration or statement.
     client,
-    // Continue the surrounding logic with this statement.
     `
     WITH to_expire AS (
       SELECT id, status AS old_status
@@ -48,11 +40,9 @@ async function expireStaleHoldsForCar(carId, now = new Date(), client = null) {
     FROM updated
     RETURNING reservation_id
     `,
-    // Contribute this line to the enclosing declaration or statement.
     [normalizedCarId, now, ACTIVE_RESERVATION_STATUSES]
   );
 
-  // Return the resulting value to the caller.
   return result.rowCount || 0;
 }
 
@@ -63,17 +53,12 @@ async function expireStaleHoldsForCar(carId, now = new Date(), client = null) {
  * @param {object|null} [client]
  */
 async function expireStaleHoldsForSession(sessionId, now = new Date(), client = null) {
-  // Guard: early-return or throw when required input is missing/invalid.
   if (!sessionId) {
-    // Return the resulting value to the caller.
     return 0;
   }
 
-  // Create the result constant.
   const result = await clientQuery(
-    // Contribute this line to the enclosing declaration or statement.
     client,
-    // Continue the surrounding logic with this statement.
     `
     WITH to_expire AS (
       SELECT id, status AS old_status
@@ -100,11 +85,9 @@ async function expireStaleHoldsForSession(sessionId, now = new Date(), client = 
     FROM updated
     RETURNING reservation_id
     `,
-    // Contribute this line to the enclosing declaration or statement.
     [sessionId, now, ACTIVE_RESERVATION_STATUSES]
   );
 
-  // Return the resulting value to the caller.
   return result.rowCount || 0;
 }
 
@@ -115,11 +98,8 @@ async function expireStaleHoldsForSession(sessionId, now = new Date(), client = 
  * @returns {Promise<*>}
  */
 async function markReservationExpired(reservationId, now = new Date(), client = null) {
-  // Create the result constant.
   const result = await clientQuery(
-    // Contribute this line to the enclosing declaration or statement.
     client,
-    // Continue the surrounding logic with this statement.
     `
     WITH to_expire AS (
       SELECT id, status AS old_status
@@ -144,11 +124,9 @@ async function markReservationExpired(reservationId, now = new Date(), client = 
     FROM updated
     RETURNING reservation_id
     `,
-    // Contribute this line to the enclosing declaration or statement.
     [reservationId, now]
   );
 
-  // Return the resulting value to the caller.
   return (result.rowCount || 0) > 0;
 }
 
@@ -159,24 +137,16 @@ async function markReservationExpired(reservationId, now = new Date(), client = 
  * @returns {Promise<*>}
  */
 async function markAbandonedReservations(activeSessionIds, now = new Date(), client = null) {
-  // Create the params constant.
   const params = [ACTIVE_RESERVATION_STATUSES, now];
-  // Create the abandon conditions constant.
   const abandonConditions = ['r.hold_expires_at <= $2', 'r.session_id IS NULL'];
 
-  // Evaluate the condition and enter the branch when it is true.
   if (activeSessionIds.length) {
-    // Call params.push to perform this step.
     params.push(activeSessionIds);
-    // Call abandonConditions.push to perform this step.
     abandonConditions.push(`r.session_id <> ALL($${params.length}::text[])`);
   }
 
-  // Create the result constant.
   const result = await clientQuery(
-    // Contribute this line to the enclosing declaration or statement.
     client,
-    // Continue the surrounding logic with this statement.
     `
     WITH to_expire AS (
       SELECT r.id, r.status AS old_status
@@ -203,29 +173,19 @@ async function markAbandonedReservations(activeSessionIds, now = new Date(), cli
     FROM updated
     RETURNING reservation_id
     `,
-    // Reference the identifier used by the enclosing expression.
     params
   );
 
-  // Create the reservation ids constant.
   const reservationIds = (result.rows || [])
-    // Call .map to perform this step.
     .map((row) => (row.reservation_id != null ? String(row.reservation_id) : null))
-    // Call .filter to perform this step.
     .filter(Boolean);
 
-  // Return the resulting value to the caller.
   return { count: reservationIds.length || result.rowCount || 0, reservationIds };
 }
 
-// Assign the CommonJS module exports.
 module.exports = {
-  // Contribute this line to the enclosing declaration or statement.
   expireStaleHoldsForCar,
-  // Contribute this line to the enclosing declaration or statement.
   expireStaleHoldsForSession,
-  // Contribute this line to the enclosing declaration or statement.
   markReservationExpired,
-  // Contribute this line to the enclosing declaration or statement.
   markAbandonedReservations,
 };

@@ -5,104 +5,64 @@
  * inserted after Calendar when present so ops staff find them next to scheduling.
  */
 import { NavLink, Outlet, Link, useLocation } from 'react-router-dom';
-// Import named exports from 'react'.
 import { useEffect, useState } from 'react';
-// Import named exports from '@tanstack/react-query'.
 import { useQuery } from '@tanstack/react-query';
-// Import named exports from '../../auth/useAuth'.
 import { useAuth } from '../../auth/useAuth';
-// Import named exports from '../../auth/permissions'.
 import { hasAnyPermission, hasPermission } from '../../auth/permissions';
-// Import named exports from '../../api/admin/cars'.
 import { getFleetAlerts } from '../../api/admin/cars';
-// Import named exports from '../../hooks/useAdminRealtime'.
 import { useAdminRealtime } from '../../hooks/useAdminRealtime';
-// Import named exports from '../ui/Button'.
 import { Button } from '../ui/Button';
-// Import named exports from '../ui/Drawer'.
 import { Drawer } from '../ui/Drawer';
 
-// Declare the NavItem TypeScript type alias.
 type NavItem = {
-  // Provide the to field value.
   to: string;
-  // Provide the label field value.
   label: string;
-  // Contribute this line to the enclosing declaration or statement.
   end?: boolean;
   /** Visible to any authenticated staff user. */
   staffOnly?: boolean;
-  // Contribute this line to the enclosing declaration or statement.
   permission?: string;
-  // Contribute this line to the enclosing declaration or statement.
   anyOf?: string[];
 };
 
 /** Static nav catalog; filtered per-user before render. */
 const adminNav: NavItem[] = [
-  // Contribute this line to the enclosing declaration or statement.
   { to: '/admin', label: 'Dashboard', end: true, staffOnly: true },
   {
-    // Provide the to field value.
     to: '/admin/reservations',
-    // Provide the label field value.
     label: 'Ops',
-    // Provide the permission field value.
     permission: 'can_view_reservations_ops',
   },
   {
-    // Provide the to field value.
     to: '/admin/calendar',
-    // Provide the label field value.
     label: 'Calendar',
-    // Provide the any of field value.
     anyOf: ['can_view_calendar', 'can_view_own_calendar_tasks'],
   },
-  // Contribute this line to the enclosing declaration or statement.
   { to: '/admin/cars', label: 'Cars', permission: 'can_manage_cars' },
-  // Contribute this line to the enclosing declaration or statement.
   { to: '/admin/pricing', label: 'Pricing', permission: 'can_manage_pricing' },
   {
-    // Provide the to field value.
     to: '/admin/fleet-alerts',
-    // Provide the label field value.
     label: 'Fleet alerts',
-    // Provide the permission field value.
     permission: 'can_manage_fleet_alerts',
   },
-  // Contribute this line to the enclosing declaration or statement.
   { to: '/admin/orders', label: 'Orders', permission: 'can_view_orders' },
-  // Contribute this line to the enclosing declaration or statement.
   { to: '/admin/contacts', label: 'Contacts', permission: 'can_manage_contacts' },
   {
-    // Provide the to field value.
     to: '/admin/payments',
-    // Provide the label field value.
     label: 'Payments',
-    // Provide the any of field value.
     anyOf: ['can_manage_payments_monitor', 'can_view_revenue', 'can_refund_payments'],
   },
   {
-    // Provide the to field value.
     to: '/admin/analytics',
-    // Provide the label field value.
     label: 'Analytics',
-    // Provide the any of field value.
     anyOf: ['can_view_revenue', 'can_export_reports'],
   },
   {
-    // Provide the to field value.
     to: '/admin/notifications',
-    // Provide the label field value.
     label: 'Notifications',
-    // Provide the permission field value.
     permission: 'can_manage_notifications',
   },
-  // Contribute this line to the enclosing declaration or statement.
   { to: '/admin/audit-logs', label: 'Audit logs', permission: 'can_view_audit_logs' },
-  // Contribute this line to the enclosing declaration or statement.
   { to: '/admin/users', label: 'Users', permission: 'can_manage_users' },
-  // Contribute this line to the enclosing declaration or statement.
   { to: '/admin/roles', label: 'Roles', permission: 'can_manage_users' },
 ];
 
@@ -111,13 +71,9 @@ const adminNav: NavItem[] = [
  * @param roles - Session role slugs
  */
 function myTasksPath(roles: string[] | undefined): string {
-  // Evaluate the condition and enter the branch when it is true.
   if (roles?.includes('driver')) return '/admin/tasks/driver';
-  // Evaluate the condition and enter the branch when it is true.
   if (roles?.includes('cleaner')) return '/admin/tasks/cleaner';
-  // Evaluate the condition and enter the branch when it is true.
   if (roles?.includes('receptionist')) return '/admin/tasks/receptionist';
-  // Return the resulting value to the caller.
   return '/admin/tasks/driver';
 }
 
@@ -126,24 +82,15 @@ function myTasksPath(roles: string[] | undefined): string {
  * @param state - Connection state from {@link useAdminRealtime}
  */
 function LiveIndicator({ state }: { state: ReturnType<typeof useAdminRealtime> }) {
-  // Evaluate the condition and enter the branch when it is true.
   if (state === 'idle') return null;
-  // Create the label constant.
   const label = state === 'live' ? 'Live' : state === 'connecting' ? 'Connecting' : 'Offline';
-  // Create the dot class constant.
   const dotClass =
-    // Update state with the right-hand side value.
     state === 'live'
-      // Continue the surrounding logic with this statement.
       ? 'bg-[var(--color-success)]'
-      // Continue the surrounding logic with this statement.
       : state === 'connecting'
-        // Continue the surrounding logic with this statement.
         ? 'bg-[var(--color-accent)]'
-        // Continue the surrounding logic with this statement.
         : 'bg-[var(--color-danger)]';
 
-  // Return control to the caller with the following value.
   return (
     <span
       className="ml-2 inline-flex items-center gap-1.5 align-middle text-[10px] font-sans font-medium uppercase tracking-wider text-slate-400"
@@ -165,27 +112,16 @@ function LiveIndicator({ state }: { state: ReturnType<typeof useAdminRealtime> }
  * @param variant - Visual style for sidebar vs drawer
  */
 function NavItems({
-  // Contribute this line to the enclosing declaration or statement.
   items,
-  // Contribute this line to the enclosing declaration or statement.
   alertCount,
-  // Contribute this line to the enclosing declaration or statement.
   onNavigate,
-  // Contribute this line to the enclosing declaration or statement.
   variant,
-// Contribute this line to the enclosing declaration or statement.
 }: {
-  // Provide the items field value.
   items: NavItem[];
-  // Provide the alert count field value.
   alertCount: number;
-  // Continue the surrounding logic with this statement.
   onNavigate?: () => void;
-  // Provide the variant field value.
   variant: 'sidebar' | 'drawer';
-// Continue the surrounding logic with this statement.
 }) {
-  // Return control to the caller with the following value.
   return (
     <>
       {items.map((item) => (
@@ -222,97 +158,62 @@ function NavItems({
 
 /** Admin chrome: RBAC-gated nav, fleet-alert badge, SSE live indicator, mobile drawer. Nav visibility is permission-driven (not role slug alone). Task links are inserted after Calendar when present so ops staff find them next to scheduling. */
 export function AdminLayout() {
-  // Destructure object properties into local variables.
   const { user, logout } = useAuth();
-  // Create the location constant.
   const location = useLocation();
-  // Destructure array values into local variables.
   const [menuOpen, setMenuOpen] = useState(false);
   // SSE lives here so all admin pages share one connection + live indicator.
   const realtimeState = useAdminRealtime();
-  // Create the can see fleet alerts constant.
   const canSeeFleetAlerts = hasPermission(user, 'can_manage_fleet_alerts');
-  // Destructure object properties into local variables.
   const { data: fleetAlerts } = useQuery({
-    // Provide the query key field value.
     queryKey: ['admin', 'fleet-alerts'],
-    // Provide the query fn field value.
     queryFn: getFleetAlerts,
-    // Provide the stale time field value.
     staleTime: 60_000,
-    // Provide the enabled field value.
     enabled: canSeeFleetAlerts,
   });
-  // Create the alert count constant.
   const alertCount = fleetAlerts?.summary.total ?? 0;
 
-  // Call useEffect to perform this step.
   useEffect(() => {
-    // Call setMenuOpen to perform this step.
     setMenuOpen(false);
-  // Continue the surrounding logic with this statement.
   }, [location.pathname]);
 
   // Manager task board and/or role-specific “My tasks” links.
   const taskNav: NavItem[] = [];
-  // Evaluate the condition and enter the branch when it is true.
   if (
-    // Call hasPermission to perform this step.
     hasPermission(user, 'can_create_calendar_tasks') ||
-    // Call hasPermission to perform this step.
     hasPermission(user, 'can_assign_calendar_staff')
-  // Continue the surrounding logic with this statement.
   ) {
-    // Call taskNav.push to perform this step.
     taskNav.push({ to: '/admin/tasks', label: 'Tasks' });
   }
-  // Evaluate the condition and enter the branch when it is true.
   if (
-    // Call hasPermission to perform this step.
     hasPermission(user, 'can_view_own_calendar_tasks') ||
-    // Continue the surrounding logic with this statement.
     (user?.roles || []).some((r) => ['driver', 'cleaner', 'receptionist'].includes(r))
-  // Continue the surrounding logic with this statement.
   ) {
-    // Call taskNav.push to perform this step.
     taskNav.push({ to: myTasksPath(user?.roles), label: 'My tasks' });
   }
 
   // RBAC filter of the static nav catalog.
   const visibleNav = [
-    // Call ...adminNav.filter to perform this step.
     ...adminNav.filter((item) => {
-      // Evaluate the condition and enter the branch when it is true.
       if (item.staffOnly) return true;
-      // Evaluate the condition and enter the branch when it is true.
       if (item.anyOf) return hasAnyPermission(user, item.anyOf);
-      // Evaluate the condition and enter the branch when it is true.
       if (item.permission) return hasPermission(user, item.permission);
-      // Return the resulting value to the caller.
       return true;
     }),
   ];
 
   // Keep task boards adjacent to Calendar in the sidebar order.
   const calendarIdx = visibleNav.findIndex((i) => i.to === '/admin/calendar');
-  // Evaluate the condition and enter the branch when it is true.
   if (calendarIdx >= 0) {
-    // Call visibleNav.splice to perform this step.
     visibleNav.splice(calendarIdx + 1, 0, ...taskNav);
-  // Contribute this line to the enclosing declaration or statement.
   } else {
-    // Call visibleNav.splice to perform this step.
     visibleNav.splice(1, 0, ...taskNav);
   }
 
   // Optional link back to the public booking site (strip trailing slashes).
   const customerUrl = import.meta.env.VITE_CUSTOMER_FRONTEND_URL
-    // Continue the surrounding logic with this statement.
     ? import.meta.env.VITE_CUSTOMER_FRONTEND_URL.replace(/\/+$/, '')
-    // Contribute this line to the enclosing declaration or statement.
     : '';
 
-  // Return control to the caller with the following value.
   return (
     <div className="flex min-h-screen bg-[var(--color-surface)]">
       <aside className="hidden w-64 flex-shrink-0 bg-asphalt text-slate-300 lg:flex lg:flex-col">

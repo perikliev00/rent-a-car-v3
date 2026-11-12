@@ -26,27 +26,16 @@ const { round2 } = require('./pricingMath');
 function buildEmptyPriceResult() {
   // All monetary fields zeroed; snapshot omitted so callers do not persist an empty quote.
   return {
-    // Provide the currency field value.
     currency: 'EUR',
-    // Provide the rental days field value.
     rentalDays: 0,
-    // Provide the day price field value.
     dayPrice: 0,
-    // Provide the unit price field value.
     unitPrice: 0,
-    // Provide the delivery price field value.
     deliveryPrice: 0,
-    // Provide the return price field value.
     returnPrice: 0,
-    // Provide the lines field value.
     lines: [],
-    // Provide the total price field value.
     totalPrice: 0,
-    // Provide the deposit field value.
     deposit: 0,
-    // Provide the price breakdown field value.
     priceBreakdown: { lines: [], totalPrice: 0, deposit: 0, currency: 'EUR' },
-    // Provide the snapshot field value.
     snapshot: null,
   };
 }
@@ -73,102 +62,58 @@ function buildEmptyPriceResult() {
  * @throws {never}
  */
 function buildPriceResult({
-  // Contribute this line to the enclosing declaration or statement.
   rentalDays,
-  // Contribute this line to the enclosing declaration or statement.
   dayPrice,
-  // Contribute this line to the enclosing declaration or statement.
   deliveryPrice,
-  // Contribute this line to the enclosing declaration or statement.
   returnPrice,
-  // Contribute this line to the enclosing declaration or statement.
   lines,
-  // Contribute this line to the enclosing declaration or statement.
   deposit,
-  // Contribute this line to the enclosing declaration or statement.
   pickupLocation,
-  // Contribute this line to the enclosing declaration or statement.
   returnLocation,
-  // Contribute this line to the enclosing declaration or statement.
   hotelDelivery,
-  // Contribute this line to the enclosing declaration or statement.
   selectedExtras,
-  // Contribute this line to the enclosing declaration or statement.
   lateReturn,
-  // Contribute this line to the enclosing declaration or statement.
   fuelFee,
-  // Contribute this line to the enclosing declaration or statement.
   bookedAt,
-// Continue the surrounding logic with this statement.
 }) {
   // Sum every line amount (base, surcharges, fees, discounts) and round the total.
   const totalPrice = round2(lines.reduce((sum, line) => sum + Number(line.amount || 0), 0));
 
   // Snapshot captures inputs + lines for audit / re-display after config changes.
   const snapshot = {
-    // Provide the currency field value.
     currency: 'EUR',
-    // Contribute this line to the enclosing declaration or statement.
     rentalDays,
-    // Contribute this line to the enclosing declaration or statement.
     dayPrice,
-    // Contribute this line to the enclosing declaration or statement.
     pickupLocation,
-    // Contribute this line to the enclosing declaration or statement.
     returnLocation,
-    // Provide the hotel delivery field value.
     hotelDelivery: Boolean(hotelDelivery),
-    // Contribute this line to the enclosing declaration or statement.
     selectedExtras,
-    // Provide the late return field value.
     lateReturn: Boolean(lateReturn),
-    // Provide the fuel fee field value.
     fuelFee: Boolean(fuelFee),
-    // Provide the booked at field value.
     bookedAt: (bookedAt instanceof Date ? bookedAt : new Date()).toISOString(),
-    // Contribute this line to the enclosing declaration or statement.
     lines,
-    // Contribute this line to the enclosing declaration or statement.
     totalPrice,
-    // Contribute this line to the enclosing declaration or statement.
     deposit,
-    // Contribute this line to the enclosing declaration or statement.
     deliveryPrice,
-    // Contribute this line to the enclosing declaration or statement.
     returnPrice,
   };
 
-  // Return the resulting value to the caller.
   return {
-    // Provide the currency field value.
     currency: 'EUR',
-    // Contribute this line to the enclosing declaration or statement.
     rentalDays,
-    // Contribute this line to the enclosing declaration or statement.
     dayPrice,
-    // Provide the unit price field value.
     unitPrice: dayPrice,
-    // Contribute this line to the enclosing declaration or statement.
     deliveryPrice,
-    // Contribute this line to the enclosing declaration or statement.
     returnPrice,
-    // Contribute this line to the enclosing declaration or statement.
     lines,
-    // Contribute this line to the enclosing declaration or statement.
     totalPrice,
-    // Contribute this line to the enclosing declaration or statement.
     deposit,
-    // Provide the price breakdown field value.
     priceBreakdown: { lines, totalPrice, deposit, currency: 'EUR' },
-    // Contribute this line to the enclosing declaration or statement.
     snapshot,
   };
 }
 
-// Assign the CommonJS module exports.
 module.exports = {
-  // Contribute this line to the enclosing declaration or statement.
   buildEmptyPriceResult,
-  // Contribute this line to the enclosing declaration or statement.
   buildPriceResult,
 };

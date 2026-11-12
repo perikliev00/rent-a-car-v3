@@ -2,72 +2,41 @@
  * Car overview/edit form and fleet status controls.
  */
 import {
-  // Contribute this line to the enclosing declaration or statement.
   CAR_FLEET_STATUSES,
-  // Contribute this line to the enclosing declaration or statement.
   FUEL_LEVEL_OPTIONS,
-// Contribute this line to the enclosing declaration or statement.
 } from '../../../api/admin/cars';
-// Import named exports from '../../../components/ui/Button'.
 import { Button } from '../../../components/ui/Button';
-// Import named exports from '../../../components/ui/Card'.
 import { Card, CardBody } from '../../../components/ui/Card';
-// Import named exports from '../../../components/ui/Input'.
 import { Input } from '../../../components/ui/Input';
-// Import named exports from '../../../components/ui/Select'.
 import { Select } from '../../../components/ui/Select';
-// Contribute this line to the enclosing declaration or statement.
 import type { CarFleetStatus, FuelLevel, OverviewForm } from './carDetailTypes';
 
-// Declare the CarLike TypeScript type alias.
 type CarLike = {
-  // Contribute this line to the enclosing declaration or statement.
   status?: string;
 };
 
 /** Car overview/edit form and fleet status controls. */
 export function CarOverviewTab({
-  // Contribute this line to the enclosing declaration or statement.
   car,
-  // Contribute this line to the enclosing declaration or statement.
   fleetStatus,
-  // Contribute this line to the enclosing declaration or statement.
   setFleetStatus,
-  // Contribute this line to the enclosing declaration or statement.
   overviewForm,
-  // Contribute this line to the enclosing declaration or statement.
   setOverviewForm,
-  // Contribute this line to the enclosing declaration or statement.
   statusMutationPending,
-  // Contribute this line to the enclosing declaration or statement.
   overviewMutationPending,
-  // Contribute this line to the enclosing declaration or statement.
   onApplyStatus,
-  // Contribute this line to the enclosing declaration or statement.
   onSaveOverview,
-// Contribute this line to the enclosing declaration or statement.
 }: {
-  // Provide the car field value.
   car: CarLike;
-  // Provide the fleet status field value.
   fleetStatus: CarFleetStatus | '';
-  // Provide the set fleet status field value.
   setFleetStatus: (v: CarFleetStatus | '') => void;
-  // Provide the overview form field value.
   overviewForm: OverviewForm;
-  // Provide the set overview form field value.
   setOverviewForm: (v: OverviewForm | ((prev: OverviewForm) => OverviewForm)) => void;
-  // Provide the status mutation pending field value.
   statusMutationPending: boolean;
-  // Provide the overview mutation pending field value.
   overviewMutationPending: boolean;
-  // Provide the on apply status field value.
   onApplyStatus: () => void;
-  // Provide the on save overview field value.
   onSaveOverview: () => void;
-// Continue the surrounding logic with this statement.
 }) {
-  // Return control to the caller with the following value.
   return (
     <div className="mt-6 space-y-4">
       <Card className="shadow-none">

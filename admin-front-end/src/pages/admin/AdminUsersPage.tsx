@@ -2,113 +2,70 @@
  * Staff user management and role assignment UI.
  */
 import { useMemo, useState } from 'react';
-// Import named exports from '@tanstack/react-query'.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-// Import named exports from '../../api/admin/users'.
 import { createAdminUser, getAdminUsers, putUserRoles } from '../../api/admin/users';
-// Import named exports from '../../api/admin/rbac'.
 import { getRbacCatalog } from '../../api/admin/rbac';
-// Import named exports from '../../components/ui/Button'.
 import { Button } from '../../components/ui/Button';
-// Import named exports from '../../components/ui/Input'.
 import { Input } from '../../components/ui/Input';
-// Import named exports from '../../components/ui/Card'.
 import { Card, CardBody } from '../../components/ui/Card';
-// Import named exports from '../../components/ui/Loading'.
 import { PageLoader } from '../../components/ui/Loading';
-// Import named exports from '../../components/ui/toastStore'.
 import { toast } from '../../components/ui/toastStore';
 
 /** Staff user management and role assignment UI. */
 export function AdminUsersPage() {
-  // Create the query client constant.
   const queryClient = useQueryClient();
-  // Destructure object properties into local variables.
   const { data: usersData, isLoading: usersLoading } = useQuery({
-    // Provide the query key field value.
     queryKey: ['admin', 'users'],
-    // Provide the query fn field value.
     queryFn: getAdminUsers,
   });
-  // Destructure object properties into local variables.
   const { data: catalog, isLoading: catalogLoading } = useQuery({
-    // Provide the query key field value.
     queryKey: ['admin', 'rbac'],
-    // Provide the query fn field value.
     queryFn: getRbacCatalog,
   });
 
-  // Destructure array values into local variables.
   const [email, setEmail] = useState('');
-  // Destructure array values into local variables.
   const [password, setPassword] = useState('');
-  // Destructure array values into local variables.
   const [createRoleIds, setCreateRoleIds] = useState<string[]>([]);
-  // Destructure array values into local variables.
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
-  // Destructure array values into local variables.
   const [editRoleIds, setEditRoleIds] = useState<string[]>([]);
 
-  // Create the roles constant.
   const roles = catalog?.roles || [];
 
-  // Create the create mutation constant.
   const createMutation = useMutation({
-    // Provide the mutation fn field value.
     mutationFn: createAdminUser,
-    // Provide the on success field value.
     onSuccess: () => {
-      // Call queryClient.invalidateQueries to perform this step.
       queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
-      // Call setEmail to perform this step.
       setEmail('');
-      // Call setPassword to perform this step.
       setPassword('');
-      // Call setCreateRoleIds to perform this step.
       setCreateRoleIds([]);
-      // Call toast to perform this step.
       toast('Staff user created', 'success');
     },
-    // Provide the on error field value.
     onError: (err) => toast((err as Error).message, 'error'),
   });
 
-  // Create the roles mutation constant.
   const rolesMutation = useMutation({
-    // Provide the mutation fn field value.
     mutationFn: ({ userId, roleIds }: { userId: string; roleIds: string[] }) =>
-      // Call putUserRoles to perform this step.
       putUserRoles(userId, roleIds),
-    // Provide the on success field value.
     onSuccess: () => {
-      // Call queryClient.invalidateQueries to perform this step.
       queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
-      // Call setEditingUserId to perform this step.
       setEditingUserId(null);
-      // Call toast to perform this step.
       toast('Roles updated', 'success');
     },
-    // Provide the on error field value.
     onError: (err) => toast((err as Error).message, 'error'),
   });
 
-  // Create the role options constant.
   const roleOptions = useMemo(
-    // Continue the surrounding logic with this statement.
     () => roles.map((r) => ({ id: r.id, label: r.name, slug: r.slug })),
-    // Contribute this line to the enclosing declaration or statement.
     [roles]
   );
 
   /** Toggle Role. */
   function toggleRole(list: string[], roleId: string): string[] {
-    // Return the resulting value to the caller.
     return list.includes(roleId) ? list.filter((id) => id !== roleId) : [...list, roleId];
   }
 
   if (usersLoading || catalogLoading) return <PageLoader />;
 
-  // Return control to the caller with the following value.
   return (
     <div className="min-w-0">
       <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--color-ink)] sm:text-3xl">Users</h1>

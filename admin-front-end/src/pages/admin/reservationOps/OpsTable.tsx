@@ -2,49 +2,30 @@
  * Shared table for ops widget reservation rows.
  */
 import type { OpsReservationRow } from '../../../api/admin/reservations';
-// Import named exports from '../refund/RefundLedgerBadge'.
 import { RefundLedgerBadge } from '../refund/RefundLedgerBadge';
-// Import named exports from './opsFormat'.
 import { formatWhen, statusChipClass } from './opsFormat';
-// Import named exports from './StatusActions'.
 import { StatusActions } from './StatusActions';
 
 /** Shared table for ops widget reservation rows. */
 export function OpsTable({
-  // Contribute this line to the enclosing declaration or statement.
   rows,
-  // Contribute this line to the enclosing declaration or statement.
   onChanged,
-  // Contribute this line to the enclosing declaration or statement.
   selectedId,
-  // Contribute this line to the enclosing declaration or statement.
   onSelect,
-  // Update showCancelReason with the right-hand side value.
   showCancelReason = false,
-  // Update allowRefund with the right-hand side value.
   allowRefund = false,
-// Contribute this line to the enclosing declaration or statement.
 }: {
-  // Provide the rows field value.
   rows: OpsReservationRow[];
-  // Provide the on changed field value.
   onChanged: () => void;
-  // Provide the selected id field value.
   selectedId: string | null;
-  // Provide the on select field value.
   onSelect: (id: string) => void;
-  // Contribute this line to the enclosing declaration or statement.
   showCancelReason?: boolean;
-  // Contribute this line to the enclosing declaration or statement.
   allowRefund?: boolean;
-// Continue the surrounding logic with this statement.
 }) {
-  // Evaluate the condition and enter the branch when it is true.
   if (!rows.length) {
     return <p className="text-sm text-[var(--color-muted)]">No items</p>;
   }
 
-  // Return control to the caller with the following value.
   return (
     <div className="min-w-0 overflow-x-auto overscroll-x-contain">
       <table className="w-full min-w-[40rem] text-left text-xs">
