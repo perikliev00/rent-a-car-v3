@@ -45,6 +45,14 @@ async function postRelease(agent) {
   return withCsrf(agent, agent.post('/api/reservations/release'));
 }
 
+async function postCheckoutCancel(agent, { sessionId } = {}) {
+  const req = withCsrf(agent, agent.post('/api/checkout/cancel'));
+  if (sessionId) {
+    return req.send({ session_id: sessionId });
+  }
+  return req.send({});
+}
+
 async function postAdminReservationStatus(agent, reservationId, body) {
   return withCsrf(agent, agent.post(`/api/admin/reservations/${reservationId}/status`)).send(
     body
@@ -93,6 +101,7 @@ module.exports = {
   postCheckout,
   postReleaseAndRehold,
   postRelease,
+  postCheckoutCancel,
   postAdminReservationStatus,
   postAdminReservationRefund,
   withCsrf,

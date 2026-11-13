@@ -16,13 +16,16 @@ describe('CheckoutCancelPage', () => {
     });
   });
 
-  it('renders cancel message', async () => {
-    renderWithRouter(<CheckoutCancelPage />, { route: '/checkout/cancel' });
+  it('renders cancel message and forwards Stripe session_id', async () => {
+    renderWithRouter(<CheckoutCancelPage />, {
+      route: '/checkout/cancel?session_id=cs_test_cancel_1',
+    });
 
     await waitFor(() => {
       expect(screen.getByText('Payment cancelled')).toBeInTheDocument();
     });
 
+    expect(checkoutCancel).toHaveBeenCalledWith('cs_test_cancel_1');
     expect(screen.getByTestId('checkout-cancel-message')).toHaveTextContent(
       'Your reservation hold has been released.'
     );

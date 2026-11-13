@@ -126,17 +126,80 @@ async function markFailed(id, errorMessage, client = null) {
   );
 }
 
-/** Return a stuck processing row to pending for retry. */
-async function requeuePending(id, client = null) {
+/**
+ * Return a processing (or failed-with-retry) row to pending.
+ * @param {string|number} id
+ * @param {object|null} [client]
+ * @param {{ delayMs?: number, lastError?: string }} [opts]
+ */
+async function requeuePending(id, client = null, opts = {}) {
+  const delayMs = Math.max(0, Number(opts.delayMs || 0));
+  const lastError =
+    opts.lastError != null ? String(opts.lastError).slice(0, 2000) : null;
   await clientQuery(
     client,
     `
     UPDATE notifications
-    SET status = 'pending', updated_at = NOW()
-    WHERE id = $1 AND status = 'processing'
+    SET status = 'pending',
+        scheduled_at = NOW() + ($2::int * INTERVAL '1 millisecond'),
+        last_error = COALESCE($3, last_error),
+        updated_at = NOW()
+    WHERE id = $1
+      AND status IN ('processing', 'failed', 'pending')
+    `,
+    [id, delayMs, lastError]
+  );
+}
+
+/**
+ * Claim one pending notification by id for immediate send (SKIP LOCKED).
+ * @param {string|number} id
+ * @param {object|null} [client]
+ */
+async function claimNotificationById(id, client = null) {
+  const result = await clientQuery(
+    client,
+    `
+    WITH due AS (
+      SELECT id
+      FROM notifications
+      WHERE id = $1
+        AND status = 'pending'
+      FOR UPDATE SKIP LOCKED
+    )
+    UPDATE notifications n
+    SET status = 'processing',
+        attempts = n.attempts + 1,
+        updated_at = NOW()
+    FROM due
+    WHERE n.id = due.id
+    RETURNING n.*
     `,
     [id]
   );
+  return mapRow(result.rows[0]);
+}
+
+/**
+ * Requeue abandoned processing rows older than the threshold.
+ * @param {{ olderThanMs?: number }} [opts]
+ * @param {object|null} [client]
+ */
+async function requeueStuckProcessing({ olderThanMs = 5 * 60 * 1000 } = {}, client = null) {
+  const result = await clientQuery(
+    client,
+    `
+    UPDATE notifications
+    SET status = 'pending',
+        scheduled_at = NOW(),
+        updated_at = NOW()
+    WHERE status = 'processing'
+      AND updated_at <= NOW() - ($1::int * INTERVAL '1 millisecond')
+    RETURNING id
+    `,
+    [Math.max(0, Number(olderThanMs) || 0)]
+  );
+  return result.rowCount || 0;
 }
 
 /** Admin list, newest first. */
@@ -185,9 +248,11 @@ async function countNotifications({ status = null } = {}, client = null) {
 module.exports = {
   insertNotification,
   claimDueNotifications,
+  claimNotificationById,
   markSent,
   markFailed,
   requeuePending,
+  requeueStuckProcessing,
   listNotifications,
   countNotifications,
   mapRow,

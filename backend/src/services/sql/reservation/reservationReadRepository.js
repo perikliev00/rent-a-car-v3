@@ -290,8 +290,13 @@ async function findProcessingWithStripeSession(client = null) {
       c.name AS car_name
     FROM reservations r
     LEFT JOIN cars c ON c.id = r.car_id
-    WHERE r.status = 'processing_payment'
-      AND r.stripe_session_id IS NOT NULL
+    WHERE r.stripe_session_id IS NOT NULL
+      AND r.status IN ('processing_payment', 'expired')
+      AND NOT EXISTS (
+        SELECT 1 FROM orders o
+        WHERE o.reservation_id = r.id
+          AND COALESCE(o.is_deleted, FALSE) = FALSE
+      )
     ORDER BY r.updated_at ASC
     `
   );
@@ -300,7 +305,8 @@ async function findProcessingWithStripeSession(client = null) {
 }
 
 /**
- * Find processing with expired hold via SQL; returns null when missing.
+ * Find unfinished Stripe checkout attempts whose hold window has elapsed.
+ * Includes legacy rows already marked expired while still unpaid/unfinalized.
  * @param {*} [now]
  * @returns {Promise<*>}
  */
@@ -313,9 +319,14 @@ async function findProcessingWithExpiredHold(now = new Date(), client = null) {
       c.name AS car_name
     FROM reservations r
     LEFT JOIN cars c ON c.id = r.car_id
-    WHERE r.status = 'processing_payment'
-      AND r.stripe_session_id IS NOT NULL
+    WHERE r.stripe_session_id IS NOT NULL
+      AND r.status IN ('processing_payment', 'expired')
       AND r.hold_expires_at <= $1
+      AND NOT EXISTS (
+        SELECT 1 FROM orders o
+        WHERE o.reservation_id = r.id
+          AND COALESCE(o.is_deleted, FALSE) = FALSE
+      )
     ORDER BY r.updated_at ASC
     `,
     [now]

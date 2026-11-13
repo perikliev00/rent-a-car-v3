@@ -34,13 +34,22 @@ export async function checkoutSuccess(sessionId: string): Promise<CheckoutSucces
 /**
  * Notify the backend that the customer abandoned Stripe Checkout.
  *
+ * @param sessionId - Stripe Checkout Session id from the cancel redirect query string when present.
  * @returns Cancellation acknowledgement plus support contact copy for the cancel page.
- * @remarks Side effect: may release holds / mark the pending payment as cancelled server-side.
+ * @remarks Side effect: may release holds / expire the specific Stripe session server-side.
  */
-export async function checkoutCancel(): Promise<{
+export async function checkoutCancel(sessionId?: string | null): Promise<{
   cancelled: boolean;
+  paymentChecking?: boolean;
   message: string;
   supportEmail: string;
 }> {
-  return api('/api/checkout/cancel', { method: 'POST' });
+  const body =
+    sessionId && String(sessionId).trim()
+      ? JSON.stringify({ session_id: String(sessionId).trim() })
+      : JSON.stringify({});
+  return api('/api/checkout/cancel', {
+    method: 'POST',
+    body,
+  });
 }

@@ -1,9 +1,9 @@
 /**
- * Stripe cancel return URL: notifies the backend once on mount so any active
- * hold can be released, then shows a calm message to restart search.
+ * Stripe cancel return URL: notifies the backend once on mount so the specific
+ * Checkout attempt (session_id from Stripe) can be released, then shows a calm message.
  */
 import { useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { ApiError } from '../../api/client';
 import { checkoutCancel } from '../../api/checkout';
@@ -18,16 +18,19 @@ const NOOP_MESSAGE =
  * Shown when the customer abandons Stripe Checkout.
  *
  * @returns Cancel confirmation UI after the cancel API call settles.
- * @remarks Side effect: calls {@link checkoutCancel} once on mount to release any hold.
+ * @remarks Side effect: calls {@link checkoutCancel} once on mount with Stripe session_id.
  */
 export function CheckoutCancelPage() {
+  const [params] = useSearchParams();
+  const sessionId = params.get('session_id');
+
   const cancelMutation = useMutation({
-    mutationFn: checkoutCancel,
+    mutationFn: () => checkoutCancel(sessionId),
   });
 
   useEffect(() => {
     cancelMutation.mutate();
-    // Intentionally run once on mount to release the hold.
+    // Intentionally run once on mount to release the hold for this Stripe attempt.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -44,15 +47,18 @@ export function CheckoutCancelPage() {
   const bodyMessage = cancelMutation.isSuccess
     ? (data?.message ?? NOOP_MESSAGE)
     : (errorMessage || NOOP_MESSAGE);
+  const paymentChecking = Boolean(data?.paymentChecking);
 
   return (
     <div>
       <StaticPageHero
-        title="Payment cancelled"
+        title={paymentChecking ? 'Confirming payment' : 'Payment cancelled'}
         description={
-          data?.cancelled
-            ? 'No charge was made for this attempt. Your reservation hold has been released.'
-            : 'No charge was made for this attempt.'
+          paymentChecking
+            ? 'We are still checking whether this payment completed. Please wait a moment.'
+            : data?.cancelled
+              ? 'No charge was made for this attempt. Your reservation hold has been released.'
+              : 'No charge was made for this attempt.'
         }
         eyebrow="Checkout"
       />

@@ -12,7 +12,10 @@ const carRepository = require('../repositories/carRepository');
 const { finalizeReservationByStripeSessionId } = require('./bookingFinalizationService');
 const { changeStatus, recordInitialStatus } = require('./reservation/reservationStatusService');
 const { logCustomerAction, logSystemAction } = require('./admin/adminAuditService');
-const { retrieveStripeCheckoutSession } = require('./payment/stripeCheckoutService');
+const {
+  retrieveStripeCheckoutSession,
+  safeExpireSupersededCheckoutSession,
+} = require('./payment/stripeCheckoutService');
 const logger = require('../utils/logger');
 const logEvent = require('../monitoring/logEvent');
 const metrics = require('../monitoring/metrics');
@@ -23,46 +26,135 @@ async function findActiveReservationBySession(req) {
 }
 
 /**
- * Cancel the session's active hold (e.g. guest releases or checkout cancel).
+ * Resolve a checkout/release target for this browser session.
+ * When stripeSessionId is provided, only that attempt may be cancelled.
  * @param {import('express').Request} req
- * @param {{ reason?: string, skipAudit?: boolean }} [options]
+ * @param {string|null|undefined} stripeSessionId
+ */
+async function resolveReleaseTarget(req, stripeSessionId) {
+  const browserSessionId = getSessionId(req);
+  if (stripeSessionId) {
+    const byStripe = await reservationRepository.findByStripeSessionId(stripeSessionId);
+    if (!byStripe) {
+      return { reservation: null, stripeSessionId };
+    }
+    if (String(byStripe.sessionId || '') !== String(browserSessionId || '')) {
+      return { reservation: null, stripeSessionId, forbidden: true };
+    }
+    return { reservation: byStripe, stripeSessionId };
+  }
+
+  const active = await findActiveReservationBySession(req);
+  return {
+    reservation: active,
+    stripeSessionId: active?.stripeSessionId || null,
+  };
+}
+
+/**
+ * Cancel a hold owned by this browser session and expire its open Stripe Checkout session.
+ * @param {import('express').Request} req
+ * @param {{ reason?: string, skipAudit?: boolean, stripeSessionId?: string|null }} [options]
  */
 async function releaseActiveReservationForSession(req, options = {}) {
   const reason = options.reason || 'session_release';
   const skipAudit = Boolean(options.skipAudit);
-  const reservation = await findActiveReservationBySession(req);
+  const requestedStripeSessionId =
+    options.stripeSessionId != null && String(options.stripeSessionId).trim() !== ''
+      ? String(options.stripeSessionId).trim()
+      : null;
 
-  if (!reservation) {
+  const target = await resolveReleaseTarget(req, requestedStripeSessionId);
+  if (target.forbidden) {
+    return { cancelled: false, reservation: null, forbidden: true };
+  }
+
+  const reservation = target.reservation;
+  const stripeSessionId = target.stripeSessionId || reservation?.stripeSessionId || null;
+
+  if (!reservation && !stripeSessionId) {
     return { cancelled: false, reservation: null };
   }
 
-  const { reservation: updated } = await changeStatus({
-    reservationId: reservation.id,
-    newStatus: 'cancelled',
-    reason,
-    actor: { type: 'customer', req, userId: req?.session?.user?.id },
-    patch: { holdExpiresAt: new Date() },
-  });
+  // Payment may have completed before cancel returned from Stripe — do not unwind it.
+  if (stripeSessionId) {
+    try {
+      const live = await retrieveStripeCheckoutSession(stripeSessionId);
+      if (live?.payment_status === 'paid' || live?.status === 'complete') {
+        return {
+          cancelled: false,
+          reservation,
+          paymentChecking: true,
+          stripeSessionId,
+          message:
+            'Payment may have completed for this attempt. We are still confirming the result — please wait a moment or check your confirmation email.',
+        };
+      }
+    } catch (err) {
+      logger.warn(
+        { err, stripeSessionId, context: 'releaseActiveReservationForSession.retrieve' },
+        'Unable to retrieve Stripe session before cancel; treating as still checking'
+      );
+      return {
+        cancelled: false,
+        reservation,
+        paymentChecking: true,
+        stripeSessionId,
+        message:
+          'We could not verify the payment status yet. Please wait while we finish checking this attempt.',
+      };
+    }
+  }
 
-  logEvent.info('reservation.cancelled', {
-    reservationId: reservation.id?.toString?.(),
-    reason,
-  });
+  let updated = reservation;
+  const cancellableStatuses = new Set(['pending_payment', 'processing_payment']);
+  if (reservation && cancellableStatuses.has(String(reservation.status))) {
+    const result = await changeStatus({
+      reservationId: reservation.id,
+      newStatus: 'cancelled',
+      reason,
+      actor: { type: 'customer', req, userId: req?.session?.user?.id },
+      patch: { holdExpiresAt: new Date() },
+    });
+    updated = result.reservation;
 
-  if (!skipAudit) {
-    const action =
-      reason === 'checkout_cancel'
-        ? 'customer.cancelled_checkout'
-        : 'customer.released_hold';
-    await logCustomerAction(req, {
-      action,
-      entityType: 'reservation',
-      entityId: reservation.id,
-      metadata: { reason },
+    logEvent.info('reservation.cancelled', {
+      reservationId: reservation.id?.toString?.(),
+      reason,
+    });
+
+    if (!skipAudit) {
+      const action =
+        reason === 'checkout_cancel'
+          ? 'customer.cancelled_checkout'
+          : 'customer.released_hold';
+      await logCustomerAction(req, {
+        action,
+        entityType: 'reservation',
+        entityId: reservation.id,
+        metadata: { reason, stripeSessionId },
+      });
+    }
+  } else if (!reservation) {
+    return { cancelled: false, reservation: null };
+  } else {
+    // Targeted attempt is no longer an active hold (e.g. superseded) — still expire Stripe.
+    updated = reservation;
+  }
+
+  if (stripeSessionId) {
+    await safeExpireSupersededCheckoutSession(stripeSessionId, {
+      context: 'releaseActiveReservationForSession',
+      reservationId: reservation?.id,
+      reason,
     });
   }
 
-  return { cancelled: true, reservation: updated };
+  return {
+    cancelled: Boolean(reservation && cancellableStatuses.has(String(reservation.status))),
+    reservation: updated,
+    stripeSessionId,
+  };
 }
 
 /** Refresh hold TTL in memory (caller persists via changeStatus patch). */

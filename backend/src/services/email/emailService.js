@@ -6,6 +6,17 @@ const logger = require('../../utils/logger');
 const logEvent = require('../../monitoring/logEvent');
 const metrics = require('../../monitoring/metrics');
 
+/** Optional test-only override for controlled SMTP behaviour in integration tests. */
+let testSendMailImpl = null;
+
+/**
+ * Install a sendMail implementation for tests (barrier / failure simulation).
+ * @param {null|((args: object) => Promise<{ sent: boolean, reason?: string }>)} impl
+ */
+function setTestSendMail(impl) {
+  testSendMailImpl = typeof impl === 'function' ? impl : null;
+}
+
 /**
  * Explicit EMAIL_ENABLED override; null means "infer from SMTP env".
  * @returns {boolean|null}
@@ -71,6 +82,10 @@ async function sendMail({ to, subject, text, html }) {
     return { sent: false, reason: 'missing_recipient' };
   }
 
+  if (typeof testSendMailImpl === 'function') {
+    return testSendMailImpl({ to, subject, text, html });
+  }
+
   const transport = await createTransport();
   if (!transport) {
     logger.info({ to, subject }, 'Email skipped (SMTP not configured)');
@@ -93,4 +108,5 @@ async function sendMail({ to, subject, text, html }) {
 module.exports = {
   isEmailConfigured,
   sendMail,
+  setTestSendMail,
 };

@@ -89,6 +89,13 @@ function field(doc, label, value) {
  * @param {object} order
  * @returns {*}
  */
+function paidAmountEuros(reservation) {
+  if (reservation.paidAmountCents != null && Number.isFinite(Number(reservation.paidAmountCents))) {
+    return Number(reservation.paidAmountCents) / 100;
+  }
+  return null;
+}
+
 function reservationBlock(doc, reservation, order) {
   field(doc, 'Reservation', `#${reservation.id}`);
   if (order?.id) field(doc, 'Order', `#${order.id}`);
@@ -109,6 +116,10 @@ function reservationBlock(doc, reservation, order) {
   );
   field(doc, 'Rental days', reservation.rentalDays);
   field(doc, 'Total', money(reservation.totalPrice));
+  const paidEuros = paidAmountEuros(reservation);
+  if (paidEuros != null) {
+    field(doc, 'Amount paid', money(paidEuros));
+  }
   field(doc, 'Deposit', money(reservation.deposit));
   doc.moveDown(0.5);
 }
@@ -120,7 +131,8 @@ function reservationBlock(doc, reservation, order) {
  */
 function buildPdfBuffer(buildFn) {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+    // compress:false keeps text extractable for CI assertions and support tooling.
+    const doc = new PDFDocument({ margin: 50, size: 'A4', compress: false });
     const chunks = [];
     doc.on('data', (chunk) => chunks.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -186,7 +198,22 @@ async function generateInvoice(reservation) {
     field(doc, 'Delivery', money(reservation.deliveryPrice));
     field(doc, 'Return fee', money(reservation.returnPrice));
     field(doc, 'Deposit held', money(reservation.deposit));
-    field(doc, 'Amount due / paid', money(reservation.totalPrice));
+    field(doc, 'Total', money(reservation.totalPrice));
+    const paidEuros = paidAmountEuros(reservation);
+    if (paidEuros != null) {
+      const balance = Number(reservation.totalPrice || 0) - paidEuros;
+      field(doc, 'Amount paid', money(paidEuros));
+      if (balance > 0.009) {
+        field(doc, 'Balance due', money(balance));
+      } else if (balance < -0.009) {
+        field(doc, 'Refund due', money(Math.abs(balance)));
+      } else {
+        field(doc, 'Balance due', money(0));
+      }
+    } else {
+      // Legacy rows without a recorded Stripe capture — show amount due only.
+      field(doc, 'Amount due', money(reservation.totalPrice));
+    }
     if (Array.isArray(reservation.selectedExtras) && reservation.selectedExtras.length) {
       doc.moveDown(0.3);
       field(doc, 'Extras', reservation.selectedExtras.join(', '));
@@ -205,6 +232,13 @@ async function generateReceipt(reservation) {
     drawHeader(doc, 'Payment Receipt');
     reservationBlock(doc, reservation, order);
     field(doc, 'Payment status', reservation.status);
+    const paidEuros = paidAmountEuros(reservation);
+    if (paidEuros != null) {
+      field(doc, 'Amount paid', money(paidEuros));
+      if (reservation.paidCurrency) {
+        field(doc, 'Paid currency', String(reservation.paidCurrency).toUpperCase());
+      }
+    }
     // Stripe / payment-related branch.
     if (reservation.stripeSessionId) {
       field(doc, 'Stripe session', reservation.stripeSessionId);

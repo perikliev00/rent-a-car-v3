@@ -145,6 +145,7 @@ async function moveOrResizeEvent(access, eventId, body, req, mode) {
     const prevEnd = existing.returnDate;
     const prevCarId = Number(existing.carId?.id || existing.carId);
     let orderSynced = false;
+    let pricing = null;
 
     await runWithTransaction(async (client) => {
       // Lock previous + target cars before re-checking hard conflicts.
@@ -158,7 +159,7 @@ async function moveOrResizeEvent(access, eventId, body, req, mode) {
       });
 
       // Reprice linked order for the new range/car, then persist reservation fields.
-      const { pricing, orderSynced: synced } = await syncLinkedOrderAfterReservationMove({
+      const syncedMove = await syncLinkedOrderAfterReservationMove({
         reservationId: existing.id,
         carId: targetCarId,
         start,
@@ -171,7 +172,8 @@ async function moveOrResizeEvent(access, eventId, body, req, mode) {
         hotelDelivery: existing.hotelDelivery,
         client,
       });
-      orderSynced = synced;
+      pricing = syncedMove.pricing;
+      orderSynced = syncedMove.orderSynced;
 
       await reservationSql.update(
         {
@@ -233,6 +235,17 @@ async function moveOrResizeEvent(access, eventId, body, req, mode) {
       }
     });
 
+    const paidCents =
+      existing.paidAmountCents != null && Number.isFinite(Number(existing.paidAmountCents))
+        ? Number(existing.paidAmountCents)
+        : null;
+    const newTotalCents =
+      pricing?.totalPrice != null && Number.isFinite(Number(pricing.totalPrice))
+        ? Math.round(Number(pricing.totalPrice) * 100)
+        : null;
+    const paymentDeltaCents =
+      paidCents != null && newTotalCents != null ? newTotalCents - paidCents : null;
+
     await logAdminAction(req, {
       action: mode === 'resize' ? 'calendar.reservation.resize' : 'calendar.reservation.move',
       entityType: 'reservation',
@@ -246,6 +259,11 @@ async function moveOrResizeEvent(access, eventId, body, req, mode) {
         previousTo: prevEnd,
         previousCarId: prevCarId,
         orderSynced,
+        paidAmountCents: paidCents,
+        newTotalCents,
+        paymentDeltaCents,
+        // Price changes after capture need staff settlement — paid_amount_cents stays as captured.
+        requiresPaymentReview: paymentDeltaCents != null && paymentDeltaCents !== 0,
       },
     });
 
