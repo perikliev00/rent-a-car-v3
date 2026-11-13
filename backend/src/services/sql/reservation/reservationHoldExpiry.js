@@ -21,6 +21,8 @@ async function expireStaleHoldsForCar(carId, now = new Date(), client = null) {
       WHERE car_id = $1
         AND status = ANY($3::text[])
         AND hold_expires_at <= $2
+        -- Keep paid-but-unfinalized Checkout attempts visible to reconcile jobs.
+        AND NOT (status = 'processing_payment' AND stripe_session_id IS NOT NULL)
       ORDER BY id
       FOR UPDATE
     ),
@@ -66,6 +68,8 @@ async function expireStaleHoldsForSession(sessionId, now = new Date(), client = 
       WHERE session_id = $1
         AND status = ANY($3::text[])
         AND hold_expires_at <= $2
+        -- Keep paid-but-unfinalized Checkout attempts visible to reconcile jobs.
+        AND NOT (status = 'processing_payment' AND stripe_session_id IS NOT NULL)
       ORDER BY id
       FOR UPDATE
     ),

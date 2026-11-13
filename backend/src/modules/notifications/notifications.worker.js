@@ -10,12 +10,62 @@ const { sendNotificationEmail } = require('./notifications.sender');
 const logger = require('../../utils/logger');
 const { runWithTransaction } = require('../../db/transaction');
 
+const MAX_ATTEMPTS = 5;
+const BASE_BACKOFF_MS = 30_000;
+
+function isTransientSendError(err) {
+  const code = String(err?.code || '').toUpperCase();
+  const message = String(err?.message || '').toLowerCase();
+  if (['ETIMEDOUT', 'ECONNRESET', 'ECONNREFUSED', 'ESOCKETTIMEDOUT', 'EAI_AGAIN'].includes(code)) {
+    return true;
+  }
+  return (
+    message.includes('temporary') ||
+    message.includes('timeout') ||
+    message.includes('try again') ||
+    message.includes('rate limit')
+  );
+}
+
+function backoffMsForAttempt(attempts) {
+  const exp = Math.max(0, Number(attempts) - 1);
+  return BASE_BACKOFF_MS * 2 ** Math.min(exp, 4);
+}
+
+/**
+ * Persist a send failure: requeue with backoff while attempts remain, else mark failed.
+ * @param {object} notification
+ * @param {string} errorMessage
+ * @param {{ transient?: boolean }} [opts]
+ */
+async function handleSendFailure(notification, errorMessage, { transient = true } = {}) {
+  const attempts = Number(notification.attempts || 0);
+  if (transient && attempts < MAX_ATTEMPTS) {
+    const delayMs = backoffMsForAttempt(attempts);
+    await repo.requeuePending(notification.id, null, {
+      delayMs,
+      lastError: errorMessage,
+    });
+    return { terminal: false, requeued: true };
+  }
+
+  await repo.markFailed(notification.id, errorMessage);
+  return { terminal: true, requeued: false };
+}
+
 /**
  * Claim and process up to `limit` due notifications.
  * @param {{ limit?: number }} [opts]
  * @returns {Promise<{ processed: number, sent: number, failed: number }>}
  */
 async function processDueNotifications({ limit = 50 } = {}) {
+  // Reclaim abandoned processing rows before claiming a fresh batch.
+  try {
+    await repo.requeueStuckProcessing({ olderThanMs: 5 * 60 * 1000 });
+  } catch (err) {
+    logger.warn({ err, context: 'notifications.requeueStuck' }, 'Failed to requeue stuck notifications');
+  }
+
   // Step 1: claim a batch inside a transaction (SKIP LOCKED via repository).
   let claimed = [];
   try {
@@ -40,22 +90,22 @@ async function processDueNotifications({ limit = 50 } = {}) {
         await repo.markSent(notification.id);
         sent += 1;
       } else {
-        // Soft failure from sender (e.g. missing recipient) — persist reason.
-        await repo.markFailed(notification.id, result.reason || 'send_failed');
-        failed += 1;
+        const outcome = await handleSendFailure(
+          notification,
+          result.reason || 'send_failed',
+          { transient: true }
+        );
+        if (outcome.terminal) failed += 1;
       }
     } catch (err) {
-      // Hard send error — count as failed and best-effort mark the row.
-      failed += 1;
       logger.error(
         { err, notificationId: notification.id, type: notification.type },
         'Notification send error'
       );
-      try {
-        await repo.markFailed(notification.id, err.message);
-      } catch (markErr) {
-        logger.error({ err: markErr, notificationId: notification.id }, 'Failed to mark notification failed');
-      }
+      const outcome = await handleSendFailure(notification, err.message, {
+        transient: isTransientSendError(err),
+      });
+      if (outcome.terminal) failed += 1;
     }
   }
 
@@ -64,24 +114,42 @@ async function processDueNotifications({ limit = 50 } = {}) {
 
 /**
  * Enqueue + immediately process a single notification if newly inserted.
- * Used for time-critical paths that should not wait for the next cron tick.
+ * Claims the row before SMTP so a concurrent worker cannot double-send.
  * @param {object|null|undefined} insertedRow Row returned from enqueue insert
  * @returns {Promise<{ sent: boolean, skipped?: boolean, reason?: string }>}
  */
 async function sendNowIfEnqueued(insertedRow) {
   // Nothing inserted (duplicate / skipped enqueue) — treat as no-op.
   if (!insertedRow) return { sent: false, skipped: true };
+
+  let claimed = null;
   try {
-    const result = await sendNotificationEmail(insertedRow);
+    claimed = await runWithTransaction(async (client) =>
+      repo.claimNotificationById(insertedRow.id, client)
+    );
+  } catch (err) {
+    logger.error(
+      { err, notificationId: insertedRow.id, context: 'notifications.claimOne' },
+      'Failed to claim notification for immediate send'
+    );
+    return { sent: false, skipped: true, reason: 'claim_failed' };
+  }
+
+  if (!claimed) {
+    // Another worker already owns or completed this row.
+    return { sent: false, skipped: true, reason: 'already_claimed' };
+  }
+
+  try {
+    const result = await sendNotificationEmail(claimed);
     if (result.sent) {
-      await repo.markSent(insertedRow.id);
+      await repo.markSent(claimed.id);
       return { sent: true, skipped: false };
     }
-    await repo.markFailed(insertedRow.id, result.reason || 'send_failed');
+    await handleSendFailure(claimed, result.reason || 'send_failed', { transient: true });
     return { sent: false, skipped: false, reason: result.reason };
   } catch (err) {
-    // Persist failure then rethrow so callers can surface the error.
-    await repo.markFailed(insertedRow.id, err.message);
+    await handleSendFailure(claimed, err.message, { transient: isTransientSendError(err) });
     throw err;
   }
 }
@@ -89,4 +157,5 @@ async function sendNowIfEnqueued(insertedRow) {
 module.exports = {
   processDueNotifications,
   sendNowIfEnqueued,
+  MAX_ATTEMPTS,
 };

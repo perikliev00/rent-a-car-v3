@@ -85,9 +85,28 @@ exports.handleCheckoutSuccess = asyncHandler(async (req, res, next) => {
  */
 exports.handleCheckoutCancel = asyncHandler(async (req, res, next) => {
   let cancelled = false;
+  let paymentChecking = false;
+  let message =
+    'No active reservation hold to cancel. You can start a new search whenever you are ready.';
   try {
-    const result = await releaseActiveReservationForSession(req, { reason: 'checkout_cancel' });
+    const stripeSessionId =
+      (req.body && (req.body.session_id || req.body.sessionId)) ||
+      (req.query && (req.query.session_id || req.query.sessionId)) ||
+      null;
+    const result = await releaseActiveReservationForSession(req, {
+      reason: 'checkout_cancel',
+      stripeSessionId,
+    });
     cancelled = Boolean(result?.cancelled);
+    paymentChecking = Boolean(result?.paymentChecking);
+    if (paymentChecking) {
+      message =
+        result.message ||
+        'Payment may have completed for this attempt. We are still confirming the result.';
+    } else if (cancelled) {
+      message =
+        'Your payment was cancelled and your reservation hold has been released. You can start a new booking when ready.';
+    }
   } catch (err) {
     // Still return a friendly success body; release failures are logged only.
     logger.warn(
@@ -99,9 +118,8 @@ exports.handleCheckoutCancel = asyncHandler(async (req, res, next) => {
   try {
     return apiResponse.success(res, {
       cancelled,
-      message: cancelled
-        ? 'Your payment was cancelled and your reservation hold has been released. You can start a new booking when ready.'
-        : 'No active reservation hold to cancel. You can start a new search whenever you are ready.',
+      paymentChecking,
+      message,
       supportEmail: process.env.SUPPORT_EMAIL || 'support@rentacar.com',
     });
   } catch (err) {

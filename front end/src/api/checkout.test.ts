@@ -33,7 +33,7 @@ describe('checkout API', () => {
     expect(mockApi).toHaveBeenCalledWith('/api/checkout/success?session_id=sess%2Fid%2Bspecial');
   });
 
-  it('checkoutCancel posts to /api/checkout/cancel', async () => {
+  it('checkoutCancel posts session_id to /api/checkout/cancel', async () => {
     const payload = {
       cancelled: true,
       message: 'Payment cancelled',
@@ -41,9 +41,12 @@ describe('checkout API', () => {
     };
     mockApi.mockResolvedValue(payload);
 
-    const result = await checkoutCancel();
+    const result = await checkoutCancel('cs_test_123');
 
-    expect(mockApi).toHaveBeenCalledWith('/api/checkout/cancel', { method: 'POST' });
+    expect(mockApi).toHaveBeenCalledWith('/api/checkout/cancel', {
+      method: 'POST',
+      body: JSON.stringify({ session_id: 'cs_test_123' }),
+    });
     expect(result).toEqual(payload);
   });
 });

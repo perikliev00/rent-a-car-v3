@@ -282,11 +282,13 @@ restore_infrastructure() {
   fi
 }
 
-rollback() {
+rollback_and_cleanup() {
   local exit_code=$?
-  trap - ERR
+  # Single exit path: restore when armed and the deploy failed for any reason
+  # (`exit 1`, ERR from `set -e`, or an explicit failing command).
+  trap - EXIT ERR
 
-  if [[ "$ROLLBACK_ARMED" == "1" ]]; then
+  if [[ "$ROLLBACK_ARMED" == "1" && "$exit_code" -ne 0 ]]; then
     echo "Deployment failed. Restoring previous release configuration and infrastructure..." >&2
 
     if [[ -f "$BACKUP_FILE" ]]; then
@@ -305,8 +307,8 @@ rollback() {
   exit "$exit_code"
 }
 
-trap cleanup EXIT
-trap rollback ERR
+trap rollback_and_cleanup EXIT
+trap 'exit 1' ERR
 
 cp -a "$ENV_FILE" "$BACKUP_FILE"
 mkdir -p "$INFRA_BACKUP_DIR"
@@ -397,15 +399,17 @@ assert_image admin "$ADMIN_IMAGE"
 
 METRICS_TOKEN="$(read_env_value METRICS_TOKEN)"
 if [[ -z "$METRICS_TOKEN" ]]; then
+  # Use a failing command (not `exit`) so the ERR trap runs rollback after arming.
   echo "METRICS_TOKEN is unexpectedly empty after compose validation" >&2
-  exit 1
+  false
 fi
 
 if ! curl --fail --silent --show-error --max-time 5 \
   -H "Authorization: Bearer $METRICS_TOKEN" \
   http://127.0.0.1:3000/prometheus >/dev/null; then
+  # Use a failing command (not `exit`) so the ERR trap runs rollback after arming.
   echo "Authenticated backend Prometheus endpoint check failed" >&2
-  exit 1
+  false
 fi
 
 echo "Authenticated backend Prometheus endpoint is responding"
@@ -420,8 +424,8 @@ EOF
 
 chmod 600 "$ROOT/config/current-release.env" || true
 
-trap - ERR
 ROLLBACK_ARMED=0
+trap cleanup EXIT
 
 echo "Production deployment completed successfully."
 compose ps
