@@ -107,25 +107,39 @@ function applyPricingToOrder(order, pricing) {
 /**
  * Find the calendar block overlapping the previous order range so update/restore
  * can remove the correct booked range even if stored endpoints drifted slightly.
+ * Prefers booking blocks so maintenance/manual ranges are never selected for remove.
  * @param {object[]} blocks
  * @param {Date} prevStart
  * @param {Date} prevEnd
+ * @param {{ blockTypes?: string[] }} [options]
  */
-function extractStoredRange(blocks, prevStart, prevEnd) {
+function extractStoredRange(blocks, prevStart, prevEnd, options = {}) {
   if (!Array.isArray(blocks) || !blocks.length) {
     return { storedStart: prevStart, storedEnd: prevEnd };
   }
 
-  const candidate = blocks.find((block) => {
+  const allowedTypes = Array.isArray(options.blockTypes) && options.blockTypes.length
+    ? new Set(options.blockTypes)
+    : new Set(['booking']);
+
+  const overlapping = blocks.filter((block) => {
     const start = new Date(block.startDate);
     const end = new Date(block.endDate);
-    return start < prevEnd && end > prevStart;
+    if (!(start < prevEnd && end > prevStart)) {
+      return false;
+    }
+    const type = block.blockType || block.block_type || 'booking';
+    return allowedTypes.has(type);
   });
+
+  const candidate = overlapping[0];
 
   if (candidate) {
     return {
       storedStart: new Date(candidate.startDate),
       storedEnd: new Date(candidate.endDate),
+      blockId: candidate.id != null ? Number(candidate.id) : null,
+      blockType: candidate.blockType || candidate.block_type || 'booking',
     };
   }
 

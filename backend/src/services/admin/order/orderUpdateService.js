@@ -105,6 +105,14 @@ async function updateOrderCore({ orderId, payload, contact, range, client }) {
     err.status = 404;
     throw err;
   }
+  // Soft-deleted orders must not resolve/remove another live booking block.
+  if (existingOrder.isDeleted) {
+    const err = new Error('Cannot update a soft-deleted order. Restore it first.');
+    err.code = 'ORDER_DELETED';
+    err.status = 409;
+    err.isOrderFormError = true;
+    throw err;
+  }
 
   const prevCarId = existingOrder.carId;
   const prevStart =

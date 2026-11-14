@@ -81,7 +81,7 @@ async function requestReservationRefund(req, { reservationId, reason = null }) {
       };
     }
 
-    assertRefundableStatus(locked.status);
+    assertRefundableStatus(locked);
     await persistPaymentIntentIfNeeded(locked, paymentIntentId, tx);
     await persistPaidAmountIfNeeded(
       locked,

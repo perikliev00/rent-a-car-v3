@@ -66,7 +66,7 @@ async function lockAndCreateAttempt({
       };
     }
 
-    assertRefundableStatus(locked.status);
+    assertRefundableStatus(locked);
     await persistPaymentIntentIfNeeded(locked, paymentIntentId, tx);
 
     const active = await refundOpSql.findActiveByReservationId(locked.id, tx);

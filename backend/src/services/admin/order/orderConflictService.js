@@ -80,12 +80,13 @@ async function assertNoOpenPhysicalRental(carId, client, options = {}) {
 
 /**
  * Locate the stored calendar block for an order's previous range (for removeRange).
+ * Only considers booking blocks so staff maintenance ranges are never selected.
  * Falls back to prevStart/prevEnd if date blocks cannot be loaded.
  */
 async function resolveStoredDateRange(carId, prevStart, prevEnd, client) {
   try {
     const blocks = await fetchDateBlocksForCar(carId, client);
-    return extractStoredRange(blocks, prevStart, prevEnd);
+    return extractStoredRange(blocks, prevStart, prevEnd, { blockTypes: ['booking'] });
   } catch {
     return { storedStart: prevStart, storedEnd: prevEnd };
   }

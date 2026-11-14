@@ -200,8 +200,8 @@ export function AdminCarsPage() {
               />
               <Input label="Seats" type="number" min={2} max={9} value={form.seats} onChange={(e) => setForm({ ...form, seats: e.target.value })} required />
               <Input label="Price tier 1–3 days" type="number" step="0.01" value={form.priceTier_1_3} onChange={(e) => setForm({ ...form, priceTier_1_3: e.target.value })} required />
-              <Input label="Price tier 7–31 days" type="number" step="0.01" value={form.priceTier_7_31} onChange={(e) => setForm({ ...form, priceTier_7_31: e.target.value })} />
-              <Input label="Price tier 31+ days" type="number" step="0.01" value={form.priceTier_31_plus} onChange={(e) => setForm({ ...form, priceTier_31_plus: e.target.value })} />
+              <Input label="Price tier 4–31 days" type="number" step="0.01" value={form.priceTier_7_31} onChange={(e) => setForm({ ...form, priceTier_7_31: e.target.value })} />
+              <Input label="Price tier 32+ days" type="number" step="0.01" value={form.priceTier_31_plus} onChange={(e) => setForm({ ...form, priceTier_31_plus: e.target.value })} />
               <Input label="Registration number" value={form.registrationNumber} onChange={(e) => setForm({ ...form, registrationNumber: e.target.value })} />
               <Input label="VIN" value={form.vin} onChange={(e) => setForm({ ...form, vin: e.target.value })} />
               <Input label="Mileage" type="number" min={0} value={form.mileage} onChange={(e) => setForm({ ...form, mileage: e.target.value })} />

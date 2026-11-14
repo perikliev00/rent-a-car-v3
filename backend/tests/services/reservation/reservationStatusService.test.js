@@ -13,6 +13,7 @@ jest.mock('../../../src/services/carFleetSyncService', () => ({
 }));
 jest.mock('../../../src/services/sql/bookingSyncSqlService', () => ({
   removeRange: jest.fn().mockResolvedValue(undefined),
+  fetchDateBlocksForCar: jest.fn().mockResolvedValue([]),
 }));
 jest.mock('../../../src/services/admin/order/orderConflictService', () => ({
   resolveStoredDateRange: jest.fn().mockResolvedValue({
@@ -23,6 +24,22 @@ jest.mock('../../../src/services/admin/order/orderConflictService', () => ({
 jest.mock('../../../src/services/admin/order/orderReservationSync', () => ({
   softDeleteOrderForReservation: jest.fn().mockResolvedValue(undefined),
 }));
+jest.mock('../../../src/services/sql/orderSqlService', () => ({
+  findOrderByReservationId: jest.fn().mockResolvedValue({ id: 99 }),
+}));
+const orderSql = require('../../../src/services/sql/orderSqlService');
+const bookingSync = require('../../../src/services/sql/bookingSyncSqlService');
+const {
+  resolveStoredDateRange,
+} = require('../../../src/services/admin/order/orderConflictService');
+jest.mock('../../../src/services/payment/refund/refundPolicy', () => {
+  const actual = jest.requireActual('../../../src/services/payment/refund/refundPolicy');
+  return {
+    ...actual,
+    hasCapturedPayment: jest.fn().mockReturnValue(false),
+    isAllowedDuringPendingRefund: actual.isAllowedDuringPendingRefund,
+  };
+});
 jest.mock('../../../src/services/admin/adminAuditService', () => ({
   logAdminAction: jest.fn().mockResolvedValue(undefined),
   logSystemAction: jest.fn().mockResolvedValue(undefined),
@@ -30,6 +47,7 @@ jest.mock('../../../src/services/admin/adminAuditService', () => ({
 }));
 jest.mock('../../../src/db/transaction', () => ({
   runWithTransaction: async (fn) => fn(null),
+  clientQuery: jest.fn().mockResolvedValue({ rows: [] }),
 }));
 
 const reservationSql = require('../../../src/services/sql/reservationSqlService');
@@ -129,5 +147,26 @@ describe('changeStatus pending-refund gate', () => {
     const result = await changeStatus({ reservationId: 1, newStatus: 'picked_up' });
     expect(result.changed).toBe(true);
     expect(result.newStatus).toBe('picked_up');
+  });
+
+  test('refund without linked order leaves unowned booking block in place', async () => {
+    reservationSql.findByIdForUpdate.mockResolvedValue({
+      id: 1,
+      status: 'manual_review',
+      carId: 3,
+      pickupDate: '2030-01-01',
+      returnDate: '2030-01-05',
+    });
+    refundOpSql.findActiveByReservationId.mockResolvedValue(null);
+    orderSql.findOrderByReservationId.mockResolvedValueOnce(null);
+    resolveStoredDateRange.mockResolvedValueOnce({
+      storedStart: new Date('2030-01-01'),
+      storedEnd: new Date('2030-01-05'),
+      blockId: 42,
+    });
+
+    const result = await changeStatus({ reservationId: 1, newStatus: 'refunded' });
+    expect(result.changed).toBe(true);
+    expect(bookingSync.removeRange).not.toHaveBeenCalled();
   });
 });

@@ -1,11 +1,25 @@
 const { createIntegrationTestApp } = require('./helpers/integrationTestApp');
-const { createSessionAgent, withCsrf } = require('./helpers/sessionAgentFactory');
+const {
+  createSessionAgent,
+  loginAsAdmin,
+  postOrder,
+  postCheckout,
+  withCsrf,
+} = require('./helpers/sessionAgentFactory');
 const {
   insertIsolatedTestCar,
+  insertTestAdmin,
   cleanupTestCar,
   getReservationById,
+  getReservationByStripeSessionId,
+  getDateBlocksForCar,
+  buildCheckoutBody,
+  buildAdminOrderBody,
+  buildOrderBody,
+  setHoldExpired,
 } = require('./helpers/dbFixtures');
 const { pool } = require('../helpers/dbTestHarness');
+const stripeTestStub = require('../../src/services/payment/stripeTestStub');
 
 const runIntegration =
   process.env.RUN_INTEGRATION_TESTS === '1' && process.env.DATABASE_URL;
@@ -78,16 +92,19 @@ describeIf('CUST-006: accountCancellationRules', () => {
   let app;
   let carId;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     app = createIntegrationTestApp();
+    await insertTestAdmin();
   });
 
   beforeEach(async () => {
+    stripeTestStub.clearSessions();
     carId = await insertIsolatedTestCar({ name: 'Account Cancel Rules Car' });
   });
 
   afterEach(async () => {
     await cleanupTestCar(carId);
+    stripeTestStub.clearSessions();
   });
 
   test('second cancel-request while pending is idempotent', async () => {
@@ -173,5 +190,59 @@ describeIf('CUST-006: accountCancellationRules', () => {
 
     expect(response.status).toBe(422);
     expect(await getPendingCancelRequest(reservationId)).toBeNull();
+  });
+
+  test('cancel unpaid checkout after staff rebook keeps the staff booking block', async () => {
+    await insertTestAdmin();
+    stripeTestStub.clearSessions();
+
+    const email = `cancel-rebook-${Date.now()}@example.com`;
+    const { agent } = await signupAgent(app, email);
+    const checkoutBody = buildCheckoutBody(carId, {
+      email,
+      fullName: 'Customer A Cancel',
+    });
+    expect((await postOrder(agent, checkoutBody)).status).toBe(200);
+    const checkoutRes = await postCheckout(agent, checkoutBody);
+    expect(checkoutRes.status).toBe(200);
+
+    const stripeSessionId = checkoutRes.body.data.checkoutUrl
+      .split('session_id=')
+      .pop()
+      ?.split('&')[0];
+    const reservationA = await getReservationByStripeSessionId(stripeSessionId);
+    expect(reservationA.status).toBe('processing_payment');
+
+    await setHoldExpired(reservationA.id);
+    stripeTestStub.expireSession(stripeSessionId);
+
+    const admin = await loginAsAdmin(app);
+    const staffOrder = await withCsrf(admin, admin.post('/api/admin/orders')).send(
+      buildAdminOrderBody(carId, {
+        email: 'staff-rebook-b@example.com',
+        fullName: 'Staff Order B',
+      })
+    );
+    expect(staffOrder.status).toBe(201);
+    const blocksBefore = await getDateBlocksForCar(carId);
+    expect(blocksBefore).toHaveLength(1);
+    const blockBId = Number(blocksBefore[0].id);
+
+    const cancelRes = await withCsrf(
+      agent,
+      agent.post(`/api/account/reservations/${reservationA.id}/cancel-request`)
+    ).send({ reason: 'customer_cancel_after_rebook' });
+    expect(cancelRes.status).toBe(200);
+    expect(cancelRes.body.data.immediate).toBe(true);
+    expect((await getReservationById(reservationA.id)).status).toBe('cancelled');
+
+    const blocksAfter = await getDateBlocksForCar(carId);
+    expect(blocksAfter).toHaveLength(1);
+    expect(Number(blocksAfter[0].id)).toBe(blockBId);
+
+    const competitor = await createSessionAgent(app);
+    expect((await postOrder(competitor, buildOrderBody(carId))).status).toBe(409);
+
+    stripeTestStub.clearSessions();
   });
 });

@@ -24,7 +24,7 @@ function success(res, data, status = 200) {
  * Send a failed JSON response with a machine-readable code and optional request correlation ids.
  *
  * @param {import('express').Response} res - Express response
- * @param {string} code - Machine-readable error code (see ERROR_CODES)
+ * @param {string} code - Machine-readable error code
  * @param {string} message - Human-readable message
  * @param {number} [status=500] - HTTP status code
  * @param {import('express').Request | null} [req=null] - Optional request for requestId

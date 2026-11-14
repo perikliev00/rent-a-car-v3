@@ -51,7 +51,8 @@ const TRANSITIONS = Object.freeze({
   active_rental: Object.freeze(['returned']),
   returned: Object.freeze(['completed']),
   completed: Object.freeze([]),
-  cancelled: Object.freeze(['manual_review']),
+  // Paid cancel may later complete via refund without reopening the booking.
+  cancelled: Object.freeze(['manual_review', 'refunded']),
   expired: Object.freeze(['paid', 'manual_review']),
   no_show: Object.freeze([]),
   refunded: Object.freeze([]),

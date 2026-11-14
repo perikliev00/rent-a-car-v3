@@ -7,6 +7,7 @@ const {
   postCheckout,
   postAdminReservationRefund,
   postAdminReservationStatus,
+  withCsrf,
 } = require('../helpers/sessionAgentFactory');
 const {
   buildCheckoutCompletedEvent,
@@ -18,6 +19,8 @@ const {
   insertTestAdmin,
   cleanupTestCar,
   buildCheckoutBody,
+  buildAdminOrderBody,
+  buildOrderBody,
   getReservationByStripeSessionId,
   getReservationById,
   getOrderByReservationId,
@@ -25,7 +28,10 @@ const {
   getRefundOperationByReservationId,
   countOrdersForCar,
   getStatusHistory,
+  setHoldExpired,
 } = require('../helpers/dbFixtures');
+const { addRange } = require('../../../src/services/sql/bookingSyncSqlService');
+const { parseSofiaDate } = require('../../../src/utils/date/timezone');
 const stripeTestStub = require('../../../src/services/payment/stripeTestStub');
 const { buildIdempotencyKey } = require('../../../src/services/payment/refund/refundPolicy');
 
@@ -487,5 +493,219 @@ describeIf('MONEY-REFUND: reservation refund via Stripe', () => {
     const order = await getOrderByReservationId(reservation.id);
     expect(order.is_deleted).toBe(true);
     expect(order.status).toBe('cancelled');
+  });
+
+  /**
+   * P0: refund of a manual_review reservation must not delete another booking's
+   * (or maintenance) calendar block that merely overlaps the same car/dates.
+   */
+  test('refund of manual_review does not remove foreign confirmed booking block', async () => {
+    const agentA = await createSessionAgent(app);
+    const checkoutBody = buildCheckoutBody(carId, { email: 'guest-a-foreign-block@example.com' });
+    expect((await postOrder(agentA, checkoutBody)).status).toBe(200);
+    const checkoutRes = await postCheckout(agentA, checkoutBody);
+    expect(checkoutRes.status).toBe(200);
+
+    const stripeSessionId = extractStripeSessionId(checkoutRes);
+    const reservationA = await getReservationByStripeSessionId(stripeSessionId);
+    expect(reservationA).toBeTruthy();
+
+    await setHoldExpired(reservationA.id);
+
+    const admin = await loginAsAdmin(app);
+    const adminCreate = await withCsrf(admin, admin.post('/api/admin/orders')).send(
+      buildAdminOrderBody(carId, {
+        email: 'guest-b-confirmed@example.com',
+        fullName: 'Guest B Confirmed',
+      })
+    );
+    expect({ status: adminCreate.status, body: adminCreate.body }).toMatchObject({ status: 201 });
+    const orderBId = Number(adminCreate.body.data?.order?.id ?? adminCreate.body.data?.id);
+    expect(orderBId).toBeGreaterThan(0);
+
+    const blocksBefore = await getDateBlocksForCar(carId);
+    expect(blocksBefore).toHaveLength(1);
+    const blockB = blocksBefore[0];
+    const blockBId = Number(blockB.id);
+    const blockBStart = new Date(blockB.start_date).toISOString();
+    const blockBEnd = new Date(blockB.end_date).toISOString();
+
+    const event = buildCheckoutCompletedEvent({
+      eventId: `evt_foreign_block_pay_${reservationA.id}_${Date.now()}`,
+      sessionId: stripeSessionId,
+      reservationId: reservationA.id,
+      carId,
+      sessionIdMeta: reservationA.session_id,
+      amountTotal: Math.round(Number(reservationA.total_price) * 100),
+      paymentIntent: stripeTestStub.sessions.get(stripeSessionId)?.payment_intent,
+    });
+    expect((await postSignedWebhook(app, event)).status).toBe(200);
+
+    const reviewedA = await getReservationById(reservationA.id);
+    expect(reviewedA.status).toBe('manual_review');
+    expect(await getOrderByReservationId(reservationA.id)).toBeFalsy();
+
+    const agentCBlocked = await createSessionAgent(app);
+    expect((await postOrder(agentCBlocked, buildOrderBody(carId))).status).toBe(409);
+
+    const refundRes = await postAdminReservationRefund(admin, reservationA.id, {
+      reason: 'foreign_block_must_survive',
+    });
+    expect({ status: refundRes.status, body: refundRes.body }).toMatchObject({ status: 200 });
+    expect(refundRes.body.data.status).toBe('succeeded');
+
+    const ops = await require('../../helpers/dbTestHarness').pool.query(
+      `SELECT id, status FROM refund_operations WHERE reservation_id = $1 AND status = 'succeeded'`,
+      [reservationA.id]
+    );
+    expect(ops.rows).toHaveLength(1);
+
+    expect((await getReservationById(reservationA.id)).status).toBe('refunded');
+
+    const blocksAfter = await getDateBlocksForCar(carId);
+    expect(blocksAfter).toHaveLength(1);
+    expect(Number(blocksAfter[0].id)).toBe(blockBId);
+    expect(new Date(blocksAfter[0].start_date).toISOString()).toBe(blockBStart);
+    expect(new Date(blocksAfter[0].end_date).toISOString()).toBe(blockBEnd);
+
+    const orderB = await require('../../helpers/dbTestHarness').pool.query(
+      `SELECT id, is_deleted, status FROM orders WHERE id = $1`,
+      [orderBId]
+    );
+    expect(orderB.rows[0]?.is_deleted).toBe(false);
+
+    const agentCStillBlocked = await createSessionAgent(app);
+    expect((await postOrder(agentCStillBlocked, buildOrderBody(carId))).status).toBe(409);
+
+    expect(await countOrdersForCar(carId)).toBe(1);
+  });
+
+  test('refund of manual_review does not remove overlapping maintenance block', async () => {
+    const agentA = await createSessionAgent(app);
+    const checkoutBody = buildCheckoutBody(carId, { email: 'guest-a-maint-block@example.com' });
+    expect((await postOrder(agentA, checkoutBody)).status).toBe(200);
+    const checkoutRes = await postCheckout(agentA, checkoutBody);
+    expect(checkoutRes.status).toBe(200);
+
+    const stripeSessionId = extractStripeSessionId(checkoutRes);
+    const reservationA = await getReservationByStripeSessionId(stripeSessionId);
+
+    await setHoldExpired(reservationA.id);
+
+    const maintStart = parseSofiaDate('2030-06-01', '10:00');
+    const maintEnd = parseSofiaDate('2030-06-05', '10:00');
+    await addRange(carId, maintStart, maintEnd, null, {
+      blockType: 'maintenance',
+      reason: 'service_window',
+    });
+
+    const blocksBefore = await getDateBlocksForCar(carId);
+    expect(blocksBefore).toHaveLength(1);
+    const maintBlockId = Number(blocksBefore[0].id);
+
+    const event = buildCheckoutCompletedEvent({
+      eventId: `evt_maint_block_pay_${reservationA.id}_${Date.now()}`,
+      sessionId: stripeSessionId,
+      reservationId: reservationA.id,
+      carId,
+      sessionIdMeta: reservationA.session_id,
+      amountTotal: Math.round(Number(reservationA.total_price) * 100),
+      paymentIntent: stripeTestStub.sessions.get(stripeSessionId)?.payment_intent,
+    });
+    expect((await postSignedWebhook(app, event)).status).toBe(200);
+    expect((await getReservationById(reservationA.id)).status).toBe('manual_review');
+
+    const admin = await loginAsAdmin(app);
+    const refundRes = await postAdminReservationRefund(admin, reservationA.id, {
+      reason: 'maintenance_block_must_survive',
+    });
+    expect({ status: refundRes.status, body: refundRes.body }).toMatchObject({ status: 200 });
+    expect(refundRes.body.data.status).toBe('succeeded');
+
+    const blocksAfter = await getDateBlocksForCar(carId);
+    expect(blocksAfter).toHaveLength(1);
+    expect(Number(blocksAfter[0].id)).toBe(maintBlockId);
+
+    const agentC = await createSessionAgent(app);
+    expect((await postOrder(agentC, buildOrderBody(carId))).status).toBe(409);
+  });
+
+  test('control: refund of reservation that owns its booking block frees the period', async () => {
+    const reservation = await checkoutAndConfirm();
+    expect(await getDateBlocksForCar(carId)).toHaveLength(1);
+
+    const admin = await loginAsAdmin(app);
+    const refundRes = await postAdminReservationRefund(admin, reservation.id, {
+      reason: 'owns_block_control_refund',
+    });
+    expect(refundRes.status).toBe(200);
+    expect(refundRes.body.data.status).toBe('succeeded');
+    expect(await getDateBlocksForCar(carId)).toHaveLength(0);
+
+    const agentC = await createSessionAgent(app);
+    expect((await postOrder(agentC, buildOrderBody(carId))).status).toBe(200);
+  });
+
+  test('refund of manual_review keeps orphan booking block with unestablished ownership', async () => {
+    const agentA = await createSessionAgent(app);
+    const checkoutBody = buildCheckoutBody(carId, { email: 'guest-a-orphan-block@example.com' });
+    expect((await postOrder(agentA, checkoutBody)).status).toBe(200);
+    const checkoutRes = await postCheckout(agentA, checkoutBody);
+    expect(checkoutRes.status).toBe(200);
+
+    const stripeSessionId = extractStripeSessionId(checkoutRes);
+    const reservationA = await getReservationByStripeSessionId(stripeSessionId);
+    expect(reservationA).toBeTruthy();
+
+    await setHoldExpired(reservationA.id);
+
+    const orphanStart = parseSofiaDate('2030-06-01', '10:00');
+    const orphanEnd = parseSofiaDate('2030-06-05', '10:00');
+    await addRange(carId, orphanStart, orphanEnd, null, {
+      blockType: 'booking',
+      reason: 'legacy_unowned_block',
+    });
+
+    const blocksBefore = await getDateBlocksForCar(carId);
+    expect(blocksBefore).toHaveLength(1);
+    const orphanBlockId = Number(blocksBefore[0].id);
+    const orphanBlockStart = new Date(blocksBefore[0].start_date).toISOString();
+    const orphanBlockEnd = new Date(blocksBefore[0].end_date).toISOString();
+
+    const event = buildCheckoutCompletedEvent({
+      eventId: `evt_orphan_block_pay_${reservationA.id}_${Date.now()}`,
+      sessionId: stripeSessionId,
+      reservationId: reservationA.id,
+      carId,
+      sessionIdMeta: reservationA.session_id,
+      amountTotal: Math.round(Number(reservationA.total_price) * 100),
+      paymentIntent: stripeTestStub.sessions.get(stripeSessionId)?.payment_intent,
+    });
+    expect((await postSignedWebhook(app, event)).status).toBe(200);
+
+    const reviewedA = await getReservationById(reservationA.id);
+    expect(reviewedA.status).toBe('manual_review');
+    expect(await getOrderByReservationId(reservationA.id)).toBeFalsy();
+
+    const blocksAfterPay = await getDateBlocksForCar(carId);
+    expect(blocksAfterPay).toHaveLength(1);
+    expect(Number(blocksAfterPay[0].id)).toBe(orphanBlockId);
+
+    const admin = await loginAsAdmin(app);
+    const refundRes = await postAdminReservationRefund(admin, reservationA.id, {
+      reason: 'orphan_block_must_survive',
+    });
+    expect({ status: refundRes.status, body: refundRes.body }).toMatchObject({ status: 200 });
+    expect(refundRes.body.data.status).toBe('succeeded');
+    expect((await getReservationById(reservationA.id)).status).toBe('refunded');
+
+    const blocksAfter = await getDateBlocksForCar(carId);
+    expect(blocksAfter).toHaveLength(1);
+    expect(Number(blocksAfter[0].id)).toBe(orphanBlockId);
+    expect(new Date(blocksAfter[0].start_date).toISOString()).toBe(orphanBlockStart);
+    expect(new Date(blocksAfter[0].end_date).toISOString()).toBe(orphanBlockEnd);
+
+    const agentCBlocked = await createSessionAgent(app);
+    expect((await postOrder(agentCBlocked, buildOrderBody(carId))).status).toBe(409);
   });
 });

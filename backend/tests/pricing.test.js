@@ -1,4 +1,4 @@
-const { computeBookingPrice, computePrice } = require('../src/utils/pricing');
+const { computeBookingPrice, computePrice, computeDayPrice } = require('../src/utils/pricing');
 const { buildDefaultConfig } = require('../src/services/sql/pricingConfigSqlService');
 
 describe('computeBookingPrice (legacy compatible)', () => {
@@ -157,5 +157,27 @@ describe('computePrice engine', () => {
     expect(result.lines.some((l) => l.code === 'extra_insurance_full')).toBe(true);
     expect(result.snapshot.selectedExtras).toEqual(['insurance_full']);
     expect(result.totalPrice).toBe(160);
+  });
+});
+
+describe('computeDayPrice tier boundaries (1-3 / 4-31 / 32+)', () => {
+  const car = { price: 99, priceTier_1_3: 60, priceTier_7_31: 45, priceTier_31_plus: 35 };
+
+  test.each([
+    [1, 60],
+    [3, 60],
+    [4, 45],
+    [6, 45],
+    [7, 45],
+    [31, 45],
+    [32, 35],
+    [60, 35],
+  ])('%i rental days -> %i per day', (days, expected) => {
+    expect(computeDayPrice(car, days)).toBe(expected);
+  });
+
+  test('empty band falls back to flat price', () => {
+    expect(computeDayPrice({ price: 99, priceTier_1_3: 60 }, 4)).toBe(99);
+    expect(computeDayPrice({ price: 99, priceTier_1_3: 60, priceTier_7_31: 45 }, 32)).toBe(99);
   });
 });

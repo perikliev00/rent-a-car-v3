@@ -53,15 +53,26 @@ function appendIdSearch(conditions, params, q) {
  * @param {number} limit
  */
 async function queryRefundableBookings(filters, limit) {
+  // Include paid-cancelled rows so cancel without immediate Stripe refund stays queue-visible.
   const conditions = [
-    `r.status IN (${REFUNDABLE_STATUSES.map((_, i) => `$${i + 1}`).join(', ')})`,
+    `(
+      r.status IN (${REFUNDABLE_STATUSES.map((_, i) => `$${i + 1}`).join(', ')})
+      OR (
+        r.status = 'cancelled'
+        AND (
+          (r.stripe_payment_intent_id IS NOT NULL AND BTRIM(r.stripe_payment_intent_id) <> '')
+          OR COALESCE(r.paid_amount_cents, 0) > 0
+        )
+      )
+    )`,
     `(refund_op.status IS NULL OR refund_op.status <> 'succeeded')`,
   ];
   const params = [...REFUNDABLE_STATUSES];
 
   const status = String(filters.status || '').trim();
+  const allowedStatusFilter = [...REFUNDABLE_STATUSES, 'cancelled'];
   // Status / lifecycle guard before mutating domain state.
-  if (status && REFUNDABLE_STATUSES.includes(status)) {
+  if (status && allowedStatusFilter.includes(status)) {
     params.push(status);
     conditions.push(`r.status = $${params.length}`);
   }

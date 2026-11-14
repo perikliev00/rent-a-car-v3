@@ -437,6 +437,9 @@ async function createCheckoutSessionFlow(req) {
     throw new NotFoundError('Car not found.');
   }
 
+  const { assertCarStatusBookable } = require('../../../utils/carBookability');
+  assertCarStatusBookable(car.status);
+
   const validation = validateCheckoutRequest(req, car, formData);
   if (!validation.ok) {
     return validation.response;
@@ -485,6 +488,10 @@ async function createCheckoutSessionFlow(req) {
       if (!locked) {
         return checkoutErrorResponse(car, formData, pricing);
       }
+
+      // Re-read fleet status under the checkout lock (hold may predate a maintenance flip).
+      const { assertCarBookableById } = require('../../../utils/carBookability');
+      await assertCarBookableById(car.id);
 
       return createOrReuseLockedCheckoutSession({
         req,

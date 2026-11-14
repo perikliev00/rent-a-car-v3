@@ -160,4 +160,19 @@ describe('POST /api/admin/reservations/:id/refund', () => {
     const response = await request(app).post('/api/admin/reservations/5/refund').send({});
     expect([401, 403]).toContain(response.status);
   });
+
+  test('rejects staff with only can_cancel_orders (no can_refund_payments)', async () => {
+    rbacService.getUserAccess.mockResolvedValue({
+      roles: ['ops'],
+      permissions: ['can_cancel_orders', 'can_view_reservations_ops', 'can_change_reservation_status'],
+      roleDetails: [{ id: '2', slug: 'ops', name: 'Ops' }],
+    });
+    const app = createApiTestApp();
+    const agent = await loginAsAdmin(app);
+    const response = await withCsrf(agent, agent.post('/api/admin/reservations/5/refund')).send({
+      reason: 'should_be_forbidden',
+    });
+    expect(response.status).toBe(403);
+    expect(requestReservationRefund).not.toHaveBeenCalled();
+  });
 });

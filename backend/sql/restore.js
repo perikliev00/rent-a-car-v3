@@ -22,6 +22,17 @@ const {
 } = require('./dbCliUtils');
 
 /**
+ * psql argv for restoring a plain SQL dump; aborts on the first SQL error.
+ *
+ * @param {string} databaseUrl
+ * @param {string} backupFile - Absolute path to the .sql dump
+ * @returns {string[]}
+ */
+function buildPsqlRestoreArgs(databaseUrl, backupFile) {
+  return ['--dbname', databaseUrl, '-v', 'ON_ERROR_STOP=1', '--file', backupFile];
+}
+
+/**
  * Restore a plain SQL backup using psql.
  *
  * @param {*} [argv] - argv = process.argv.slice(2)
@@ -55,7 +66,9 @@ async function restore(argv = process.argv.slice(2)) {
   await dropPublicSchema();
 
   console.log(`→ restoring from ${resolvedBackup}`);
-  await runCommand(psql, ['--dbname', databaseUrl, '--file', resolvedBackup], {
+  // ON_ERROR_STOP=1: psql exits non-zero (code 3) on the first SQL error instead of
+  // continuing and reporting success for a half-restored database.
+  await runCommand(psql, buildPsqlRestoreArgs(databaseUrl, resolvedBackup), {
     inheritStdio: true,
   });
 
@@ -69,4 +82,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { restore };
+module.exports = { restore, buildPsqlRestoreArgs };

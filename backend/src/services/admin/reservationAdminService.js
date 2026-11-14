@@ -11,6 +11,8 @@ const { ADMIN_OPS_STATUSES, isValidStatus } = require('../../domain/reservationS
 const historySql = require('../sql/reservationStatusHistorySqlService');
 const reservationRepository = require('../../repositories/reservationRepository');
 const { runWithTransaction, acquireCarAdvisoryLocks } = require('../../db/transaction');
+const carRepository = require('../../repositories/carRepository');
+const { sendBookingConfirmationEmails } = require('../email/bookingEmailService');
 const {
   assertNoActiveReservationHold,
   assertNoOpenPhysicalRental,
@@ -25,7 +27,7 @@ const {
  * @param {string} [reason]
  */
 async function confirmManualReviewReservation(req, reservation, reason) {
-  return runWithTransaction(async (client) => {
+  const result = await runWithTransaction(async (client) => {
     const carId = reservation.carId?.id || reservation.carId;
 
     await acquireCarAdvisoryLocks(client, [carId]);
@@ -83,6 +85,22 @@ async function confirmManualReviewReservation(req, reservation, reason) {
       order,
     };
   });
+
+  let carName = null;
+  try {
+    const carId = reservation.carId?.id || reservation.carId;
+    const car = await carRepository.findById(carId);
+    carName = car?.name || null;
+  } catch {
+    carName = null;
+  }
+  await sendBookingConfirmationEmails({
+    order: result.order,
+    reservation: result.reservation,
+    carName,
+  });
+
+  return result;
 }
 
 /**
@@ -129,6 +147,45 @@ async function changeReservationStatus(req, { reservationId, status, reason }) {
   // Idempotency guard: return early when work was already applied.
   if (existing.status === 'manual_review' && status === 'confirmed') {
     return confirmManualReviewReservation(req, existing, reason);
+  }
+
+  // Opening a physical rental must serialize on the car and refuse a second open rental.
+  if (
+    (status === 'picked_up' || status === 'active_rental') &&
+    existing.status !== status
+  ) {
+    const carId = existing.carId?.id || existing.carId;
+    return runWithTransaction(async (client) => {
+      if (carId) {
+        await acquireCarAdvisoryLocks(client, [carId]);
+        try {
+          await assertNoOpenPhysicalRental(carId, client, {
+            excludeReservationId: reservationId,
+          });
+        } catch (err) {
+          if (err.isOrderFormError) {
+            const mapped = new Error(err.message);
+            mapped.code = 'OPEN_PHYSICAL_RENTAL';
+            mapped.status = 409;
+            throw mapped;
+          }
+          throw err;
+        }
+      }
+
+      return changeStatus({
+        reservationId,
+        newStatus: status,
+        reason: reason || 'admin_status_change',
+        actor: {
+          type: 'admin',
+          req,
+          userId: req?.session?.user?.id ?? null,
+        },
+        metadata: { source: 'admin_api' },
+        client,
+      });
+    });
   }
 
   const result = await changeStatus({

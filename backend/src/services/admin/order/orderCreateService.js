@@ -130,6 +130,11 @@ async function createOrderCore({ command, range, client }) {
     throw err;
   }
 
+  const { isHardUnbookableStatus, CAR_NOT_BOOKABLE_MESSAGE } = require('../../../utils/carBookability');
+  if (isHardUnbookableStatus(car.status)) {
+    throw new OrderFormError('CAR_NOT_BOOKABLE', CAR_NOT_BOOKABLE_MESSAGE);
+  }
+
   await assertNoOpenPhysicalRental(command.carId, client);
   await assertNoBookedOverlap(command.carId, range.start, range.end, client);
   await assertNoActiveReservationHold(command.carId, range.start, range.end, client);

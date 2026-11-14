@@ -18,26 +18,26 @@ function initSentry() {
     return;
   }
 
-  const SENSITIVE_KEY_PATTERN = /password|secret|token|cookie|authorization|email|phone|address/i;
+  // Include "name" so fullName / customerName from paid-conflict context are scrubbed.
+  const SENSITIVE_KEY_PATTERN =
+    /password|secret|token|cookie|authorization|email|phone|address|name/i;
 
   /**
-   * Redact nested values whose keys match sensitive patterns.
-   * Strings under a sensitive key become `[Redacted]`; other structures recurse.
-   * @param {*} value - Arbitrary nested value from a Sentry event
-   * @returns {*} Scrubbed copy suitable for outbound reporting
+   * Recurse into nested structures. Leaf strings are kept unless the caller
+   * already classified the parent key as sensitive (then the whole value is
+   * replaced with `[Redacted]` in scrubObject).
+   * @param {*} value
+   * @returns {*}
    */
   function scrubValue(value) {
     if (value === null || value === undefined) {
       return value;
     }
 
-    // Leaf strings under a sensitive key are fully replaced.
-    if (typeof value === 'string') {
-      return '[Redacted]';
-    }
-
     if (Array.isArray(value)) {
-      return value.map(scrubValue);
+      return value.map((entry) =>
+        entry && typeof entry === 'object' ? scrubObject(entry) : entry
+      );
     }
 
     if (typeof value === 'object') {
@@ -49,8 +49,10 @@ function initSentry() {
 
   /**
    * Scrub an object's own enumerable entries by key name.
-   * @param {object|null|undefined} obj - Plain object to scrub
-   * @returns {object|null|undefined} New object with sensitive fields redacted
+   * Sensitive keys (email, phone, fullName, …) become `[Redacted]`.
+   * Non-sensitive identifiers such as reservationId remain visible.
+   * @param {object|null|undefined} obj
+   * @returns {object|null|undefined}
    */
   function scrubObject(obj) {
     if (!obj || typeof obj !== 'object') {

@@ -137,7 +137,7 @@ async function getRefundOperationByReservationId(reservationId) {
 async function getDateBlocksForCar(carId) {
   const result = await pool.query(
     `
-    SELECT id, car_id, start_date, end_date
+    SELECT id, car_id, start_date, end_date, block_type, reason
     FROM car_date_blocks
     WHERE car_id = $1
     ORDER BY start_date

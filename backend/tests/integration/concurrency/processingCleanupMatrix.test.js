@@ -13,10 +13,14 @@ const {
   getOrderByReservationId,
   setHoldExpired,
   countOrdersForCar,
+  getStatusHistory,
 } = require('../helpers/dbFixtures');
 const {
   reconcileProcessingStripeReservations,
 } = require('../../../src/services/reservationService');
+const {
+  reconcileStripeSessions,
+} = require('../../../src/services/payment/reconcileStripeSessionsService');
 const stripeTestStub = require('../../../src/services/payment/stripeTestStub');
 
 const runIntegration =
@@ -88,6 +92,45 @@ describeIf('MONEY-009: processingCleanupMatrix', () => {
     expect(await countOrdersForCar(carId)).toBe(1);
   });
 
+  test('second reconcile of already-expired unpaid session is a no-op', async () => {
+    const { stripeSessionId, reservation } = await checkoutToExpiredHold();
+    stripeTestStub.expireSession(stripeSessionId);
+
+    const first = await reconcileProcessingStripeReservations(new Date());
+    expect(first.expired).toBeGreaterThanOrEqual(1);
+    expect((await getReservationById(reservation.id)).status).toBe('expired');
+
+    const { pool } = require('../../helpers/dbTestHarness');
+    const historyBefore = await pool.query(
+      `
+      SELECT COUNT(*)::int AS count
+      FROM reservation_status_history
+      WHERE reservation_id = $1 AND old_status = 'expired' AND new_status = 'expired'
+      `,
+      [reservation.id]
+    );
+
+    const retrieveSpy = jest.spyOn(stripeTestStub, 'retrieveSession');
+    await reconcileProcessingStripeReservations(new Date());
+    const retrieveCallsForSession = retrieveSpy.mock.calls.filter(
+      (args) => args[0] === stripeSessionId
+    ).length;
+    retrieveSpy.mockRestore();
+
+    const historyAfter = await pool.query(
+      `
+      SELECT COUNT(*)::int AS count
+      FROM reservation_status_history
+      WHERE reservation_id = $1 AND old_status = 'expired' AND new_status = 'expired'
+      `,
+      [reservation.id]
+    );
+
+    expect(historyAfter.rows[0].count).toBe(historyBefore.rows[0].count);
+    expect(retrieveCallsForSession).toBe(0);
+    expect((await getReservationById(reservation.id)).status).toBe('expired');
+  });
+
   test('expired unpaid Stripe session marks reservation expired', async () => {
     const { stripeSessionId, reservation } = await checkoutToExpiredHold();
     stripeTestStub.expireSession(stripeSessionId);
@@ -98,5 +141,55 @@ describeIf('MONEY-009: processingCleanupMatrix', () => {
     const updated = await getReservationById(reservation.id);
     expect(updated.status).toBe('expired');
     expect(await getOrderByReservationId(reservation.id)).toBeNull();
+  });
+
+  test('second cleanup cycle does not re-query Stripe or add expired→expired history', async () => {
+    const { stripeSessionId, reservation } = await checkoutToExpiredHold();
+    stripeTestStub.expireSession(stripeSessionId);
+
+    const first = await reconcileProcessingStripeReservations(new Date());
+    expect(first.expired).toBeGreaterThanOrEqual(1);
+    expect((await getReservationById(reservation.id)).status).toBe('expired');
+    const historyAfterFirst = await getStatusHistory(reservation.id);
+    const expiredRows = (rows) => rows.filter((h) => h.new_status === 'expired');
+    expect(expiredRows(historyAfterFirst)).toHaveLength(1);
+
+    const retrieveSpy = jest.spyOn(stripeTestStub, 'retrieveSession');
+    try {
+      const second = await reconcileProcessingStripeReservations(new Date());
+      expect(second.expired).toBe(0);
+
+      const retrievedIds = retrieveSpy.mock.calls.map((args) => args[0]);
+      expect(retrievedIds).not.toContain(stripeSessionId);
+    } finally {
+      retrieveSpy.mockRestore();
+    }
+
+    const historyAfterSecond = await getStatusHistory(reservation.id);
+    expect(historyAfterSecond.length).toBe(historyAfterFirst.length);
+    expect(expiredRows(historyAfterSecond)).toHaveLength(1);
+    expect(historyAfterSecond.some((h) => h.old_status === 'expired' && h.new_status === 'expired')).toBe(
+      false
+    );
+  });
+
+  test('admin reconcileStripeSessions skips terminal stripe_session_expired rows', async () => {
+    const { stripeSessionId, reservation } = await checkoutToExpiredHold();
+    stripeTestStub.expireSession(stripeSessionId);
+
+    expect((await reconcileProcessingStripeReservations(new Date())).expired).toBeGreaterThanOrEqual(1);
+    expect((await getReservationById(reservation.id)).status).toBe('expired');
+
+    const retrieveSpy = jest.spyOn(stripeTestStub, 'retrieveSession');
+    try {
+      const adminPass = await reconcileStripeSessions({ dryRun: false, limit: 200 });
+      const touched = adminPass.results.some(
+        (row) => String(row.reservationId) === String(reservation.id)
+      );
+      expect(touched).toBe(false);
+      expect(retrieveSpy.mock.calls.map((args) => args[0])).not.toContain(stripeSessionId);
+    } finally {
+      retrieveSpy.mockRestore();
+    }
   });
 });

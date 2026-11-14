@@ -6,7 +6,7 @@
 const logger = require('../../../utils/logger');
 const { refundError } = require('./refundErrors');
 
-/** Statuses from which a full refund may be initiated. */
+/** Statuses from which a full refund may be initiated (excluding paid-cancelled). */
 const REFUNDABLE_STATUSES = Object.freeze([
   'paid',
   'manual_review',
@@ -28,15 +28,60 @@ function buildIdempotencyKey(reservationId, attempt = 1) {
 }
 
 /**
- * @param {string} status
- * @throws {Error} REFUND_NOT_ALLOWED when status is not refundable
+ * True when the reservation row shows captured payment (PI id or stored paid amount).
+ * Unpaid holds that were cancelled have neither and must not become refundable.
+ *
+ * @param {object|null|undefined} reservation
+ * @returns {boolean}
  */
-function assertRefundableStatus(status) {
+function hasCapturedPayment(reservation) {
+  if (!reservation) {
+    return false;
+  }
+  const paymentIntentId = reservation.stripePaymentIntentId ?? reservation.stripe_payment_intent_id;
+  if (paymentIntentId && String(paymentIntentId).trim()) {
+    return true;
+  }
+  const paidAmount = Number(reservation.paidAmountCents ?? reservation.paid_amount_cents);
+  return Number.isFinite(paidAmount) && paidAmount > 0;
+}
+
+/**
+ * Refundable when in REFUNDABLE_STATUSES, or cancelled after payment was captured.
+ *
+ * @param {object|null|undefined} reservation
+ * @returns {boolean}
+ */
+function isRefundableReservation(reservation) {
+  if (!reservation) {
+    return false;
+  }
+  if (REFUNDABLE_STATUSES.includes(reservation.status)) {
+    return true;
+  }
+  return reservation.status === 'cancelled' && hasCapturedPayment(reservation);
+}
+
+/**
+ * @param {object|string} statusOrReservation - Reservation row, or a status string
+ * @param {object} [reservation] - Reservation row when the first argument is a status string
+ * @throws {Error} REFUND_NOT_ALLOWED when the reservation is not refundable
+ */
+function assertRefundableStatus(statusOrReservation, reservation) {
+  const subject =
+    statusOrReservation && typeof statusOrReservation === 'object'
+      ? statusOrReservation
+      : { ...(reservation || {}), status: statusOrReservation };
+  const status = subject.status;
   // Status / lifecycle guard before mutating domain state.
-  if (!REFUNDABLE_STATUSES.includes(status)) {
+  if (!isRefundableReservation(subject)) {
+    const hint =
+      status === 'cancelled'
+        ? ' Cancelled reservations are refundable only when a payment was captured.'
+        : '';
     throw refundError(
       'REFUND_NOT_ALLOWED',
-      `Cannot refund reservation in status "${status}". Allowed: ${REFUNDABLE_STATUSES.join(', ')}.`
+      `Cannot refund reservation in status "${status}". Allowed: ${REFUNDABLE_STATUSES.join(', ')}.${hint}`
     );
   }
 }
@@ -168,6 +213,8 @@ module.exports = {
   buildIdempotencyKey,
   parseAttemptFromIdempotencyKey,
   isIndeterminateStripeError,
+  hasCapturedPayment,
+  isRefundableReservation,
   assertRefundableStatus,
   isAllowedDuringPendingRefund,
   requireSucceededLedgerForRefunded,

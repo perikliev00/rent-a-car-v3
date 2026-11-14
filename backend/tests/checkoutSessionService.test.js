@@ -13,6 +13,13 @@ jest.mock('../src/services/sql/reservationSqlService', () => ({
 jest.mock('../src/db/transaction', () => ({
   withReservationCheckoutLock: jest.fn(async (_id, work) => work({})),
   isCheckoutLockBusyError: (err) => Boolean(err && err.code === 'CHECKOUT_LOCK_BUSY'),
+  clientQuery: jest.fn().mockResolvedValue({ rows: [{ status: 'available' }] }),
+}));
+
+jest.mock('../src/utils/carBookability', () => ({
+  assertCarStatusBookable: jest.fn(),
+  assertCarBookableById: jest.fn().mockResolvedValue(undefined),
+  isHardUnbookableStatus: jest.fn().mockReturnValue(false),
 }));
 
 jest.mock('../src/services/reservation/reservationStatusService', () => ({

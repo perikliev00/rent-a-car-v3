@@ -220,6 +220,8 @@ test.describe("admin-manual-review-resolve", () => {
       expect(await countOrdersForCar(carId)).toBe(1);
       expect(await countDateBlocksForCar(carId)).toBe(1);
 
+      // Owned calendar block (linked order) must be freed on refund. Orphan/unowned
+      // blocks are covered by backend integration (reservationRefund orphan case).
       const refundEmail = uniqueEmail('mr-refund');
       const refundSeed = await seedLinkedBooking({
         carId,
@@ -228,7 +230,7 @@ test.describe("admin-manual-review-resolve", () => {
         returnDate: rangeRefund.returnDate,
         pickupTime: rangeRefund.pickupTime,
         returnTime: rangeRefund.returnTime,
-        withOrder: false,
+        withOrder: true,
         withBlock: true,
         stripePaymentIntentId: `pi_e2e_mr_refund_${Date.now()}`,
         guest: { ...E2E_GUEST, email: refundEmail, fullName: 'MR Refund' },
@@ -269,7 +271,9 @@ test.describe("admin-manual-review-resolve", () => {
       expect(refundRes.ok, JSON.stringify(refundRes.body)).toBeTruthy();
 
       await assertReservationStatus(refundSeed.reservationId, 'refunded');
-      expect(await getOrderByReservationId(refundSeed.reservationId)).toBeNull();
+      const refundedOrder = await getOrderByReservationId(refundSeed.reservationId);
+      expect(refundedOrder).toBeTruthy();
+      expect(refundedOrder.is_deleted).toBe(true);
       expect((await getRefundOperationByReservationId(refundSeed.reservationId))?.status).toBe(
         'succeeded'
       );

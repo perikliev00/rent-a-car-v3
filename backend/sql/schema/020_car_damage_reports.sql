@@ -7,12 +7,20 @@ CREATE TABLE IF NOT EXISTS car_damage_reports (
   repair_cost          NUMERIC(10,2),
   reported_by_user_id  BIGINT REFERENCES users(id) ON DELETE SET NULL,
   status               VARCHAR(16) NOT NULL DEFAULT 'unresolved',
+  source               VARCHAR(32) NOT NULL DEFAULT 'manual',
   created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   resolved_at          TIMESTAMPTZ,
   CONSTRAINT car_damage_status_valid CHECK (status IN ('unresolved', 'resolved')),
+  CONSTRAINT car_damage_source_valid CHECK (source IN ('manual', 'return_checklist')),
   CONSTRAINT car_damage_cost_nonneg CHECK (repair_cost IS NULL OR repair_cost >= 0)
 );
 
 CREATE INDEX IF NOT EXISTS idx_car_damage_car_status
   ON car_damage_reports(car_id, status, created_at DESC);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_car_damage_one_auto_unresolved_per_reservation
+  ON car_damage_reports (reservation_id)
+  WHERE source = 'return_checklist'
+    AND status = 'unresolved'
+    AND reservation_id IS NOT NULL;

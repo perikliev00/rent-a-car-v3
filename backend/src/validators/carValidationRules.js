@@ -48,12 +48,12 @@ function buildPriceTierRules() {
       .optional({ checkFalsy: true })
       .toFloat()
       .isFloat({ gt: 0 })
-      .withMessage('Tier 7–31 must be a number greater than 0'),
+      .withMessage('Tier 4–31 must be a number greater than 0'),
     body('priceTier_31_plus')
       .optional({ checkFalsy: true })
       .toFloat()
       .isFloat({ gt: 0 })
-      .withMessage('Tier 31+ must be a number greater than 0'),
+      .withMessage('Tier 32+ must be a number greater than 0'),
     // Cross-field: require at least one tier and enforce non-increasing prices with duration.
     body()
       .custom((_, { req }) => {
@@ -64,18 +64,18 @@ function buildPriceTierRules() {
         const hasValidTier = tier1 !== null || tier2 !== null || tier3 !== null;
         if (!hasValidTier) {
           throw new Error(
-            'At least one price tier (1–3 days, 7–31 days, or 31+ days) is required'
+            'At least one price tier (1–3 days, 4–31 days, or 32+ days) is required'
           );
         }
 
         if (tier1 !== null && tier2 !== null && tier2 > tier1) {
-          throw new Error('Tier 7–31 price must not exceed tier 1–3 price.');
+          throw new Error('Tier 4–31 price must not exceed tier 1–3 price.');
         }
         if (tier2 !== null && tier3 !== null && tier3 > tier2) {
-          throw new Error('Tier 31+ price must not exceed tier 7–31 price.');
+          throw new Error('Tier 32+ price must not exceed tier 4–31 price.');
         }
         if (tier1 !== null && tier3 !== null && tier3 > tier1) {
-          throw new Error('Tier 31+ price must not exceed tier 1–3 price.');
+          throw new Error('Tier 32+ price must not exceed tier 1–3 price.');
         }
 
         return true;

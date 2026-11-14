@@ -84,10 +84,18 @@ async function restoreOrder(orderId) {
         order.expiredAt = undefined;
       }
 
-      // Drop cancelled/missing reservation links so we can create a fresh confirmed one.
+      // Drop terminal/cancelled links so restore creates a fresh confirmed reservation
+      // instead of reactivating a refunded/expired booking.
       if (order.reservationId) {
         const existing = await reservationRepository.findById(order.reservationId, client);
-        if (!existing || existing.status === 'cancelled') {
+        const unlinkStatuses = new Set([
+          'cancelled',
+          'refunded',
+          'expired',
+          'completed',
+          'no_show',
+        ]);
+        if (!existing || unlinkStatuses.has(existing.status)) {
           order.reservationId = undefined;
         }
       }
