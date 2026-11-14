@@ -297,6 +297,17 @@ async function findProcessingWithStripeSession(client = null) {
         WHERE o.reservation_id = r.id
           AND COALESCE(o.is_deleted, FALSE) = FALSE
       )
+      -- Same terminal filter as findProcessingWithExpiredHold: Stripe already
+      -- reported expired/unpaid, so admin reconcile must not re-retrieve forever.
+      AND NOT (
+        r.status = 'expired'
+        AND EXISTS (
+          SELECT 1 FROM reservation_status_history h
+          WHERE h.reservation_id = r.id
+            AND h.new_status = 'expired'
+            AND h.reason = 'stripe_session_expired'
+        )
+      )
     ORDER BY r.updated_at ASC
     `
   );
@@ -326,6 +337,16 @@ async function findProcessingWithExpiredHold(now = new Date(), client = null) {
         SELECT 1 FROM orders o
         WHERE o.reservation_id = r.id
           AND COALESCE(o.is_deleted, FALSE) = FALSE
+      )
+      -- Locally final: already expired because Stripe reported the session expired/unpaid.
+      AND NOT (
+        r.status = 'expired'
+        AND EXISTS (
+          SELECT 1 FROM reservation_status_history h
+          WHERE h.reservation_id = r.id
+            AND h.new_status = 'expired'
+            AND h.reason = 'stripe_session_expired'
+        )
       )
     ORDER BY r.updated_at ASC
     `,

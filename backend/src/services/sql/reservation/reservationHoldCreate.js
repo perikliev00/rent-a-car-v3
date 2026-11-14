@@ -183,6 +183,9 @@ async function createPendingReservationWithAvailabilityCheck({
 
     await expireStaleHoldsForCar(normalizedCarId, now, client);
 
+    const { assertCarBookableById } = require('../../../utils/carBookability');
+    await assertCarBookableById(normalizedCarId, client);
+
     const holdCriteria = {
       carId: normalizedCarId,
       startDate,

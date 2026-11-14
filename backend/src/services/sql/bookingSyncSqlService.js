@@ -412,12 +412,15 @@ async function moveRange(prevCarId, newCarId, prevStart, prevEnd, newStart, newE
 
 /**
  * Delete the date block matching start/end for a car (soft-delete / cancel path).
+ * Defaults to booking blocks only so cancel/refund never removes maintenance/manual ranges.
+ * Pass `blockType: null` to match any type (escape hatch).
  * @param {number|string} carId
  * @param {Date} startDate
  * @param {Date} endDate
  * @param {object|null} [client]
+ * @param {{ blockType?: string|null }} [options]
  */
-async function removeRange(carId, startDate, endDate, client = null) {
+async function removeRange(carId, startDate, endDate, client = null, options = {}) {
   if (!carId || !startDate || !endDate) {
     return;
   }
@@ -427,13 +430,29 @@ async function removeRange(carId, startDate, endDate, client = null) {
     return;
   }
 
+  const blockType = Object.prototype.hasOwnProperty.call(options, 'blockType')
+    ? options.blockType
+    : 'booking';
+
+  if (blockType == null) {
+    await clientQuery(
+      client,
+      `
+      DELETE FROM car_date_blocks
+      WHERE car_id = $1 AND start_date = $2 AND end_date = $3
+      `,
+      [normalizedCarId, startDate, endDate]
+    );
+    return;
+  }
+
   await clientQuery(
     client,
     `
     DELETE FROM car_date_blocks
-    WHERE car_id = $1 AND start_date = $2 AND end_date = $3
+    WHERE car_id = $1 AND start_date = $2 AND end_date = $3 AND block_type = $4
     `,
-    [normalizedCarId, startDate, endDate]
+    [normalizedCarId, startDate, endDate, blockType]
   );
 }
 
@@ -546,7 +565,7 @@ async function fetchDateBlocksByCarIds(carIds, client = null) {
   const result = await clientQuery(
     client,
     `
-    SELECT car_id, start_date, end_date
+    SELECT id, car_id, start_date, end_date, block_type
     FROM car_date_blocks
     WHERE car_id = ANY($1::bigint[])
     ORDER BY start_date ASC
@@ -560,8 +579,10 @@ async function fetchDateBlocksByCarIds(carIds, client = null) {
       map.set(carId, []);
     }
     map.get(carId).push({
+      id: row.id != null ? Number(row.id) : null,
       startDate: row.start_date,
       endDate: row.end_date,
+      blockType: row.block_type || 'booking',
     });
   }
 

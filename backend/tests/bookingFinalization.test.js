@@ -68,6 +68,7 @@ jest.mock('../src/services/admin/adminAuditService', () => ({
 
 jest.mock('../src/db/transaction', () => ({
   runWithTransaction: jest.fn(async (fn) => fn({})),
+  clientQuery: jest.fn(async () => ({ rows: [{ status: 'available' }] })),
   isUniqueViolation: jest.requireActual('../src/db/transaction').isUniqueViolation,
 }));
 

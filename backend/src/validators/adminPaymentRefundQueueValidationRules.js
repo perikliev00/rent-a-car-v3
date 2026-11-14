@@ -15,7 +15,7 @@ const adminPaymentRefundQueueValidationRules = [
     .withMessage('Search query must be at most 40 characters.'),
   query('status')
     .optional({ checkFalsy: true })
-    .isIn([...REFUNDABLE_STATUSES])
+    .isIn([...REFUNDABLE_STATUSES, 'cancelled'])
     .withMessage('Invalid reservation status.'),
   query('refundState')
     .optional({ checkFalsy: true })

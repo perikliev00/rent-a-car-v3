@@ -18,6 +18,7 @@ const {
   syncLinkedOrderAfterReservationMove,
 } = require('../../services/admin/order/orderReservationSync');
 const { createHttpError, emitCalendarUpdated } = require('./calendar.shared');
+const { formatSofiaTime } = require('../../utils/date/timezone');
 
 /** Soft calendar blocks that force-override is allowed to clear for a reservation move/resize. */
 async function clearOverridableBlocksInRange(carId, start, end, client) {
@@ -141,35 +142,96 @@ async function moveOrResizeEvent(access, eventId, body, req, mode) {
     );
     conflictEngine.assertWritable(writableConflicts, { force, canOverride });
 
-    const prevStart = existing.pickupDate;
-    const prevEnd = existing.returnDate;
-    const prevCarId = Number(existing.carId?.id || existing.carId);
+    const initialCarId = Number(existing.carId?.id || existing.carId);
+    let prevStart = existing.pickupDate;
+    let prevEnd = existing.returnDate;
+    let prevCarId = initialCarId;
     let orderSynced = false;
     let pricing = null;
 
     await runWithTransaction(async (client) => {
-      // Lock previous + target cars before re-checking hard conflicts.
-      await acquireCarAdvisoryLocks(client, [prevCarId, targetCarId]);
+      // Lock previous + target cars, then re-read under the same transaction.
+      await acquireCarAdvisoryLocks(client, [initialCarId, targetCarId]);
+      const locked = await reservationSql.findByIdForUpdate(existing.id, client);
+      if (!locked) {
+        throw createHttpError('NOT_FOUND', 'Reservation not found.', 404);
+      }
+
+      prevStart = locked.pickupDate;
+      prevEnd = locked.returnDate;
+      prevCarId = Number(locked.carId?.id || locked.carId);
+
+      // Active Checkout offer must stay aligned with the Stripe session amount/dates.
+      if (locked.status === 'processing_payment' || locked.status === 'pending_payment') {
+        throw createHttpError(
+          'CHECKOUT_IN_PROGRESS',
+          'Cannot move or resize a reservation while Stripe Checkout is in progress.',
+          409
+        );
+      }
+
+      // Only statuses that own (or will keep) a booking block may move/resize.
+      // manual_review/paid/terminal have no order block; moving them would insert a phantom one.
+      const movableStatuses = new Set([
+        'confirmed',
+        'car_prepared',
+        'picked_up',
+        'active_rental',
+      ]);
+      if (!movableStatuses.has(locked.status)) {
+        throw createHttpError(
+          'INVALID_STATUS_TRANSITION',
+          `Cannot move or resize a reservation in status '${locked.status}'.`,
+          409
+        );
+      }
+
+      // Physically open rentals stay on their car; moveRange would free the original block.
+      const openPhysicalStatuses = new Set(['picked_up', 'active_rental']);
+      if (openPhysicalStatuses.has(locked.status) && prevCarId !== targetCarId) {
+        throw createHttpError(
+          'OPEN_PHYSICAL_RENTAL',
+          'Cannot change car for a reservation that is already picked up or in active rental.',
+          409,
+          {
+            conflicts: [
+              {
+                code: 'OPEN_PHYSICAL_RENTAL',
+                severity: 'block',
+                message:
+                  'Cannot change car for a reservation that is already picked up or in active rental.',
+                overridable: false,
+                overlappingReservationId: String(locked.id),
+              },
+            ],
+          }
+        );
+      }
+
       await assertNoHoldOrOpenPhysicalRental({
         carId: targetCarId,
         start,
         end,
-        excludeReservationId: existing.id,
+        excludeReservationId: locked.id,
         client,
       });
 
+      // Text times must follow the new instants (Sofia wall clock), not the stale originals.
+      const newPickupTime = formatSofiaTime(start) || locked.pickupTime;
+      const newReturnTime = formatSofiaTime(end) || locked.returnTime;
+
       // Reprice linked order for the new range/car, then persist reservation fields.
       const syncedMove = await syncLinkedOrderAfterReservationMove({
-        reservationId: existing.id,
+        reservationId: locked.id,
         carId: targetCarId,
         start,
         end,
-        pickupTime: existing.pickupTime,
-        returnTime: existing.returnTime,
-        pickupLocation: existing.pickupLocation,
-        returnLocation: existing.returnLocation,
-        selectedExtras: existing.selectedExtras,
-        hotelDelivery: existing.hotelDelivery,
+        pickupTime: newPickupTime,
+        returnTime: newReturnTime,
+        pickupLocation: locked.pickupLocation,
+        returnLocation: locked.returnLocation,
+        selectedExtras: locked.selectedExtras,
+        hotelDelivery: locked.hotelDelivery,
         client,
       });
       pricing = syncedMove.pricing;
@@ -177,21 +239,23 @@ async function moveOrResizeEvent(access, eventId, body, req, mode) {
 
       await reservationSql.update(
         {
-          ...existing,
+          ...locked,
           carId: targetCarId,
           pickupDate: start,
           returnDate: end,
+          pickupTime: newPickupTime,
+          returnTime: newReturnTime,
           rentalDays: pricing.rentalDays,
           deliveryPrice: pricing.deliveryPrice,
           returnPrice: pricing.returnPrice,
           totalPrice: pricing.totalPrice,
-          deposit: pricing.deposit ?? existing.deposit,
-          priceSnapshot: pricing.snapshot || existing.priceSnapshot,
-          selectedExtras: pricing.snapshot?.selectedExtras || existing.selectedExtras,
+          deposit: pricing.deposit ?? locked.deposit,
+          priceSnapshot: pricing.snapshot || locked.priceSnapshot,
+          selectedExtras: pricing.snapshot?.selectedExtras || locked.selectedExtras,
           hotelDelivery:
             pricing.snapshot?.hotelDelivery != null
               ? Boolean(pricing.snapshot.hotelDelivery)
-              : existing.hotelDelivery,
+              : locked.hotelDelivery,
         },
         client
       );

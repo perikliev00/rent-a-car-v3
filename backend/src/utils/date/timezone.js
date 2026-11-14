@@ -166,6 +166,32 @@ function parseSofiaDate(dateString, timeString = '00:00') {
 }
 
 /**
+ * Sofia wall-clock time for an absolute instant, as zero-padded `HH:MM` (24h).
+ * Inverse of the time half of {@link parseSofiaDate}; DST-aware.
+ *
+ * @param {Date | string | number} date
+ * @returns {string | null} `HH:MM`, or null when the input is not a valid instant
+ * @throws {never}
+ */
+function formatSofiaTime(date) {
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) {
+    return null;
+  }
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: SOFIA_TZ,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(d);
+  const data = {};
+  for (const { type, value } of parts) {
+    data[type] = value;
+  }
+  return `${data.hour}:${data.minute}`;
+}
+
+/**
  * Normalize any date-like value to a UTC Date with the same UTC components.
  *
  * @param {string | number | Date} date - Value accepted by the Date constructor
@@ -194,6 +220,7 @@ module.exports = {
   getTomorrowSofiaIsoDate,
   getTodayInSofia,
   parseSofiaDate,
+  formatSofiaTime,
   addSofiaCalendarDays,
   formatSofiaIsoDateFromParts,
   toUtc,

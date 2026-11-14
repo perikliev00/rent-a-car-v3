@@ -131,6 +131,18 @@ async function changeStatusCore({
     client
   );
 
+  // Paid cancel must leave an explicit refund-decision trail for the payments panel.
+  let effectiveMetadata = metadata;
+  if (newStatus === 'cancelled' && oldStatus !== 'cancelled') {
+    const { hasCapturedPayment } = require('../payment/refund/refundPolicy');
+    if (hasCapturedPayment(updated)) {
+      effectiveMetadata = {
+        ...(metadata && typeof metadata === 'object' ? metadata : {}),
+        refund_decision: 'pending_staff_refund',
+      };
+    }
+  }
+
   await historySql.insertStatusHistory(
     {
       reservationId,
@@ -139,7 +151,7 @@ async function changeStatusCore({
       changedByUserId: actor?.userId ?? null,
       changedBySystem: actor?.type !== 'admin' && actor?.type !== 'customer',
       reason,
-      metadata,
+      metadata: effectiveMetadata,
     },
     client
   );
@@ -157,16 +169,71 @@ async function changeStatusCore({
   ) {
     const bookingSync = require('../sql/bookingSyncSqlService');
     const { resolveStoredDateRange } = require('../admin/order/orderConflictService');
+    const orderSql = require('../sql/orderSqlService');
 
     const carId = updated.carId?.id || updated.carId;
     if (carId && updated.pickupDate && updated.returnDate) {
-      const { storedStart, storedEnd } = await resolveStoredDateRange(
+      // Ownership: only release a booking block when this reservation has a linked
+      // order and no other live order claims the same car/range. Orphan / unowned
+      // overlap blocks must survive refund/cancel for ops review.
+      const linkedOrder = await orderSql.findOrderByReservationId(reservationId, client);
+      const { storedStart, storedEnd, blockId } = await resolveStoredDateRange(
         carId,
         updated.pickupDate,
         updated.returnDate,
         client
       );
-      await bookingSync.removeRange(carId, storedStart, storedEnd, client);
+      const { clientQuery } = require('../../db/transaction');
+
+      if (!linkedOrder) {
+        if (blockId != null) {
+          logger.warn(
+            {
+              reservationId: String(reservationId),
+              carId: String(carId),
+              newStatus,
+              oldStatus,
+              blockId,
+              reason: 'calendar_block_ownership_unestablished',
+            },
+            'Skipping calendar block removal: reservation has no linked order and block ownership is unestablished'
+          );
+        }
+      } else {
+        const foreignOwners = await clientQuery(
+          client,
+          `
+          SELECT id
+          FROM orders
+          WHERE car_id = $1
+            AND is_deleted = FALSE
+            AND id <> $2
+            AND pickup_date < $4
+            AND return_date > $3
+          LIMIT 1
+          `,
+          [carId, linkedOrder.id, storedStart, storedEnd]
+        );
+        if (foreignOwners.rows.length) {
+          logger.warn(
+            {
+              reservationId: String(reservationId),
+              carId: String(carId),
+              newStatus,
+              oldStatus,
+              blockId: blockId ?? null,
+              linkedOrderId: String(linkedOrder.id),
+              foreignOrderId: String(foreignOwners.rows[0].id),
+              reason: 'calendar_block_ownership_ambiguous',
+            },
+            'Skipping calendar block removal: overlapping active order claims the same range'
+          );
+        } else {
+          await bookingSync.removeRange(carId, storedStart, storedEnd, client, {
+            blockType: 'booking',
+          });
+        }
+      }
     }
 
     // Soft-delete linked order on cancel and refund (not no_show).
@@ -183,7 +250,7 @@ async function changeStatusCore({
     oldStatus,
     newStatus,
     reason,
-    metadata,
+    metadata: effectiveMetadata !== undefined ? effectiveMetadata : metadata,
     actor,
     reservation: updated,
   };

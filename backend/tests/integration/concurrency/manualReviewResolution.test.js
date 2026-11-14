@@ -101,9 +101,98 @@ describeIf('MONEY-007: manualReviewResolution', () => {
 
     const confirmed = await getReservationById(reservation.id);
     expect(confirmed.status).toBe('confirmed');
-    expect(await getOrderByReservationId(reservation.id)).toBeTruthy();
+    const order = await getOrderByReservationId(reservation.id);
+    expect(order).toBeTruthy();
     expect(await countOrdersForCar(carId)).toBe(1);
     expect(await getDateBlocksForCar(carId)).toHaveLength(1);
+
+    const { pool } = require('../../helpers/dbTestHarness');
+    const notes = await pool.query(
+      `
+      SELECT id, type, reservation_id, order_id, idempotency_key
+      FROM notifications
+      WHERE reservation_id = $1
+        AND type = 'reservation_confirmation'
+      ORDER BY id ASC
+      `,
+      [reservation.id]
+    );
+    expect(notes.rowCount).toBe(1);
+    expect(notes.rows[0].idempotency_key).toBe(
+      `reservation_confirmation:order:${order.id}`
+    );
+
+    // Repeat confirm is a no-op for notifications (already confirmed).
+    const again = await postAdminReservationStatus(admin, reservation.id, {
+      status: 'confirmed',
+      reason: 'admin_manual_review_confirm_repeat',
+    });
+    expect([200, 422].includes(again.status)).toBe(true);
+    const notesAfter = await pool.query(
+      `
+      SELECT COUNT(*)::int AS count
+      FROM notifications
+      WHERE reservation_id = $1 AND type = 'reservation_confirmation'
+      `,
+      [reservation.id]
+    );
+    expect(notesAfter.rows[0].count).toBe(1);
+  });
+
+  test('admin confirm from manual_review enqueues exactly one customer confirmation', async () => {
+    const { pool } = require('../../helpers/dbTestHarness');
+    const reservation = await forceManualReview();
+    await pool.query('DELETE FROM car_date_blocks WHERE car_id = $1', [carId]);
+
+    const countConfirmations = async () => {
+      const r = await pool.query(
+        `SELECT COUNT(*)::int AS count FROM notifications
+         WHERE reservation_id = $1 AND type = 'reservation_confirmation'`,
+        [reservation.id]
+      );
+      return r.rows[0].count;
+    };
+    expect(await countConfirmations()).toBe(0);
+
+    const admin = await loginAsAdmin(app);
+    const first = await postAdminReservationStatus(admin, reservation.id, {
+      status: 'confirmed',
+      reason: 'admin_manual_review_confirm',
+    });
+    expect(first.status).toBe(200);
+    expect(await countConfirmations()).toBe(1);
+
+    // Repeating the confirm (already confirmed) must not enqueue another email.
+    await postAdminReservationStatus(admin, reservation.id, {
+      status: 'confirmed',
+      reason: 'admin_manual_review_confirm',
+    });
+    expect(await countConfirmations()).toBe(1);
+
+    await pool.query('DELETE FROM notifications WHERE reservation_id = $1', [reservation.id]);
+  });
+
+  test('rejected confirm while range still blocked enqueues no customer confirmation', async () => {
+    const { pool } = require('../../helpers/dbTestHarness');
+    const reservation = await forceManualReview();
+    // Keep the foreign block so confirm must fail availability checks.
+    expect(await getDateBlocksForCar(carId)).toHaveLength(1);
+
+    const admin = await loginAsAdmin(app);
+    const res = await postAdminReservationStatus(admin, reservation.id, {
+      status: 'confirmed',
+      reason: 'admin_manual_review_confirm_blocked',
+    });
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect((await getReservationById(reservation.id)).status).toBe('manual_review');
+    expect(await getOrderByReservationId(reservation.id)).toBeFalsy();
+
+    const notes = await pool.query(
+      `SELECT COUNT(*)::int AS count FROM notifications
+       WHERE reservation_id = $1 AND type = 'reservation_confirmation'`,
+      [reservation.id]
+    );
+    expect(notes.rows[0].count).toBe(0);
   });
 
   test('admin refund from manual_review leaves booking without order', async () => {

@@ -8,7 +8,7 @@ const permissionSql = require('../sql/permissionSqlService');
 const userRoleSql = require('../sql/userRoleSqlService');
 const userSql = require('../sql/userSqlService');
 const sessionSql = require('../sql/sessionSqlService');
-const { runWithTransaction, clientQuery } = require('../../db/transaction');
+const { runWithTransaction, clientQuery, ADVISORY_LOCK_NS } = require('../../db/transaction');
 
 /** Privileged role slug that implicitly grants every permission key. */
 const OWNER_SLUG = 'owner';
@@ -142,7 +142,36 @@ async function syncUserLegacyRole(userId, assigned, client) {
  * @param {object|null} [client]
  * @returns {Promise<*>}
  */
+/**
+ * Only an existing owner may grant the owner role (prevents manager self-escalation).
+ * @param {string|number|null} actorUserId
+ * @param {object|null} [client]
+ */
+async function assertActorCanAssignOwner(actorUserId, client) {
+  if (actorUserId == null || actorUserId === '') {
+    throw createHttpError(
+      'FORBIDDEN',
+      'Only an owner can assign the owner role.',
+      403
+    );
+  }
+  const isOwner = await userRoleSql.userHasRoleSlug(actorUserId, OWNER_SLUG, client);
+  if (!isOwner) {
+    throw createHttpError(
+      'FORBIDDEN',
+      'Only an owner can assign the owner role.',
+      403
+    );
+  }
+}
+
 async function assertCanRemoveOwner(userId, client) {
+  // Serialize every owner removal: without this, two concurrent demotions each see
+  // ownerCount = 2 (READ COMMITTED) and both commit, leaving zero owners. The lock is
+  // transaction-scoped, so the second demotion re-counts after the first has committed.
+  await clientQuery(client, 'SELECT pg_advisory_xact_lock($1, 0)', [
+    ADVISORY_LOCK_NS.OWNER_ROLE,
+  ]);
   const currentlyOwner = await userRoleSql.userHasRoleSlug(userId, OWNER_SLUG, client);
   if (!currentlyOwner) return;
 
@@ -180,6 +209,10 @@ async function setUserRoles(userId, roleIds, assignedByUserId = null) {
 
     const ownerRole = await roleSql.findRoleBySlug(OWNER_SLUG, client);
     const nextHasOwner = ownerRole && uniqueIds.includes(Number(ownerRole.id));
+    const currentlyOwner = await userRoleSql.userHasRoleSlug(userId, OWNER_SLUG, client);
+    if (nextHasOwner && !currentlyOwner) {
+      await assertActorCanAssignOwner(assignedByUserId, client);
+    }
     if (!nextHasOwner) {
       await assertCanRemoveOwner(userId, client);
     }
@@ -215,6 +248,13 @@ async function assignUserRole(userId, roleId, assignedByUserId = null) {
 
     const role = await roleSql.findRoleById(roleId, client);
     if (!role) throw createHttpError('NOT_FOUND', 'Role not found.', 404);
+
+    if (role.slug === OWNER_SLUG) {
+      const currentlyOwner = await userRoleSql.userHasRoleSlug(userId, OWNER_SLUG, client);
+      if (!currentlyOwner) {
+        await assertActorCanAssignOwner(assignedByUserId, client);
+      }
+    }
 
     const assigned = await userRoleSql.assignRoleToUser(
       userId,

@@ -137,8 +137,8 @@ exports.getPricingInfo = async (req, res) => {
       returnFees: FEES,
       priceTierExplanation: {
         tier1_3: '1-3 days',
-        tier7_31: '7-31 days',
-        tier31_plus: '31+ days',
+        tier7_31: '4-31 days',
+        tier31_plus: '32+ days',
       },
     });
   } catch (err) {

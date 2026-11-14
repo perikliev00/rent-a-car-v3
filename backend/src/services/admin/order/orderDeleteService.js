@@ -41,7 +41,7 @@ async function deleteOrder(orderId) {
       client
     );
 
-    await removeRange(order.carId, storedStart, storedEnd, client);
+    await removeRange(order.carId, storedStart, storedEnd, client, { blockType: 'booking' });
     order.isDeleted = true;
     order.deletedAt = new Date();
     await orderSql.updateOrderFromDoc(order, client);

@@ -47,6 +47,9 @@ function bookedUnavailableResponse(car, formData, pricing) {
  * @returns {Promise<{ ok: true, reservationDoc: object, createdReservationThisStep: boolean } | { ok: false, response: object }>}
  */
 async function resolveCheckoutReservation({ req, car, formData, startDate, endDate, pricing }) {
+  const { assertCarStatusBookable } = require('../../../utils/carBookability');
+  assertCarStatusBookable(car.status);
+
   const trimmedContact = normalizeContactDetails(formData);
   const sessionId = getSessionId(req);
   const now = new Date();

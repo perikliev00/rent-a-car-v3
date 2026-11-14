@@ -16,6 +16,7 @@ jest.mock('../../src/services/sql/sessionSqlService', () => ({
 jest.mock('../../src/db/transaction', () => ({
   runWithTransaction: async (work) => work({}),
   clientQuery: jest.fn().mockResolvedValue({ rows: [] }),
+  ADVISORY_LOCK_NS: { OWNER_ROLE: 6 },
 }));
 
 describe('rbacService', () => {
@@ -91,6 +92,38 @@ describe('rbacService', () => {
       expect.stringContaining('UPDATE users SET role'),
       [9, 'staff']
     );
+  });
+
+  test('assignUserRole rejects non-owner actor granting owner', async () => {
+    userSql.findUserById.mockResolvedValue({ id: '9', role: 'staff', email: 'm@b.c' });
+    roleSql.findRoleById.mockResolvedValue({ id: '1', slug: 'owner', name: 'Owner' });
+    userRoleSql.userHasRoleSlug
+      .mockResolvedValueOnce(false) // target is not currently owner
+      .mockResolvedValueOnce(false); // actor is not owner
+
+    await expect(rbacService.assignUserRole(9, 1, 42)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      status: 403,
+    });
+    expect(userRoleSql.assignRoleToUser).not.toHaveBeenCalled();
+  });
+
+  test('setUserRoles rejects non-owner actor granting owner', async () => {
+    userSql.findUserById.mockResolvedValue({ id: '9', role: 'staff', email: 'm@b.c' });
+    roleSql.findRolesByIds.mockResolvedValue([
+      { id: '1', slug: 'owner' },
+      { id: '2', slug: 'manager' },
+    ]);
+    roleSql.findRoleBySlug.mockResolvedValue({ id: '1', slug: 'owner' });
+    userRoleSql.userHasRoleSlug
+      .mockResolvedValueOnce(false) // target currently owner?
+      .mockResolvedValueOnce(false); // actor is owner?
+
+    await expect(rbacService.setUserRoles(9, [1, 2], 42)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      status: 403,
+    });
+    expect(userRoleSql.replaceUserRoles).not.toHaveBeenCalled();
   });
 
   test('setUserRoles with empty list demotes legacy role to user', async () => {

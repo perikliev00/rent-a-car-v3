@@ -1,7 +1,6 @@
 const {
   buildErrorPayload,
   getRequestIdFromReq,
-  wantsJson,
 } = require('../../src/utils/httpResponse');
 
 describe('getRequestIdFromReq', () => {
@@ -33,25 +32,5 @@ describe('buildErrorPayload', () => {
         correlationId: 'abc-123',
       },
     });
-  });
-});
-
-describe('wantsJson', () => {
-  test('returns true for API paths', () => {
-    expect(wantsJson({ path: '/api/cars', get: () => '' })).toBe(true);
-  });
-
-  test('returns true for stripe webhook', () => {
-    expect(wantsJson({ path: '/webhook/stripe', get: () => '' })).toBe(true);
-  });
-
-  test('returns false for HTML accept on non-API paths', () => {
-    expect(
-      wantsJson({
-        path: '/',
-        xhr: false,
-        get: () => 'text/html,application/json',
-      })
-    ).toBe(false);
   });
 });

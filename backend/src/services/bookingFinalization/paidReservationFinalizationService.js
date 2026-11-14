@@ -7,6 +7,11 @@ const paymentFailureSql = require('../sql/paymentFailureSqlService');
 const { addRange } = require('../sql/bookingSyncSqlService');
 const { ACTIVE_RESERVATION_STATUSES } = require('../../utils/reservationHelpers');
 const { changeStatus } = require('../reservation/reservationStatusService');
+const {
+  isHardUnbookableStatus,
+  loadCarStatus,
+} = require('../../utils/carBookability');
+const { markPaidReservationConflict } = require('./paidConflictManualReviewService');
 const logger = require('../../utils/logger');
 const logEvent = require('../../monitoring/logEvent');
 const metrics = require('../../monitoring/metrics');
@@ -47,6 +52,24 @@ async function completeReservationFinalization({
   const resolvedCarId = reservation.carId?.id || reservation.carId;
   const paymentIntentId =
     stripePaymentIntent || reservation.stripePaymentIntentId || null;
+
+  // Fleet may have flipped to hard-unbookable after Checkout opened; keep payment,
+  // route to manual_review, and do not create an order / booking block.
+  const carStatus = await loadCarStatus(resolvedCarId, client);
+  if (isHardUnbookableStatus(carStatus)) {
+    return markPaidReservationConflict({
+      reservation,
+      stripeSessionId,
+      conflictReason: 'car_not_bookable_after_payment',
+      paidAmount: reservation.totalPrice ?? null,
+      paidAmountCents,
+      paidCurrency,
+      stripePaymentIntent: paymentIntentId,
+      logPrefix,
+      client,
+      resultReason: 'car_not_bookable_after_payment',
+    });
+  }
 
   const { reservation: paidReservation } = await changeStatus({
     reservationId: reservation.id,

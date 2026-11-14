@@ -29,7 +29,41 @@ async function waitUntilAdvisoryLockWaiter(
   throw new Error(`Timed out waiting for advisory lock waiter ns=${namespace} key=${key}`);
 }
 
+/**
+ * Wait until at least `count` distinct backends are blocked on the same advisory lock.
+ */
+async function waitUntilAdvisoryLockWaiters(
+  namespace,
+  key,
+  count,
+  { timeoutMs = 10000, intervalMs = 25 } = {}
+) {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const result = await pool.query(
+      `
+      SELECT COUNT(DISTINCT pid)::int AS waiters
+      FROM pg_locks
+      WHERE locktype = 'advisory'
+        AND granted = false
+        AND classid = $1
+        AND objid = $2
+        AND objsubid = 2
+      `,
+      [namespace, key]
+    );
+    if (result.rows[0].waiters >= count) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  throw new Error(
+    `Timed out waiting for ${count} advisory lock waiters ns=${namespace} key=${key}`
+  );
+}
+
 module.exports = {
   ADVISORY_LOCK_NS,
   waitUntilAdvisoryLockWaiter,
+  waitUntilAdvisoryLockWaiters,
 };

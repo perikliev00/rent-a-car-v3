@@ -162,8 +162,8 @@ export function CarDetailPage() {
   // Only show tiers the API actually priced.
   const tiers = [
     { label: '1–3 days', price: car.priceTier_1_3, hint: 'Short trips' },
-    { label: '7–31 days', price: car.priceTier_7_31, hint: 'Best for holidays' },
-    { label: '31+ days', price: car.priceTier_31_plus, hint: 'Long-term rate' },
+    { label: '4–31 days', price: car.priceTier_7_31, hint: 'Best for holidays' },
+    { label: '32+ days', price: car.priceTier_31_plus, hint: 'Long-term rate' },
   ].filter((tier) => tier.price != null);
 
   // Prefer longer-term rates for the “from” teaser when available.

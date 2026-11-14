@@ -3,7 +3,6 @@ import { render, type RenderOptions } from '@testing-library/react';
 import type { ReactElement, ReactNode } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from '../auth/AuthProvider';
-import { defaultSearchParams, searchParamsToQuery } from '../utils/searchParams';
 
 export function createTestQueryClient() {
   return new QueryClient({
@@ -12,10 +11,6 @@ export function createTestQueryClient() {
       mutations: { retry: false },
     },
   });
-}
-
-export function buildTestSearchQuery() {
-  return new URLSearchParams(searchParamsToQuery(defaultSearchParams())).toString();
 }
 
 export function renderWithRouter(

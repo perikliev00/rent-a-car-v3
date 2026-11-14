@@ -23,6 +23,10 @@ const ADVISORY_LOCK_NS = Object.freeze({
   SESSION: 2,
   CHECKOUT: 3,
   JOB: 4,
+  /** Transaction-scoped; serializes damage-report upserts per reservation (B6). */
+  DAMAGE_REPORT: 5,
+  /** Transaction-scoped; serializes owner-role removals so the last owner cannot be raced away (B4). */
+  OWNER_ROLE: 6,
 });
 
 /**

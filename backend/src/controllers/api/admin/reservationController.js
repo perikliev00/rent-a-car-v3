@@ -61,6 +61,9 @@ exports.changeStatus = asyncHandler(async (req, res, next) => {
     if (err.code === 'REFUND_IN_PROGRESS') {
       return apiResponse.error(res, 'REFUND_IN_PROGRESS', err.message, 409);
     }
+    if (err.code === 'OPEN_PHYSICAL_RENTAL') {
+      return apiResponse.error(res, 'OPEN_PHYSICAL_RENTAL', err.message, 409);
+    }
     if (err.code === 'FORBIDDEN' || err.status === 403) {
       return apiResponse.error(res, 'FORBIDDEN', err.message, 403);
     }

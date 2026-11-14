@@ -99,6 +99,7 @@ async function processStripeWebhookEvent({
       result?.reason === 'overlap_after_payment' ||
       result?.reason === 'paid_after_cancel' ||
       result?.reason === 'paid_conflict' ||
+      result?.reason === 'car_not_bookable_after_payment' ||
       result?.reason === 'stale_stripe_session' ||
       result?.reason === 'stripe_amount_mismatch' ||
       result?.reason === 'stripe_currency_mismatch'
@@ -134,6 +135,7 @@ async function processStripeWebhookEvent({
     result.reason !== 'overlap_after_payment' &&
     result.reason !== 'paid_after_cancel' &&
     result.reason !== 'paid_conflict' &&
+    result.reason !== 'car_not_bookable_after_payment' &&
     result.reason !== 'stale_stripe_session' &&
     result.reason !== 'stripe_amount_mismatch' &&
     result.reason !== 'stripe_currency_mismatch' &&

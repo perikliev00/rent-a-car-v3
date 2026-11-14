@@ -24,20 +24,9 @@ const CAR_STATUSES = [
 /** Ops statuses that block booking regardless of calendar dates (aligned with conflict engine). */
 const HARD_UNBOOKABLE_STATUSES = ['in_maintenance', 'damaged', 'inactive'];
 
-/**
- * Fleet statuses still eligible for public date search.
- * Calendar blocks + payment holds decide period conflicts; reserved/rented/cleaning
- * must not unlist the car for non-overlapping future ranges.
- */
-const BOOKABLE_STATUSES = CAR_STATUSES.filter(
-  (status) => !HARD_UNBOOKABLE_STATUSES.includes(status)
-);
-
 const FUEL_LEVELS = ['empty', 'quarter', 'half', 'three_quarters', 'full'];
 
 const SERVICE_TYPES = ['oil_change', 'tires', 'brakes', 'inspection', 'bodywork', 'other'];
-
-const DAMAGE_STATUSES = ['unresolved', 'resolved'];
 
 const COMPLIANCE_TYPES = [
   'civil_insurance',
@@ -79,31 +68,6 @@ const FLEET_ALERT_COMPLIANCE_TYPES = [
 
 const FLEET_ALERT_EXPIRY_WINDOW_DAYS = 7;
 
-const FLEET_ALERT_TYPES = [
-  'insurance_expired',
-  'insurance_expiring_soon',
-  'casco_expired',
-  'casco_expiring_soon',
-  'vignette_expired',
-  'vignette_expiring_soon',
-  'inspection_expired',
-  'inspection_expiring_soon',
-  'unresolved_damage',
-];
-
-const FLEET_ALERT_SEVERITIES = ['critical', 'warning', 'info'];
-
-const FLEET_ALERT_STATUSES = ['active', 'resolved'];
-
-const FLEET_ALERT_SOURCE_KINDS = ['compliance_item', 'damage_report'];
-
-const ACTIVE_RENTAL_RESERVATION_STATUSES = [
-  'confirmed',
-  'car_prepared',
-  'picked_up',
-  'active_rental',
-];
-
 module.exports = {
   TRANSMISSIONS,
   FUEL_TYPES,
@@ -112,18 +76,11 @@ module.exports = {
   CAR_SEATS_MAX,
   CAR_STATUSES,
   HARD_UNBOOKABLE_STATUSES,
-  BOOKABLE_STATUSES,
   FUEL_LEVELS,
   SERVICE_TYPES,
-  DAMAGE_STATUSES,
   COMPLIANCE_TYPES,
   COMPLIANCE_TYPE_LABELS,
   COMPLIANCE_STATUSES,
   FLEET_ALERT_COMPLIANCE_TYPES,
   FLEET_ALERT_EXPIRY_WINDOW_DAYS,
-  FLEET_ALERT_TYPES,
-  FLEET_ALERT_SEVERITIES,
-  FLEET_ALERT_STATUSES,
-  FLEET_ALERT_SOURCE_KINDS,
-  ACTIVE_RENTAL_RESERVATION_STATUSES,
 };

@@ -1,7 +1,12 @@
 /**
  * SQL for car_damage_reports (list/create/resolve/remove).
  */
-const { clientQuery } = require('../../db/transaction');
+const { clientQuery, runWithTransaction, ADVISORY_LOCK_NS } = require('../../db/transaction');
+
+const DAMAGE_SOURCES = Object.freeze({
+  MANUAL: 'manual',
+  RETURN_CHECKLIST: 'return_checklist',
+});
 
 /**
  * Map a DB/API row into the domain shape used by callers (mapDamageReport).
@@ -29,6 +34,7 @@ function mapDamageReport(row) {
     repairCost: row.repair_cost != null ? Number(row.repair_cost) : null,
     reportedByUserId: row.reported_by_user_id != null ? Number(row.reported_by_user_id) : null,
     status: row.status,
+    source: row.source || DAMAGE_SOURCES.MANUAL,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     resolvedAt: row.resolved_at || null,
@@ -103,6 +109,7 @@ async function countUnresolved(carId, client = null) {
  * @returns {Promise<*>}
  */
 async function create(carId, payload, client = null) {
+  const source = payload.source || DAMAGE_SOURCES.MANUAL;
   const result = await clientQuery(
     client,
     `
@@ -113,9 +120,10 @@ async function create(carId, payload, client = null) {
       photos,
       repair_cost,
       reported_by_user_id,
-      status
+      status,
+      source
     )
-    VALUES ($1, $2, $3, $4::jsonb, $5, $6, 'unresolved')
+    VALUES ($1, $2, $3, $4::jsonb, $5, $6, 'unresolved', $7)
     RETURNING *
     `,
     [
@@ -125,9 +133,94 @@ async function create(carId, payload, client = null) {
       JSON.stringify(payload.photos || []),
       payload.repairCost ?? null,
       payload.reportedByUserId ?? null,
+      source,
     ]
   );
   return mapDamageReport(result.rows[0]);
+}
+
+/**
+ * Idempotent damage write for return-checklist retries: update the existing
+ * unresolved auto row for the reservation (including description/cost edits),
+ * otherwise insert. Manual reports are never matched or mutated.
+ * @param {string|number} carId
+ * @param {object} payload
+ * @param {object|null} [client]
+ */
+async function upsertForReservation(carId, payload, client = null) {
+  const reservationId = payload.reservationId ? Number(payload.reservationId) : null;
+  if (!reservationId) {
+    return create(carId, { ...payload, source: DAMAGE_SOURCES.RETURN_CHECKLIST }, client);
+  }
+  // Serialize per reservation so a concurrent double submit cannot insert twice.
+  if (client) {
+    await acquireDamageReportLock(client, reservationId);
+    return upsertForReservationLocked(carId, payload, client);
+  }
+  return runWithTransaction(async (txClient) => {
+    await acquireDamageReportLock(txClient, reservationId);
+    return upsertForReservationLocked(carId, payload, txClient);
+  });
+}
+
+/**
+ * Transaction-scoped advisory lock keyed on reservation id.
+ * @param {object} client
+ * @param {number} reservationId
+ */
+async function acquireDamageReportLock(client, reservationId) {
+  await client.query('SELECT pg_advisory_xact_lock($1, $2)', [
+    ADVISORY_LOCK_NS.DAMAGE_REPORT,
+    reservationId,
+  ]);
+}
+
+async function upsertForReservationLocked(carId, payload, client) {
+  const reservationId = Number(payload.reservationId);
+  const description = String(payload.description || '');
+  {
+    const existing = await clientQuery(
+      client,
+      `
+      SELECT id
+      FROM car_damage_reports
+      WHERE car_id = $1
+        AND reservation_id = $2
+        AND source = $3
+        AND status = 'unresolved'
+      ORDER BY id ASC
+      LIMIT 1
+      `,
+      [Number(carId), reservationId, DAMAGE_SOURCES.RETURN_CHECKLIST]
+    );
+    if (existing.rows[0]) {
+      const updated = await clientQuery(
+        client,
+        `
+        UPDATE car_damage_reports
+        SET
+          description = $2,
+          photos = CASE WHEN jsonb_array_length($3::jsonb) > 0 THEN $3::jsonb ELSE photos END,
+          repair_cost = COALESCE($4, repair_cost),
+          updated_at = NOW()
+        WHERE id = $1
+        RETURNING *
+        `,
+        [
+          Number(existing.rows[0].id),
+          description,
+          JSON.stringify(payload.photos || []),
+          payload.repairCost ?? null,
+        ]
+      );
+      return mapDamageReport(updated.rows[0]);
+    }
+  }
+  return create(
+    carId,
+    { ...payload, source: DAMAGE_SOURCES.RETURN_CHECKLIST },
+    client
+  );
 }
 
 /**
@@ -176,10 +269,12 @@ async function remove(carId, reportId, client = null) {
 }
 
 module.exports = {
+  DAMAGE_SOURCES,
   listByCarId,
   findById,
   countUnresolved,
   create,
+  upsertForReservation,
   resolve,
   remove,
 };

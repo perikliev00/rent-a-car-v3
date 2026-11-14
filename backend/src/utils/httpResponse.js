@@ -1,24 +1,6 @@
 /**
- * HTTP response helpers for content negotiation and standardized error payloads.
+ * HTTP response helpers for standardized error payloads.
  */
-
-/**
- * Whether the client expects a JSON body (API path, XHR, Stripe webhook, or Accept header).
- *
- * @param {import('express').Request} req
- * @returns {boolean}
- * @throws {never}
- */
-function wantsJson(req) {
-  // Stripe webhooks and XHR always get JSON.
-  if (req.path === '/webhook/stripe') return true;
-  if (req.xhr) return true;
-  if (req.path.startsWith('/api/')) return true;
-
-  // Prefer JSON when Accept lists it and does not also ask for HTML.
-  const accept = req.get('accept') || '';
-  return accept.includes('application/json') && !accept.includes('text/html');
-}
 
 /**
  * Resolve the request correlation id attached by middleware.
@@ -52,7 +34,6 @@ function buildErrorPayload(error, req) {
 }
 
 module.exports = {
-  wantsJson,
   buildErrorPayload,
   getRequestIdFromReq,
 };

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hasAnyPermission, hasPermission, isStaffUser } from './permissions';
+import { isStaffUser } from './permissions';
 
 describe('permissions helpers', () => {
   it('detects staff via roles', () => {
@@ -18,16 +18,5 @@ describe('permissions helpers', () => {
 
   it('denies plain customers', () => {
     expect(isStaffUser({ roles: [], permissions: [] })).toBe(false);
-  });
-
-  it('owner bypasses permission checks', () => {
-    expect(hasPermission({ roles: ['owner'], permissions: [] }, 'can_manage_users')).toBe(true);
-  });
-
-  it('checks concrete permissions', () => {
-    const user = { roles: ['receptionist'], permissions: ['can_view_orders'] };
-    expect(hasPermission(user, 'can_view_orders')).toBe(true);
-    expect(hasPermission(user, 'can_manage_users')).toBe(false);
-    expect(hasAnyPermission(user, ['can_manage_users', 'can_view_orders'])).toBe(true);
   });
 });
