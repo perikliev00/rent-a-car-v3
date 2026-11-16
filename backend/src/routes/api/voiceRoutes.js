@@ -10,6 +10,9 @@ const logger = require('../../utils/logger');
 const { createLimiter } = require('../../middleware/rateLimit');
 const { buildSessionConfig } = require('../../modules/voiceAgent/sessionConfig');
 
+// Node 22 provides these Web API globals; bind them for the backend ESLint scope.
+const { FormData, Blob, fetch, AbortSignal } = globalThis;
+
 const router = express.Router();
 const voiceLimiter = createLimiter({ windowMs: 15 * 60 * 1000, max: 4 });
 
