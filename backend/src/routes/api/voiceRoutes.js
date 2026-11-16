@@ -33,7 +33,7 @@ router.post('/session', voiceLimiter, asyncHandler(async (req, res) => {
 
   const form = new FormData();
   form.set('sdp', sdp);
-  form.set('session', JSON.stringify(buildSessionConfig(language)));
+  form.set('session', new Blob([JSON.stringify(buildSessionConfig(language))], { type: 'application/json' }));
   // Privacy-preserving identifier, unrelated to the customer's actual identity.
   const safetyId = crypto.createHmac('sha256', process.env.SESSION_SECRET)
     .update(String(req.sessionID)).digest('hex');
