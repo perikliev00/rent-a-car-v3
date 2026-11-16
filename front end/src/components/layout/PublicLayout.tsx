@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../../auth/useAuth';
 import { isStaffUser } from '../../auth/permissions';
 import { Button } from '../ui/Button';
+import { VoiceAssistant } from '../voice/VoiceAssistant';
 import { Drawer } from '../ui/Drawer';
 
 /**
@@ -229,6 +230,8 @@ export function PublicLayout() {
           )}
         </div>
       </Drawer>
+
+      {import.meta.env.VITE_VOICE_AGENT_ENABLED === 'true' && <VoiceAssistant />}
 
       <main className="min-w-0 flex-1">
         <Outlet />

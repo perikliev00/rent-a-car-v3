@@ -11,6 +11,7 @@ const checkoutRoutes = require('./checkoutRoutes');
 const authRoutes = require('./authRoutes');
 const adminRoutes = require('./admin');
 const chatRoutes = require('./chatRoutes');
+const voiceRoutes = require('./voiceRoutes');
 const contactRoutes = require('./contactRoutes');
 const accountRoutes = require('./accountRoutes');
 const docsRoutes = require('./docsRoutes');
@@ -37,6 +38,8 @@ router.use('/account', accountRoutes);
 router.use('/admin', adminRoutes);
 // External chatbot contract (non-envelope responses).
 router.use('/chat', chatRoutes);
+// Read-only browser voice session setup.
+router.use('/voice', voiceRoutes);
 // Public contact form submissions.
 router.use('/contacts', contactRoutes);
 
