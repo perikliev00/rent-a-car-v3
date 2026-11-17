@@ -27,7 +27,7 @@ Do not rebuild an old commit on the server. Roll back by redeploying a previousl
 
 `ops/deploy-production.sh` backs up the current Compose environment and monitoring/deployment payload before replacing the live release.
 
-If a deployment fails after rollback is armed, the script restores the prior configuration/infrastructure and brings the previous release back up.
+If a deployment fails after rollback is armed, the script restores the previous Compose environment and deployment files and attempts to restart the previous release. This attempt is best-effort: recheck the actual containers, readiness, and public HTTPS before declaring recovery complete.
 
 Treat this as deployment-failure recovery, not as a substitute for an intentional application rollback.
 
@@ -39,7 +39,7 @@ The current release metadata is written to:
 /opt/rentacar/config/current-release.env
 ```
 
-It records the deployed commit and immutable image references.
+It records the last successfully recorded commit and immutable image references. After a failed deploy, use the [release verification checks](../ops/production-deployment.md#verify-a-release) to confirm what is actually running.
 
 ## Database warning
 

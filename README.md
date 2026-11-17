@@ -11,9 +11,10 @@ LuxRide covers the customer booking journey and the staff operational lifecycle:
 - PostgreSQL enforces booking consistency with exclusion constraints in addition to application-level locking.
 - CI validates linting, unit tests, frontend tests/builds, database consistency, migrations, integration flows, security scans, Docker images, and Playwright E2E.
 - The production workflow promotes immutable container images from Amazon ECR to AWS Lightsail after CI succeeds.
+- The production release at `38397792ab23` passed [CI](https://github.com/perikliev00/rent-a-car-v3/actions/runs/43644437041) and [deployed successfully to Lightsail on 14 November 2026](https://github.com/perikliev00/rent-a-car-v3/actions/runs/43645069291). See the [deployment and DevOps guide](docs/ops/production-deployment.md) for the topology, delivery sequence, and what the checks prove.
 - Prometheus, Grafana, Alertmanager, structured logs, health/readiness endpoints, and optional Sentry provide operational visibility.
 
-> Production note: the current AWS Compose topology includes PostgreSQL on a persistent Docker volume. For business-critical use, prefer managed PostgreSQL with automated backups and PITR, or maintain validated off-host backups and regular restore drills. See `docs/runbooks/db-restore.md`.
+> PostgreSQL runs on the same Lightsail host on a persistent Docker volume. That volume is not an off-host backup. See the [database recovery runbook](docs/runbooks/db-restore.md) for logical dumps, isolated restore drills, and remaining recovery requirements.
 
 ## Product capabilities
 
@@ -205,33 +206,11 @@ On `main`, the Docker job publishes commit-SHA-tagged images to Amazon ECR. Depl
 
 ### Production deployment
 
-`.github/workflows/deploy.yml` starts after a successful CI run on `main` or through an explicit manual dispatch.
+The [Deploy workflow](.github/workflows/deploy.yml) runs after a successful push CI run on `main`, or by manual dispatch for a previously verified release. It resolves the three ECR image digests, checks out the exact commit, and deploys the versioned AWS Compose and monitoring configuration over SSH. The host starts the API first, waits for database readiness, then starts the worker and both frontends. It checks the services and expected image digests before writing release metadata.
 
-Release flow:
+The deployed stack uses [`docker-compose.aws.yml`](docker-compose.aws.yml). The API, worker, customer frontend, and admin frontend run separately; PostgreSQL and monitoring run on the same host. The [deployment and DevOps guide](docs/ops/production-deployment.md) explains the public HTTPS boundary and how to verify a release.
 
-1. Resolve the exact 40-character commit SHA.
-2. Verify that the API, customer, and admin images exist in ECR.
-3. Resolve immutable ECR digests for all three images.
-4. Check out the exact release commit.
-5. Authenticate the Lightsail host to ECR through GitHub Actions AWS OIDC credentials.
-6. Copy the versioned Compose, monitoring, and deployment payload.
-7. Run `ops/deploy-production.sh` on the host.
-8. Validate backend readiness, worker/frontend containers, Prometheus, Alertmanager, and Grafana.
-9. Verify that the running API/worker/customer/admin containers use the expected immutable image references.
-10. Automatically restore the previous deployment configuration if the deployment fails after rollback is armed.
-
-Current AWS Compose services:
-
-- PostgreSQL
-- backend API
-- background worker
-- customer frontend
-- admin frontend
-- Prometheus
-- Alertmanager
-- Grafana
-
-Use the deployment workflow for rollback rather than rebuilding an older commit. See [`docs/runbooks/rollback.md`](docs/runbooks/rollback.md).
+On deployment failure the script attempts to restore the prior application configuration and images. It does not revert database migrations or data. For a deliberate rollback, follow the [release rollback runbook](docs/runbooks/rollback.md).
 
 ## Health and observability
 
@@ -249,6 +228,7 @@ Important alerts include API/worker availability, stale worker heartbeat, migrat
 Operational documentation:
 
 - [`docs/README.md`](docs/README.md) — documentation index
+- [`docs/ops/production-deployment.md`](docs/ops/production-deployment.md) — verified deployment, topology, and release checks
 - [`docs/runbooks/webhook-failure.md`](docs/runbooks/webhook-failure.md) — Stripe/payment recovery
 - [`docs/runbooks/rollback.md`](docs/runbooks/rollback.md) — application rollback
 - [`docs/runbooks/db-restore.md`](docs/runbooks/db-restore.md) — backup/restore and DR guidance

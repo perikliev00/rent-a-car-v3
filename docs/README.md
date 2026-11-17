@@ -6,6 +6,7 @@ This directory contains operational documentation, production runbooks, and impl
 
 - [`../README.md`](../README.md) — system overview, architecture, local setup, CI/CD, production topology, and operational guarantees.
 - [`../TESTING.md`](../TESTING.md) — test layers, local setup, concurrency coverage, Playwright, coverage, and CI ownership.
+- [`ops/production-deployment.md`](ops/production-deployment.md) — verified Lightsail deployment, ECR release flow, monitoring, and recovery limits.
 - [`ci-local.md`](ci-local.md) — local CI gate (`npm run ci:local`), pre-push hook setup, and GitHub parity notes.
 - [`branch-protection.md`](branch-protection.md) — GitHub ruleset for requiring the aggregate `CI` check on `main`.
 
@@ -13,6 +14,7 @@ This directory contains operational documentation, production runbooks, and impl
 
 | Scenario | Document |
 | --- | --- |
+| Deploy or verify a production release | [`ops/production-deployment.md`](ops/production-deployment.md) |
 | Stripe webhook/payment finalization failure | [`runbooks/webhook-failure.md`](runbooks/webhook-failure.md) |
 | Roll back an application release | [`runbooks/rollback.md`](runbooks/rollback.md) |
 | Backup/restore and database recovery | [`runbooks/db-restore.md`](runbooks/db-restore.md) |

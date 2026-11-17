@@ -1,8 +1,6 @@
 # Runbook: Database backup and restore
 
-## Goal
-
-Recover PostgreSQL safely without creating a second incident while fixing the first one, a tradition software teams have somehow kept alive for decades.
+Use this runbook to verify logical dumps on a disposable database and to plan recovery of the PostgreSQL data volume. The repository restore command is for non-production drills only.
 
 ## Principles
 
@@ -33,20 +31,18 @@ The helper uses `pg_dump` with plain SQL, `--no-owner`, and `--no-acl`.
 
 ## Restore drill
 
-Restore into a separate database:
+Run from `backend/` with compatible PostgreSQL client tools. Use a sanitized source and an empty, disposable target on an isolated instance. Check the target host and database name before passing `--confirm`: the wrapper drops the target's `public` schema.
 
 ```bash
-DATABASE_URL=postgres://.../luxride_source \
+DATABASE_URL="$DRILL_SOURCE_URL" \
   npm run db:backup -- --out=backups/drill_source.sql
 
-createdb luxride_restore_drill
-
-DATABASE_URL=postgres://.../luxride_restore_drill \
+DATABASE_URL="$DRILL_TARGET_URL" \
 NODE_ENV=development \
   npm run db:restore -- --file=backups/drill_source.sql --confirm
 ```
 
-Then boot the API against the restored database and verify `/ready`.
+Set `DRILL_SOURCE_URL` to a disposable or sanitized database and `DRILL_TARGET_URL` to the separate, pre-created drill database. [The restore script](../../backend/sql/restore.js) passes `ON_ERROR_STOP=1` to `psql`. It exits on the first SQL error, but earlier statements may already have been applied. Never use a partially restored target; recreate it for the next drill. Boot the API against a successful restore and check `/ready` before proceeding.
 
 ## Restore pass criteria
 
@@ -83,9 +79,9 @@ Useful gauges/checks include:
 
 ## Current AWS topology
 
-`docker-compose.aws.yml` currently includes PostgreSQL with a persistent Docker volume on the Lightsail host.
+[`docker-compose.aws.yml`](../../docker-compose.aws.yml) includes PostgreSQL with a persistent Docker volume on the Lightsail host.
 
-That provides persistence across container recreation, but it is not equivalent to managed multi-AZ PostgreSQL, provider PITR, or an off-host disaster-recovery plan.
+That provides persistence across container recreation, not protection against host or disk loss. The repo does not demonstrate an active off-host schedule or a measured production restore. Application object storage is not proof of database backup.
 
 For real business traffic, use one of these patterns:
 

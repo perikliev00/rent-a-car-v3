@@ -1,6 +1,6 @@
 # Production Alertmanager email notifications
 
-Alertmanager on Lightsail sends warning and critical alerts by SMTP.
+Alertmanager on Lightsail is configured to send warning and critical alerts by SMTP. A green readiness probe confirms the process is up, not that mail was delivered. Verify the receiving mailbox with a controlled test before relying on the alert route.
 SMTP credentials are **not** stored in Git.
 
 ## Required host file
@@ -45,9 +45,9 @@ Suggested permissions on the host:
 
 ```bash
 sudo install -d -m 700 /opt/rentacar/config
-sudo install -m 600 /dev/null /opt/rentacar/config/alertmanager.env
-# edit the file, then:
-sudo chown root:root /opt/rentacar/config/alertmanager.env
+sudo test -e /opt/rentacar/config/alertmanager.env ||
+  sudo install -m 600 /dev/null /opt/rentacar/config/alertmanager.env
+sudoedit /opt/rentacar/config/alertmanager.env
 ```
 
 ## Compose wiring
