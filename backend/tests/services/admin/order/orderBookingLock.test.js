@@ -24,6 +24,7 @@ jest.mock('../../../../src/services/admin/order/orderConflictService', () => ({
   assertNoBookedOverlap: jest.fn().mockResolvedValue(undefined),
   assertNoActiveReservationHold: jest.fn().mockResolvedValue(undefined),
   assertNoOpenPhysicalRental: jest.fn().mockResolvedValue(undefined),
+  assertLinkedReservationAllowsCarChange: jest.fn().mockResolvedValue(undefined),
   getAvailabilityConflicts: jest.fn(),
   resolveStoredDateRange: jest.fn().mockResolvedValue({
     storedStart: new Date('2030-06-01T07:00:00.000Z'),

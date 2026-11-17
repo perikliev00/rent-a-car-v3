@@ -370,4 +370,112 @@ describeIf('booking lifecycle integrity', () => {
       await cleanupTestCar(carId);
     }
   });
+
+  test.each(['picked_up', 'active_rental'])(
+    'order update cannot reassign car while reservation is %s',
+    async (physicalStatus) => {
+      const carA = await insertIsolatedTestCar({ name: 'Lifecycle Order Physical Car A' });
+      const carB = await insertIsolatedTestCar({ name: 'Lifecycle Order Physical Car B' });
+      try {
+        const pickupDate = '2031-11-01';
+        const returnDate = '2031-11-04';
+        const pickupTime = '10:00';
+        const returnTime = '10:00';
+
+        const seeded = await insertLinkedBooking({
+          carId: carA,
+          status: physicalStatus,
+          withOrder: true,
+          withBlock: true,
+          pickupDate,
+          returnDate,
+          pickupTime,
+          returnTime,
+          guest: { email: `lifecycle-ord-phys-${physicalStatus}-${Date.now()}@example.com` },
+        });
+
+        expect(await getDateBlocksForCar(carA)).toHaveLength(1);
+        expect(await getDateBlocksForCar(carB)).toHaveLength(0);
+
+        const result = await orderAdmin.updateOrder(seeded.orderId, {
+          carId: String(carB),
+          pickupDate,
+          pickupTime,
+          returnDate,
+          returnTime,
+          pickupLocation: 'office',
+          returnLocation: 'office',
+          fullName: 'Lifecycle Physical Guest',
+          phoneNumber: '+359888000099',
+          email: `lifecycle-ord-phys-upd-${Date.now()}@example.com`,
+          address: 'Test',
+        });
+
+        expect(result.success).toBe(false);
+        expect(String(result.viewModel?.error || '')).toMatch(/picked up|active rental/i);
+
+        expect(await getDateBlocksForCar(carA)).toHaveLength(1);
+        expect(await getDateBlocksForCar(carB)).toHaveLength(0);
+
+        const reservation = await getReservationById(seeded.reservationId);
+        expect(Number(reservation.car_id)).toBe(Number(carA));
+        expect(reservation.status).toBe(physicalStatus);
+
+        const orderRow = await pool.query(`SELECT car_id FROM orders WHERE id = $1`, [
+          seeded.orderId,
+        ]);
+        expect(Number(orderRow.rows[0].car_id)).toBe(Number(carA));
+      } finally {
+        await cleanupTestCar(carA);
+        await cleanupTestCar(carB);
+      }
+    }
+  );
+
+  test('order update may reassign car while reservation is confirmed (control)', async () => {
+    const carA = await insertIsolatedTestCar({ name: 'Lifecycle Order Confirmed Car A' });
+    const carB = await insertIsolatedTestCar({ name: 'Lifecycle Order Confirmed Car B' });
+    try {
+      const pickupDate = '2031-12-01';
+      const returnDate = '2031-12-04';
+      const pickupTime = '10:00';
+      const returnTime = '10:00';
+
+      const seeded = await insertLinkedBooking({
+        carId: carA,
+        status: 'confirmed',
+        withOrder: true,
+        withBlock: true,
+        pickupDate,
+        returnDate,
+        pickupTime,
+        returnTime,
+        guest: { email: `lifecycle-ord-conf-${Date.now()}@example.com` },
+      });
+
+      const result = await orderAdmin.updateOrder(seeded.orderId, {
+        carId: String(carB),
+        pickupDate,
+        pickupTime,
+        returnDate,
+        returnTime,
+        pickupLocation: 'office',
+        returnLocation: 'office',
+        fullName: 'Lifecycle Confirmed Guest',
+        phoneNumber: '+359888000088',
+        email: `lifecycle-ord-conf-upd-${Date.now()}@example.com`,
+        address: 'Test',
+      });
+
+      expect(result.success).toBe(true);
+      expect(await getDateBlocksForCar(carA)).toHaveLength(0);
+      expect(await getDateBlocksForCar(carB)).toHaveLength(1);
+
+      const reservation = await getReservationById(seeded.reservationId);
+      expect(Number(reservation.car_id)).toBe(Number(carB));
+    } finally {
+      await cleanupTestCar(carA);
+      await cleanupTestCar(carB);
+    }
+  });
 });
