@@ -78,6 +78,26 @@ async function assertNoOpenPhysicalRental(carId, client, options = {}) {
   }
 }
 
+const OPEN_PHYSICAL_STATUSES = new Set(['picked_up', 'active_rental']);
+
+/**
+ * Mirror calendar move: a physically open rental must stay on its car.
+ * Date-only edits remain allowed; car reassignment is blocked.
+ * @param {string|number|null|undefined} reservationId
+ * @param {object|null} client
+ */
+async function assertLinkedReservationAllowsCarChange(reservationId, client) {
+  if (!reservationId) return;
+  const reservation = await reservationRepository.findById(reservationId, client);
+  if (!reservation) return;
+  if (OPEN_PHYSICAL_STATUSES.has(reservation.status)) {
+    throw new OrderFormError(
+      'OPEN_PHYSICAL_RENTAL',
+      'Cannot change car for a reservation that is already picked up or in active rental.'
+    );
+  }
+}
+
 /**
  * Locate the stored calendar block for an order's previous range (for removeRange).
  * Only considers booking blocks so staff maintenance ranges are never selected.
@@ -133,6 +153,7 @@ module.exports = {
   assertNoBookedOverlap,
   assertNoActiveReservationHold,
   assertNoOpenPhysicalRental,
+  assertLinkedReservationAllowsCarChange,
   resolveStoredDateRange,
   getAvailabilityConflicts,
 };

@@ -23,6 +23,7 @@ jest.mock('../../../../src/services/admin/order/orderConflictService', () => ({
   assertNoBookedOverlap: jest.fn().mockResolvedValue(undefined),
   assertNoActiveReservationHold: jest.fn().mockResolvedValue(undefined),
   assertNoOpenPhysicalRental: jest.fn().mockResolvedValue(undefined),
+  assertLinkedReservationAllowsCarChange: jest.fn().mockResolvedValue(undefined),
   getAvailabilityConflicts: jest.fn(),
   resolveStoredDateRange: jest.fn().mockResolvedValue({
     storedStart: new Date('2030-06-01T07:00:00.000Z'),
@@ -57,6 +58,7 @@ const {
 const orderSql = require('../../../../src/services/sql/orderSqlService');
 const {
   assertNoOpenPhysicalRental,
+  assertLinkedReservationAllowsCarChange,
 } = require('../../../../src/services/admin/order/orderConflictService');
 const { syncLinkedReservationAfterOrderUpdate } = require('../../../../src/services/admin/order/orderReservationSync');
 const { updateOrderCore } = require('../../../../src/services/admin/order/orderUpdateService');
@@ -97,6 +99,7 @@ describe('updateOrderCore open physical rental guard', () => {
     jest.clearAllMocks();
     orderSql.findOrderById.mockResolvedValue({ ...baseOrder });
     assertNoOpenPhysicalRental.mockResolvedValue(undefined);
+    assertLinkedReservationAllowsCarChange.mockResolvedValue(undefined);
   });
 
   async function moveToCar7() {
@@ -133,6 +136,7 @@ describe('updateOrderCore open physical rental guard', () => {
         isOrderFormError: true,
       });
 
+      expect(assertLinkedReservationAllowsCarChange).toHaveBeenCalledWith(88, client);
       expect(assertNoOpenPhysicalRental).toHaveBeenCalledWith('7', client, {
         excludeReservationId: 88,
       });
@@ -143,6 +147,25 @@ describe('updateOrderCore open physical rental guard', () => {
       void status;
     }
   );
+
+  test('rejects car change when the linked reservation itself is physically open', async () => {
+    assertLinkedReservationAllowsCarChange.mockRejectedValue(
+      new OrderFormError(
+        'OPEN_PHYSICAL_RENTAL',
+        'Cannot change car for a reservation that is already picked up or in active rental.'
+      )
+    );
+
+    await expect(moveToCar7()).rejects.toMatchObject({
+      code: 'OPEN_PHYSICAL_RENTAL',
+      isOrderFormError: true,
+    });
+
+    expect(assertLinkedReservationAllowsCarChange).toHaveBeenCalledWith(88, client);
+    expect(assertNoOpenPhysicalRental).not.toHaveBeenCalled();
+    expect(moveRange).not.toHaveBeenCalled();
+    expect(orderSql.updateOrderFromDoc).not.toHaveBeenCalled();
+  });
 
   test('excludes the order linked reservation and allows extending the same open rental', async () => {
     const extendedEnd = new Date('2030-06-08T07:00:00.000Z');

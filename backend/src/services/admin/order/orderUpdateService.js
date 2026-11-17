@@ -18,6 +18,7 @@ const {
   RESERVATION_CONFLICT_MESSAGE,
   assertNoActiveReservationHold,
   assertNoOpenPhysicalRental,
+  assertLinkedReservationAllowsCarChange,
   resolveStoredDateRange,
 } = require('./orderConflictService');
 const { applyPricingToOrder } = require('./orderMapper');
@@ -170,6 +171,10 @@ async function updateOrderCore({ orderId, payload, contact, range, client }) {
   };
 
   if (!sameCar || !sameStart || !sameEnd) {
+    // Same invariant as calendar move: open physical rentals cannot change cars.
+    if (!sameCar) {
+      await assertLinkedReservationAllowsCarChange(existingOrder.reservationId, client);
+    }
     await assertNoActiveReservationHold(newCarId, range.start, range.end, client);
     await assertNoOpenPhysicalRental(newCarId, client, {
       excludeReservationId: existingOrder.reservationId,
